@@ -225,7 +225,7 @@ function debugLog_(label, data) {
   }
 }
 
-const BACKEND_VERSION = 'v8-fixed-designations';
+const BACKEND_VERSION = 'v9-ordered-list-numbering';
 
 function doGet(e) {
   if (e && e.parameter) {
@@ -480,10 +480,23 @@ function parseWeekRangeDates_(weekRange) {
 
 function stripHtml_(html) {
   if (!html) return '';
-  return String(html)
+  let s = String(html);
+
+  // Number <li> inside <ol> blocks before the generic <li>→bullet pass.
+  // Placeholder uses non-printable sentinels so it can't collide with real text.
+  s = s.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, function (_m, inner) {
+    let n = 0;
+    return inner.replace(/<li[^>]*>/gi, function () {
+      n += 1;
+      return 'OL' + n + '';
+    });
+  });
+
+  return s
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/li>/gi, '\n')
     .replace(/<li[^>]*>/gi, '• ')
+    .replace(/OL(\d+)/g, function (_m, n) { return n + '. '; })
     .replace(/<\/p>/gi, '\n')
     .replace(/<\/div>/gi, '\n')
     .replace(/<[^>]+>/g, '')
