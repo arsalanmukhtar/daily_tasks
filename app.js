@@ -231,14 +231,33 @@ Array.from(taskToolbar.querySelectorAll('[data-cmd]')).forEach((btn) => {
 });
 
 function refreshToolbarState() {
-  const cmds = ['bold', 'italic', 'underline', 'strikethrough', 'insertUnorderedList', 'insertOrderedList'];
-  cmds.forEach((cmd) => {
+  // Inline marks: queryCommandState is reliable for these.
+  const inline = ['bold', 'italic', 'underline', 'strikethrough'];
+  inline.forEach((cmd) => {
     const btn = taskToolbar.querySelector('[data-cmd="' + cmd + '"]');
     if (!btn) return;
     let on = false;
     try { on = document.queryCommandState(cmd); } catch (_e) {}
     btn.classList.toggle('active', !!on);
   });
+  // List state: queryCommandState('insertUnorderedList') is unreliable
+  // (returns false even when the caret is inside a <ul>). Walk the selection's
+  // ancestry instead.
+  const ulBtn = taskToolbar.querySelector('[data-cmd="insertUnorderedList"]');
+  const olBtn = taskToolbar.querySelector('[data-cmd="insertOrderedList"]');
+  if (ulBtn) ulBtn.classList.toggle('active', selectionIsInside_('UL'));
+  if (olBtn) olBtn.classList.toggle('active', selectionIsInside_('OL'));
+}
+
+function selectionIsInside_(tagName) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return false;
+  let node = sel.getRangeAt(0).startContainer;
+  while (node && node !== document.body) {
+    if (node.nodeType === 1 && node.tagName === tagName) return true;
+    node = node.parentNode;
+  }
+  return false;
 }
 
 document.addEventListener('selectionchange', () => {
