@@ -72,6 +72,11 @@ const thisWeekBtn      = document.getElementById('thisWeekBtn');
 const clearWeekBtn     = document.getElementById('clearWeekBtn');
 const submittingAsName = document.getElementById('submittingAsName');
 const submittingAsEmail= document.getElementById('submittingAsEmail');
+const viewSubmissionsBtn = document.getElementById('viewSubmissionsBtn');
+const submissionsBackdrop = document.getElementById('submissionsBackdrop');
+const submissionsDrawer  = document.getElementById('submissionsDrawer');
+const closeDrawerBtn     = document.getElementById('closeDrawerBtn');
+const submissionsList    = document.getElementById('submissionsList');
 
 // ---------- Quill editor ----------
 const quill = new Quill('#editor', {
@@ -204,13 +209,18 @@ clearWeekBtn.addEventListener('click', () => {
 });
 
 // ---------- Auth state machine ----------
-function showLoading()  { loadingState.classList.remove('hidden'); authGate.classList.add('hidden'); form.classList.add('hidden'); userChip.classList.add('hidden'); userChip.classList.remove('flex'); }
+function showLoading()  {
+  loadingState.classList.remove('hidden'); authGate.classList.add('hidden'); form.classList.add('hidden');
+  userChip.classList.add('hidden'); userChip.classList.remove('flex');
+  submissionsDrawer.classList.remove('open'); submissionsBackdrop.classList.remove('open');
+}
 function showAuthGate(errMsg) {
   loadingState.classList.add('hidden');
   authGate.classList.remove('hidden');
   form.classList.add('hidden');
   userChip.classList.add('hidden');
   userChip.classList.remove('flex');
+  submissionsDrawer.classList.remove('open'); submissionsBackdrop.classList.remove('open');
   if (errMsg) { authError.textContent = errMsg; authError.classList.remove('hidden'); }
   else { authError.classList.add('hidden'); authError.textContent = ''; }
 }
@@ -337,6 +347,118 @@ form.addEventListener('submit', async (e) => {
     setStatus('error', 'Submit failed: ' + err.message);
   } finally {
     submitBtn.disabled = false;
+  }
+});
+
+// ---------- My Submissions drawer ----------
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+function formatTimestamp(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso);
+  return d.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function weekLabelToIsoInput(weekLabel) {
+  const m = /^Week\s+(\d+),\s*(\d+)/.exec(String(weekLabel || ''));
+  if (!m) return '';
+  const week = String(parseInt(m[1], 10)).padStart(2, '0');
+  return `${m[2]}-W${week}`;
+}
+
+function openSubmissionsDrawer() {
+  if (!currentUserContext) return;
+  submissionsDrawer.classList.add('open');
+  submissionsBackdrop.classList.add('open');
+  submissionsList.innerHTML =
+    '<div class="text-center py-10 text-slate-500 text-sm">Loading…</div>';
+  fetchSubmissions();
+}
+
+function closeSubmissionsDrawer() {
+  submissionsDrawer.classList.remove('open');
+  submissionsBackdrop.classList.remove('open');
+}
+
+async function fetchSubmissions() {
+  try {
+    const idToken = await currentUserContext.user.getIdToken(false);
+    // GET avoids the POST-preflight problem; Apps Script returns JSON with
+    // permissive CORS for GET /exec, so we can actually read the response.
+    const url = APPS_SCRIPT_URL +
+      '?action=list&idToken=' + encodeURIComponent(idToken);
+    const res = await fetch(url, { method: 'GET' });
+    const data = await res.json();
+    if (data.status !== 'ok') throw new Error(data.message || 'Failed to load submissions.');
+    renderSubmissions(data.submissions || []);
+  } catch (err) {
+    submissionsList.innerHTML =
+      '<div class="text-center py-10 text-rose-600 text-sm font-medium">' +
+      escapeHtml(err.message || 'Failed to load submissions.') +
+      '</div>';
+  }
+}
+
+function renderSubmissions(subs) {
+  if (!subs.length) {
+    submissionsList.innerHTML =
+      '<div class="text-center py-10 text-slate-500 text-sm">No submissions yet.<br><span class="text-xs text-slate-400">Submitted weeks will appear here.</span></div>';
+    return;
+  }
+  submissionsList.innerHTML = '';
+  for (const s of subs) {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className =
+      'group w-full text-left bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-xl p-3.5 transition shadow-sm hover:shadow';
+    card.innerHTML = `
+      <div class="flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <div class="font-semibold text-slate-800 text-sm truncate">${escapeHtml(s.weekLabel)}</div>
+          <div class="text-xs text-slate-500 mt-0.5 truncate">${escapeHtml(s.weekRange)}</div>
+        </div>
+        <span class="text-xs text-emerald-700 font-semibold opacity-0 group-hover:opacity-100 transition shrink-0">Edit →</span>
+      </div>
+      <div class="text-[11px] text-slate-400 mt-2">Last submitted ${escapeHtml(formatTimestamp(s.timestamp))}</div>
+    `;
+    card.addEventListener('click', () => loadSubmissionIntoForm(s));
+    submissionsList.appendChild(card);
+  }
+}
+
+function loadSubmissionIntoForm(s) {
+  const isoWeek = weekLabelToIsoInput(s.weekLabel);
+  if (isoWeek) weekInput.value = isoWeek;
+  refreshWeekSummary();
+
+  if (s.designation) {
+    const opt = Array.from(form.designation.options).find(o => o.value === s.designation);
+    if (opt) form.designation.value = s.designation;
+  }
+
+  if (s.taskDelta && s.taskDelta.ops) {
+    quill.setContents(s.taskDelta);
+  } else if (s.taskPlain) {
+    quill.setText(s.taskPlain);
+  }
+  // Loaded content is the user's own past work — guard it from week-change re-seeds.
+  editorIsPristine = false;
+
+  setStatus('info', `Loaded ${s.weekLabel} — clicking Submit will overwrite this entry with a fresh timestamp.`);
+  closeSubmissionsDrawer();
+}
+
+viewSubmissionsBtn.addEventListener('click', openSubmissionsDrawer);
+closeDrawerBtn.addEventListener('click', closeSubmissionsDrawer);
+submissionsBackdrop.addEventListener('click', closeSubmissionsDrawer);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && submissionsDrawer.classList.contains('open')) {
+    closeSubmissionsDrawer();
   }
 });
 

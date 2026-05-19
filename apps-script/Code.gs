@@ -37,7 +37,8 @@ const ALLOWLIST = {
   'ahad.khan.work01@gmail.com':   'Muhammad Ahad Khan',
   'zainabali27feb2024@gmail.com': 'Zainab Ali',
   'ttalha063@gmail.com':          'Talha Rizwan',
-  'zeeshannasir2001@gmail.com':   'Zeeshan Nasir'
+  'zeeshannasir2001@gmail.com':   'Zeeshan Nasir',
+  'usamabinumar199@gmail.com':    'Usama bin Umar'
 };
 
 const SHEET_NAME = 'Weekly Submissions';
@@ -50,6 +51,8 @@ const VALID_DESIGNATIONS = [
   'Deputy Manager - I'
 ];
 
+// Column 11 stores the raw Quill Delta JSON so we can round-trip into the
+// editor losslessly when a user reloads their own submission for editing.
 const HEADERS = [
   'Timestamp',
   'Email',
@@ -60,7 +63,8 @@ const HEADERS = [
   'Week Range',
   'Daily Tasks',
   'Assigned By',
-  'Report To'
+  'Report To',
+  'Task Delta JSON'
 ];
 
 // =====================================================
@@ -124,29 +128,43 @@ function processSubmission_(e) {
     debugLog_('7. designation ok', designation);
 
     const sheet = getOrCreateSheet_();
+    ensureExtendedHeaders_(sheet);
     debugLog_('8. target sheet', sheet.getName() + ' in workbook: ' + sheet.getParent().getName() + ' (id ' + sheet.getParent().getId() + ')');
 
-    sheet.appendRow([
+    const weekLabel = body.weekLabel || '';
+    const deltaJson = JSON.stringify(body.taskDelta || { ops: [] });
+    const rowValues = [
       new Date(),
       email,
       displayName,
       designation,
       'GIS Developer',
-      body.weekLabel || '',
+      weekLabel,
       body.weekRange || '',
       '',
       'Muhammad Arsalan Mukhtar',
-      'Muhammad Arsalan Mukhtar'
-    ]);
+      'Muhammad Arsalan Mukhtar',
+      deltaJson
+    ];
 
-    const lastRow = sheet.getLastRow();
-    debugLog_('9. row appended at index', String(lastRow));
+    // Upsert by (email, weekLabel): one submission per user per ISO week.
+    const targetRow = findRowByEmailAndWeek_(sheet, email, weekLabel);
+    let row;
+    if (targetRow > 0) {
+      sheet.getRange(targetRow, 1, 1, rowValues.length).setValues([rowValues]);
+      row = targetRow;
+      debugLog_('9. upsert: overwrite', 'row ' + row + ' for ' + email + ' / ' + weekLabel);
+    } else {
+      sheet.appendRow(rowValues);
+      row = sheet.getLastRow();
+      debugLog_('9. upsert: append', 'row ' + row + ' for ' + email + ' / ' + weekLabel);
+    }
 
     const richText = deltaToRichText_(body.taskDelta);
-    sheet.getRange(lastRow, 8).setRichTextValue(richText).setWrap(true).setVerticalAlignment('top');
+    sheet.getRange(row, 8).setRichTextValue(richText).setWrap(true).setVerticalAlignment('top');
 
-    debugLog_('10. SUCCESS', 'row ' + lastRow);
-    return jsonResponse_({ status: 'ok', row: lastRow });
+    debugLog_('10. SUCCESS', 'row ' + row + ' (' + (targetRow > 0 ? 'overwrite' : 'append') + ')');
+    return jsonResponse_({ status: 'ok', row: row, mode: targetRow > 0 ? 'overwrite' : 'append' });
   } catch (err) {
     debugLog_('99. FATAL', String(err && err.stack || err));
     return jsonResponse_({ status: 'error', message: String(err && err.message || err) });
@@ -196,14 +214,19 @@ function debugLog_(label, data) {
   }
 }
 
-const BACKEND_VERSION = 'v4-doget-logging';
+const BACKEND_VERSION = 'v5-upsert-and-list';
 
 function doGet(e) {
-  // If a payload arrives as a GET parameter, treat it as a submission
-  // (some browsers downgrade POST→GET on Apps Script's 302 redirect).
-  if (e && e.parameter && e.parameter.payload) {
-    debugLog_('doGet with payload (forwarding to submission)', 'len=' + e.parameter.payload.length);
-    return processSubmission_(e);
+  if (e && e.parameter) {
+    if (e.parameter.action === 'list') {
+      return listSubmissions_(e);
+    }
+    // If a payload arrives as a GET parameter, treat it as a submission
+    // (some browsers downgrade POST→GET on Apps Script's 302 redirect).
+    if (e.parameter.payload) {
+      debugLog_('doGet with payload (forwarding to submission)', 'len=' + e.parameter.payload.length);
+      return processSubmission_(e);
+    }
   }
   debugLog_('doGet invoked (no payload)', 'parameter=' + JSON.stringify(e && e.parameter || {}));
   return jsonResponse_({
@@ -211,6 +234,96 @@ function doGet(e) {
     message: 'Tech EW endpoint live',
     version: BACKEND_VERSION
   });
+}
+
+/**
+ * Returns the calling user's submissions (rows where Email column matches the
+ * verified token's email). Used by the "My Submissions" drawer to let users
+ * reload their own past entries for editing.
+ *
+ * GET ?action=list&idToken=...
+ */
+function listSubmissions_(e) {
+  try {
+    const idToken = e && e.parameter && e.parameter.idToken;
+    if (!idToken) return jsonResponse_({ status: 'error', message: 'Missing auth token.' });
+
+    let verified;
+    try {
+      verified = verifyIdToken_(idToken);
+    } catch (err) {
+      return jsonResponse_({ status: 'error', message: 'Unauthorized: ' + err.message });
+    }
+    const email = (verified.email || '').toLowerCase();
+    if (!ALLOWLIST[email]) {
+      return jsonResponse_({ status: 'error', message: 'Email ' + email + ' is not authorized.' });
+    }
+
+    const sheet = getOrCreateSheet_();
+    ensureExtendedHeaders_(sheet);
+    const last = sheet.getLastRow();
+    if (last < 2) return jsonResponse_({ status: 'ok', submissions: [] });
+
+    const values = sheet.getRange(2, 1, last - 1, HEADERS.length).getValues();
+    const submissions = [];
+    for (let i = 0; i < values.length; i++) {
+      const r = values[i];
+      if (String(r[1] || '').toLowerCase() !== email) continue;
+      let delta = null;
+      const deltaCell = r[10];
+      if (deltaCell) {
+        try { delta = JSON.parse(deltaCell); } catch (_e) { delta = null; }
+      }
+      submissions.push({
+        rowIndex: i + 2,
+        timestamp: r[0] instanceof Date ? r[0].toISOString() : String(r[0] || ''),
+        weekLabel: r[5] || '',
+        weekRange: r[6] || '',
+        designation: r[3] || '',
+        taskDelta: delta,
+        taskPlain: delta ? null : String(r[7] || '')
+      });
+    }
+    // Most recent submissions first.
+    submissions.sort(function (a, b) { return String(b.timestamp).localeCompare(String(a.timestamp)); });
+
+    return jsonResponse_({ status: 'ok', submissions: submissions });
+  } catch (err) {
+    return jsonResponse_({ status: 'error', message: String(err && err.message || err) });
+  }
+}
+
+/**
+ * Returns 1-based sheet row index of the existing submission for
+ * (email, weekLabel), or -1 if none exists.
+ */
+function findRowByEmailAndWeek_(sheet, email, weekLabel) {
+  const last = sheet.getLastRow();
+  if (last < 2 || !weekLabel) return -1;
+  const values = sheet.getRange(2, 1, last - 1, 6).getValues();
+  for (let i = 0; i < values.length; i++) {
+    if (String(values[i][1] || '').toLowerCase() === email &&
+        String(values[i][5] || '') === weekLabel) {
+      return i + 2;
+    }
+  }
+  return -1;
+}
+
+/**
+ * If HEADERS has more columns than the existing sheet, append the missing
+ * headers in place. Keeps older deployments compatible with newer columns.
+ */
+function ensureExtendedHeaders_(sheet) {
+  const lastCol = sheet.getLastColumn();
+  if (lastCol >= HEADERS.length) return;
+  for (let c = lastCol + 1; c <= HEADERS.length; c++) {
+    sheet.getRange(1, c)
+      .setValue(HEADERS[c - 1])
+      .setFontWeight('bold')
+      .setBackground('#eef2ff')
+      .setFontColor('#1e293b');
+  }
 }
 
 function jsonResponse_(obj) {
