@@ -10,7 +10,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet" />
   <link href="styles.css" rel="stylesheet" />
 </head>
 <body class="min-h-screen lg:h-screen lg:overflow-hidden bg-gradient-to-br from-slate-200 via-slate-100 to-emerald-100/70">
@@ -181,7 +180,19 @@
           <!-- Action bar: bottom footer of the unified panel -->
           <div class="px-5 py-4 border-t border-slate-100 bg-slate-50/60">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div id="status" class="text-sm min-h-[1.25rem] flex-1 min-w-0"></div>
+              <div id="status" class="flex-1 min-w-0 flex items-center gap-3 min-h-[2rem]">
+                <!-- Submitting: 4-dot loader inside a dark pill so the white dots stay visible.
+                     Hidden by default; toggled via .hidden by setStatus(). -->
+                <span id="statusSpinner" class="hidden inline-flex items-center justify-center rounded-md bg-slate-800 relative"
+                  style="width: 128px; height: 32px;">
+                  <span class="loader"></span>
+                </span>
+                <!-- Tick: appears on success, gets .status-tick-fade for the 5s fade-out. -->
+                <svg id="statusTick" class="hidden w-6 h-6 text-emerald-600" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                </svg>
+                <span id="statusText" class="text-sm"></span>
+              </div>
               <div class="flex items-center justify-end gap-2 shrink-0">
                 <button type="button" id="resetBtn"
                   class="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-400 transition">
@@ -198,15 +209,57 @@
         </div>
       </div>
 
-      <!-- Right column: Editor (flex-fills the row height) -->
-      <section class="editor-fill bg-white rounded-2xl shadow-md ring-1 ring-slate-200/70 p-4 lg:col-span-7 lg:flex lg:flex-col lg:min-h-0">
-        <div class="flex items-baseline justify-between gap-3 mb-2 flex-wrap shrink-0">
+      <!-- Right column: Table editor (5 day columns × N rows; each cell is
+           contenteditable with a shared toolbar). Flex-fills the row height. -->
+      <section class="bg-white rounded-2xl shadow-md ring-1 ring-slate-200/70 p-4 lg:col-span-7 lg:flex lg:flex-col lg:min-h-0">
+        <div class="flex items-baseline justify-between gap-3 mb-3 flex-wrap shrink-0">
           <label class="text-sm font-semibold text-slate-700">
             Daily Tasks <span class="text-rose-500">*</span>
           </label>
-          <p class="text-xs text-slate-500">Pick a week &mdash; Mon&ndash;Fri headers auto-fill. The editor scrolls when content exceeds.</p>
+          <p class="text-xs text-slate-500">Add rows for multiple tasks per day. Formatting applies to the focused cell.</p>
         </div>
-        <div id="editor"></div>
+
+        <!-- Shared formatting toolbar — operates on the currently-focused cell. -->
+        <div id="taskToolbar" class="flex items-center gap-0.5 px-2 py-1.5 rounded-t-lg border border-slate-300 border-b-0 bg-slate-50 shrink-0">
+          <button type="button" data-cmd="bold"          class="tb-btn" title="Bold (Ctrl+B)"><b>B</b></button>
+          <button type="button" data-cmd="italic"        class="tb-btn" title="Italic (Ctrl+I)"><i>I</i></button>
+          <button type="button" data-cmd="underline"     class="tb-btn" title="Underline (Ctrl+U)"><u>U</u></button>
+          <button type="button" data-cmd="strikethrough" class="tb-btn" title="Strikethrough"><s>S</s></button>
+          <span class="w-px h-5 bg-slate-300 mx-1.5" aria-hidden="true"></span>
+          <button type="button" data-cmd="insertUnorderedList" class="tb-btn" title="Bulleted list" aria-label="Bulleted list">
+            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><circle cx="3" cy="5" r="1.5"/><circle cx="3" cy="10" r="1.5"/><circle cx="3" cy="15" r="1.5"/><rect x="7" y="4" width="11" height="2" rx="1"/><rect x="7" y="9" width="11" height="2" rx="1"/><rect x="7" y="14" width="11" height="2" rx="1"/></svg>
+          </button>
+          <button type="button" data-cmd="insertOrderedList" class="tb-btn" title="Numbered list" aria-label="Numbered list">
+            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><text x="0" y="7" font-size="6" font-weight="700">1.</text><text x="0" y="13" font-size="6" font-weight="700">2.</text><text x="0" y="19" font-size="6" font-weight="700">3.</text><rect x="7" y="4" width="11" height="2" rx="1"/><rect x="7" y="9" width="11" height="2" rx="1"/><rect x="7" y="14" width="11" height="2" rx="1"/></svg>
+          </button>
+        </div>
+
+        <!-- Scrollable table body. The container is the flex-1 absorber on lg+. -->
+        <div class="lg:flex-1 lg:min-h-0 overflow-auto border border-slate-300 border-t-0 rounded-b-lg bg-white">
+          <table id="taskTable" class="w-full table-fixed border-collapse">
+            <thead>
+              <tr>
+                <th data-day="Mon" class="tb-th"><div class="tb-day">Mon</div><div class="tb-date">&mdash;</div></th>
+                <th data-day="Tue" class="tb-th"><div class="tb-day">Tue</div><div class="tb-date">&mdash;</div></th>
+                <th data-day="Wed" class="tb-th"><div class="tb-day">Wed</div><div class="tb-date">&mdash;</div></th>
+                <th data-day="Thu" class="tb-th"><div class="tb-day">Thu</div><div class="tb-date">&mdash;</div></th>
+                <th data-day="Fri" class="tb-th"><div class="tb-day">Fri</div><div class="tb-date">&mdash;</div></th>
+                <th class="tb-th-action" aria-label="Row actions"></th>
+              </tr>
+            </thead>
+            <tbody id="taskTbody">
+              <!-- rows populated by app.js -->
+            </tbody>
+          </table>
+        </div>
+
+        <button type="button" id="addRowBtn"
+          class="mt-2 self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 hover:border-slate-400 transition shrink-0">
+          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 4v12M4 10h12"/>
+          </svg>
+          Add row
+        </button>
       </section>
 
     </form>
@@ -233,7 +286,6 @@
     <div id="submissionsList" class="flex-1 overflow-y-auto p-4 space-y-2.5"></div>
   </aside>
 
-  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

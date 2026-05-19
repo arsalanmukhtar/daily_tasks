@@ -66,6 +66,9 @@ const form             = document.getElementById('taskForm');
 const submitBtn        = document.getElementById('submitBtn');
 const resetBtn         = document.getElementById('resetBtn');
 const statusEl         = document.getElementById('status');
+const statusSpinner    = document.getElementById('statusSpinner');
+const statusTick       = document.getElementById('statusTick');
+const statusText       = document.getElementById('statusText');
 const weekInput        = document.getElementById('weekInput');
 const weekSummary      = document.getElementById('weekSummary');
 const lastWeekBtn      = document.getElementById('lastWeekBtn');
@@ -74,26 +77,182 @@ const clearWeekBtn     = document.getElementById('clearWeekBtn');
 const submittingAsName = document.getElementById('submittingAsName');
 const submittingAsEmail= document.getElementById('submittingAsEmail');
 const weekDaysList     = document.getElementById('weekDaysList');
+const taskTable        = document.getElementById('taskTable');
+const taskTbody        = document.getElementById('taskTbody');
+const taskToolbar      = document.getElementById('taskToolbar');
+const addRowBtn        = document.getElementById('addRowBtn');
 const viewSubmissionsBtn = document.getElementById('viewSubmissionsBtn');
 const submissionsBackdrop = document.getElementById('submissionsBackdrop');
 const submissionsDrawer  = document.getElementById('submissionsDrawer');
 const closeDrawerBtn     = document.getElementById('closeDrawerBtn');
 const submissionsList    = document.getElementById('submissionsList');
 
-// ---------- Quill editor ----------
-const quill = new Quill('#editor', {
-  theme: 'snow',
-  modules: {
-    toolbar: [
-      [{ header: [1, 2, 3, false] }],
-      ['bold', 'italic', 'underline', 'strike'],
-      [{ color: [] }, { background: [] }],
-      [{ list: 'ordered' }, { list: 'bullet' }],
-      ['link', 'clean']
-    ]
-  },
-  placeholder: 'Pick a week to auto-insert day headers, then write tasks under each day…'
+// ---------- Task table editor ----------
+// Replaces the previous single Quill editor. Each cell is contenteditable;
+// formatting (bold/italic/underline/strike, bullet/ordered lists) is applied
+// to the focused cell via document.execCommand from the shared toolbar.
+const TASK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+const TASK_DAY_LONG = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday' };
+const TASK_FORMAT_VERSION = 'rows-v1';
+
+let activeCell = null;
+
+function createTaskRow(rowData) {
+  const tr = document.createElement('tr');
+  tr.className = 'task-row';
+  TASK_DAYS.forEach((day) => {
+    const td = document.createElement('td');
+    td.className = 'task-cell';
+    const cell = document.createElement('div');
+    cell.className = 'cell-editor';
+    cell.contentEditable = 'true';
+    cell.dataset.day = day;
+    cell.dataset.placeholder = day + ' tasks…';
+    cell.spellcheck = true;
+    if (rowData && rowData[day]) cell.innerHTML = rowData[day];
+    cell.addEventListener('focus', () => { activeCell = cell; });
+    td.appendChild(cell);
+    tr.appendChild(td);
+  });
+  const actionTd = document.createElement('td');
+  actionTd.className = 'row-action-cell';
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'remove-row-btn';
+  removeBtn.title = 'Remove row';
+  removeBtn.setAttribute('aria-label', 'Remove row');
+  removeBtn.textContent = '×';
+  removeBtn.addEventListener('mousedown', (e) => e.preventDefault());
+  removeBtn.addEventListener('click', () => removeTaskRow(tr));
+  actionTd.appendChild(removeBtn);
+  tr.appendChild(actionTd);
+  return tr;
+}
+
+function addTaskRow(rowData) {
+  const tr = createTaskRow(rowData);
+  taskTbody.appendChild(tr);
+  return tr;
+}
+
+function removeTaskRow(tr) {
+  // Keep at least one row in the table; if it's the only one, just clear it.
+  if (taskTbody.children.length <= 1) {
+    tr.querySelectorAll('.cell-editor').forEach((c) => { c.innerHTML = ''; });
+    return;
+  }
+  if (activeCell && tr.contains(activeCell)) activeCell = null;
+  tr.remove();
+}
+
+function clearTaskTable() {
+  taskTbody.innerHTML = '';
+  addTaskRow();
+}
+
+function isTaskTableEmpty() {
+  const cells = taskTbody.querySelectorAll('.cell-editor');
+  for (const c of cells) {
+    if ((c.textContent || '').trim().length) return false;
+  }
+  return true;
+}
+
+function serializeTaskTable() {
+  const rows = [];
+  Array.from(taskTbody.children).forEach((tr) => {
+    const row = {};
+    let hasContent = false;
+    tr.querySelectorAll('.cell-editor').forEach((cell) => {
+      const html = (cell.innerHTML || '').trim();
+      const normalised = html === '<br>' ? '' : html;
+      row[cell.dataset.day] = normalised;
+      if (normalised && (cell.textContent || '').trim()) hasContent = true;
+    });
+    if (hasContent) rows.push(row);
+  });
+  return rows;
+}
+
+function loadTaskRows(rows) {
+  taskTbody.innerHTML = '';
+  if (!rows || !rows.length) { addTaskRow(); return; }
+  rows.forEach((rowData) => addTaskRow(rowData));
+}
+
+// Legacy: a Quill Delta (single flat doc with "Day — date" headers) gets
+// flattened to plain text, sliced at the day-header pattern, and packed into
+// a single row of the new table. Rich formatting is lost — once the user
+// resubmits, the row stores in the new format and round-trips cleanly.
+function deltaToTaskRows(delta) {
+  if (!delta || !delta.ops) return null;
+  let plain = '';
+  for (const op of delta.ops) {
+    if (typeof op.insert === 'string') plain += op.insert;
+  }
+  const dayPattern = /(Monday|Tuesday|Wednesday|Thursday|Friday)\s*[—-]\s*\d{4}-\d{2}-\d{2}/g;
+  const matches = [];
+  let m;
+  while ((m = dayPattern.exec(plain)) !== null) matches.push(m);
+  if (!matches.length) {
+    return [{ Mon: escapeHtmlPreservingBreaks(plain.trim()) }];
+  }
+  const dayMap = { Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu', Friday: 'Fri' };
+  const row = {};
+  for (let i = 0; i < matches.length; i++) {
+    const hit = matches[i];
+    const dayKey = dayMap[hit[1]];
+    const start = hit.index + hit[0].length;
+    const end = (i + 1 < matches.length) ? matches[i + 1].index : plain.length;
+    const content = plain.slice(start, end).trim();
+    if (content) row[dayKey] = escapeHtmlPreservingBreaks(content);
+  }
+  return [row];
+}
+
+function escapeHtmlPreservingBreaks(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br>');
+}
+
+// Toolbar: mousedown preventDefault keeps the cell focused so execCommand
+// has a valid Selection to operate on.
+Array.from(taskToolbar.querySelectorAll('[data-cmd]')).forEach((btn) => {
+  btn.addEventListener('mousedown', (e) => e.preventDefault());
+  btn.addEventListener('click', () => {
+    if (!activeCell) return;
+    activeCell.focus();
+    try { document.execCommand(btn.dataset.cmd, false, null); } catch (_e) {}
+    refreshToolbarState();
+  });
 });
+
+function refreshToolbarState() {
+  const cmds = ['bold', 'italic', 'underline', 'strikethrough', 'insertUnorderedList', 'insertOrderedList'];
+  cmds.forEach((cmd) => {
+    const btn = taskToolbar.querySelector('[data-cmd="' + cmd + '"]');
+    if (!btn) return;
+    let on = false;
+    try { on = document.queryCommandState(cmd); } catch (_e) {}
+    btn.classList.toggle('active', !!on);
+  });
+}
+
+document.addEventListener('selectionchange', () => {
+  if (activeCell && document.activeElement === activeCell) refreshToolbarState();
+});
+
+addRowBtn.addEventListener('click', () => {
+  const tr = addTaskRow();
+  const firstCell = tr.querySelector('.cell-editor');
+  if (firstCell) firstCell.focus();
+});
+
+// Seed with a single empty row on startup.
+addTaskRow();
 
 // ---------- ISO week math ----------
 function isoWeekToMonday(year, week) {
@@ -145,11 +304,13 @@ function refreshWeekSummary() {
   if (!info) {
     weekSummary.textContent = '';
     renderWeekDaysList(null);
+    updateColumnHeaderDates(null);
     return null;
   }
   weekSummary.textContent =
     `Week ${info.week}, ${info.year}  ·  ${fmtLong(info.days[0].date)} – ${fmtLong(info.days[4].date)}, ${info.year}`;
   renderWeekDaysList(info);
+  updateColumnHeaderDates(info);
   return info;
 }
 
@@ -173,40 +334,27 @@ function renderWeekDaysList(info) {
   });
 }
 
-function isEditorEmpty() { return quill.getText().trim().length === 0; }
-
-// Pristine = editor was last filled by us (auto-seed or empty), not by user typing.
-// Lets us safely re-seed when the week changes without clobbering user tasks.
-let editorIsPristine = true;
-
-quill.on('text-change', (_delta, _oldDelta, source) => {
-  if (source === 'user') editorIsPristine = false;
-});
-
-function seedEditor(days) {
-  const ops = [];
-  days.forEach((d, i) => {
-    ops.push({ insert: `${d.name} — ${fmtISO(d.date)}`, attributes: { bold: true } });
-    ops.push({ insert: '\n', attributes: { header: 3 } });
-    ops.push({ insert: '\n' });
-    if (i < days.length - 1) ops.push({ insert: '\n' });
-  });
-  quill.setContents(ops);
-  editorIsPristine = true;
-}
-
-function clearEditor() {
-  quill.setContents([]);
-  editorIsPristine = true;
-}
-
 function handleWeekChange() {
-  const info = refreshWeekSummary();
-  if (info) {
-    if (editorIsPristine) seedEditor(info.days);
-  } else {
-    if (editorIsPristine) clearEditor();
-  }
+  // Just refresh the date display in the week summary, days panel, and the
+  // column header dates. The table editor's content is owned by the user;
+  // we never overwrite it on week change.
+  refreshWeekSummary();
+}
+
+function updateColumnHeaderDates(info) {
+  const dayIndex = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4 };
+  taskTable.querySelectorAll('thead th[data-day]').forEach((th) => {
+    const dateEl = th.querySelector('.tb-date');
+    if (!dateEl) return;
+    if (info) {
+      const d = info.days[dayIndex[th.dataset.day]].date;
+      dateEl.textContent = d.toLocaleDateString('en-GB', {
+        day: '2-digit', month: 'short', timeZone: 'UTC'
+      });
+    } else {
+      dateEl.textContent = '—';
+    }
+  });
 }
 
 // Listen on both events so Chrome's native picker "Clear" / "This week" buttons
@@ -219,20 +367,17 @@ weekInput.addEventListener('input', handleWeekChange);
 // These are explicit user actions, so they always act on the editor.
 lastWeekBtn.addEventListener('click', () => {
   weekInput.value = getPreviousIsoWeekString();
-  const info = refreshWeekSummary();
-  if (info) seedEditor(info.days);
+  refreshWeekSummary();
 });
 
 thisWeekBtn.addEventListener('click', () => {
   weekInput.value = getCurrentIsoWeekString();
-  const info = refreshWeekSummary();
-  if (info) seedEditor(info.days);
+  refreshWeekSummary();
 });
 
 clearWeekBtn.addEventListener('click', () => {
   weekInput.value = '';
   refreshWeekSummary();
-  clearEditor();
 });
 
 // ---------- Auth state machine ----------
@@ -267,10 +412,10 @@ function showForm(user, displayName) {
   submittingAsName.textContent  = displayName;
   submittingAsEmail.textContent = user.email;
 
-  // Seed week if empty
+  // Default to the current ISO week if nothing's selected yet. We don't
+  // touch the task table — the user controls its content.
   if (!weekInput.value) weekInput.value = getCurrentIsoWeekString();
-  const info = refreshWeekSummary();
-  if (info && isEditorEmpty()) seedEditor(info.days);
+  refreshWeekSummary();
 }
 
 let currentUserContext = null; // { user, displayName }
@@ -305,30 +450,49 @@ signInBtn.addEventListener('click', async () => {
 signOutBtn.addEventListener('click', () => signOut(auth));
 
 // ---------- Form actions ----------
+// `kind` is one of: 'submitting' | 'ok' | 'error' | 'info'.
+// 'submitting' shows the dark-pill loader, no text.
+// 'ok'         shows the green tick (fades over 5s) + optional message.
+// 'error'      shows the message in rose, no icon.
+// 'info'       clears icons + message; used to reset between states.
 let statusClearTimer = null;
-function setStatus(kind, msg, autoClearMs) {
+function setStatus(kind, msg) {
   const colors = {
     info: 'text-slate-500',
     ok: 'text-emerald-600 font-semibold',
     error: 'text-rose-600 font-medium'
   };
-  statusEl.className = 'mt-2 text-sm min-h-[1.25rem] ' + (colors[kind] || '');
-  statusEl.textContent = msg;
-  // Cancel any pending auto-clear from a previous status; the latest call wins.
-  if (statusClearTimer) {
-    clearTimeout(statusClearTimer);
-    statusClearTimer = null;
-  }
-  if (autoClearMs && msg) {
-    statusClearTimer = setTimeout(() => setStatus('info', ''), autoClearMs);
+  // Cancel any pending fade so the latest call always wins.
+  if (statusClearTimer) { clearTimeout(statusClearTimer); statusClearTimer = null; }
+
+  // Reset all icons + classes before applying the new state.
+  statusSpinner.classList.add('hidden');
+  statusTick.classList.add('hidden');
+  statusTick.classList.remove('status-tick-fade');
+  statusText.textContent = msg || '';
+  statusText.className = 'text-sm ' + (colors[kind === 'submitting' ? 'info' : kind] || '');
+
+  if (kind === 'submitting') {
+    statusSpinner.classList.remove('hidden');
+    statusText.textContent = '';
+  } else if (kind === 'ok') {
+    statusTick.classList.remove('hidden');
+    // Force a reflow so the keyframe animation restarts when ok fires repeatedly.
+    void statusTick.offsetWidth;
+    statusTick.classList.add('status-tick-fade');
+    statusClearTimer = setTimeout(() => {
+      statusTick.classList.add('hidden');
+      statusTick.classList.remove('status-tick-fade');
+      statusText.textContent = '';
+    }, 5000);
   }
 }
 
 resetBtn.addEventListener('click', () => {
   if (!confirm('Clear the form?')) return;
   weekInput.value = getCurrentIsoWeekString();
-  const info = refreshWeekSummary();
-  if (info) seedEditor(info.days);
+  refreshWeekSummary();
+  clearTaskTable();
   setStatus('info', '');
 });
 
@@ -339,7 +503,7 @@ form.addEventListener('submit', async (e) => {
   if (!currentUserContext) return setStatus('error', 'Please sign in again.');
   const info = weekdaysFor(weekInput.value);
   if (!info) return setStatus('error', 'Please pick a valid week.');
-  if (isEditorEmpty()) return setStatus('error', 'Please enter your tasks.');
+  if (isTaskTableEmpty()) return setStatus('error', 'Please enter your tasks.');
 
   if (APPS_SCRIPT_URL === 'PASTE_YOUR_DEPLOYED_URL_HERE') {
     return setStatus('error', 'APPS_SCRIPT_URL is not configured in app.js.');
@@ -357,11 +521,12 @@ form.addEventListener('submit', async (e) => {
     weekLabel: `Week ${info.week}, ${info.year}`,
     weekRange: `${fmtISO(info.days[0].date)} to ${fmtISO(info.days[4].date)}`,
     designation: form.designation.value,
-    taskDelta: quill.getContents()
+    taskFormat: TASK_FORMAT_VERSION,
+    taskRows: serializeTaskTable()
   };
 
   submitBtn.disabled = true;
-  setStatus('info', 'Submitting…');
+  setStatus('submitting');
 
   try {
     // URLSearchParams body → fetch sends Content-Type:
@@ -378,7 +543,7 @@ form.addEventListener('submit', async (e) => {
       body: formBody,
       redirect: 'follow'
     });
-    setStatus('ok', 'Submitted.', 5000);
+    setStatus('ok', 'Submitted.');
   } catch (err) {
     setStatus('error', 'Submit failed: ' + err.message);
   } finally {
@@ -548,13 +713,18 @@ function loadSubmissionIntoForm(s) {
     }
   }
 
-  if (s.taskDelta && s.taskDelta.ops) {
-    quill.setContents(s.taskDelta);
+  // Prefer the new rows format. Fall back to deriving rows from a legacy
+  // Quill Delta (day-header split). Last resort: dump plain text into Monday.
+  if (Array.isArray(s.taskRows) && s.taskRows.length) {
+    loadTaskRows(s.taskRows);
+  } else if (s.taskDelta && s.taskDelta.ops) {
+    const rows = deltaToTaskRows(s.taskDelta);
+    loadTaskRows(rows && rows.length ? rows : [{ Mon: escapeHtmlPreservingBreaks(s.taskPlain || '') }]);
   } else if (s.taskPlain) {
-    quill.setText(s.taskPlain);
+    loadTaskRows([{ Mon: escapeHtmlPreservingBreaks(s.taskPlain) }]);
+  } else {
+    clearTaskTable();
   }
-  // Loaded content is the user's own past work — guard it from week-change re-seeds.
-  editorIsPristine = false;
 
   setStatus('info', `Loaded ${s.weekLabel} — clicking Submit will overwrite this entry with a fresh timestamp.`);
   closeSubmissionsDrawer();

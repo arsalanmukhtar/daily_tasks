@@ -133,7 +133,28 @@ function processSubmission_(e) {
     debugLog_('8. target sheet', sheet.getName() + ' in workbook: ' + sheet.getParent().getName() + ' (id ' + sheet.getParent().getId() + ')');
 
     const weekLabel = body.weekLabel || '';
-    const deltaJson = JSON.stringify(body.taskDelta || { ops: [] });
+    const weekRange = body.weekRange || '';
+
+    // New format (rows-v1): client sends `taskRows` as an array of
+    // {Mon, Tue, Wed, Thu, Fri} where each value is the cell's HTML.
+    // Legacy clients still send `taskDelta` (Quill Delta); we keep storing
+    // those untouched so they round-trip cleanly.
+    const hasRows = Array.isArray(body.taskRows);
+    let taskJson, sheetCellWriter;
+    if (hasRows) {
+      taskJson = JSON.stringify({ format: 'rows-v1', rows: body.taskRows });
+      sheetCellWriter = function (cellRange) {
+        cellRange.setValue(rowsToSheetText_(body.taskRows, weekRange))
+                 .setWrap(true).setVerticalAlignment('top');
+      };
+    } else {
+      taskJson = JSON.stringify(body.taskDelta || { ops: [] });
+      const richText = deltaToRichText_(body.taskDelta);
+      sheetCellWriter = function (cellRange) {
+        cellRange.setRichTextValue(richText).setWrap(true).setVerticalAlignment('top');
+      };
+    }
+
     const rowValues = [
       new Date(),
       email,
@@ -141,11 +162,11 @@ function processSubmission_(e) {
       designation,
       'GIS Developer',
       weekLabel,
-      body.weekRange || '',
+      weekRange,
       '',
       'Muhammad Arsalan Mukhtar',
       'Muhammad Arsalan Mukhtar',
-      deltaJson
+      taskJson
     ];
 
     // Upsert by (email, weekLabel): one submission per user per ISO week.
@@ -161,8 +182,7 @@ function processSubmission_(e) {
       debugLog_('9. upsert: append', 'row ' + row + ' for ' + email + ' / ' + weekLabel);
     }
 
-    const richText = deltaToRichText_(body.taskDelta);
-    sheet.getRange(row, 8).setRichTextValue(richText).setWrap(true).setVerticalAlignment('top');
+    sheetCellWriter(sheet.getRange(row, 8));
 
     debugLog_('10. SUCCESS', 'row ' + row + ' (' + (targetRow > 0 ? 'overwrite' : 'append') + ')');
     return jsonResponse_({ status: 'ok', row: row, mode: targetRow > 0 ? 'overwrite' : 'append' });
@@ -215,7 +235,7 @@ function debugLog_(label, data) {
   }
 }
 
-const BACKEND_VERSION = 'v6-richtext-fallback';
+const BACKEND_VERSION = 'v7-task-rows';
 
 function doGet(e) {
   if (e && e.parameter) {
@@ -273,17 +293,26 @@ function listSubmissions_(e) {
       const r = values[i];
       if (String(r[1] || '').toLowerCase() !== email) continue;
 
-      // Prefer the stored Quill Delta (lossless). Fall back to reconstructing
-      // a Delta from the Daily Tasks cell's RichTextValue for legacy rows
-      // submitted before column K existed — recovers bold/italic/underline/
-      // color/headers but not bullet-prefix lists.
-      let delta = null;
-      const deltaCell = r[10];
-      if (deltaCell) {
-        try { delta = JSON.parse(deltaCell); } catch (_e) { delta = null; }
+      // Column K stores either:
+      //   - { format: 'rows-v1', rows: [...] }   (new, table editor)
+      //   - { ops: [...] }                       (legacy, Quill Delta)
+      // Fall back to reconstructing a Delta from the visible rich-text cell
+      // for very old rows where column K didn't exist yet.
+      let taskRows = null;
+      let taskDelta = null;
+      const cellJson = r[10];
+      if (cellJson) {
+        try {
+          const parsed = JSON.parse(cellJson);
+          if (parsed && parsed.format === 'rows-v1' && Array.isArray(parsed.rows)) {
+            taskRows = parsed.rows;
+          } else if (parsed && parsed.ops) {
+            taskDelta = parsed;
+          }
+        } catch (_e) { /* fall through to richtext fallback */ }
       }
-      if (!delta) {
-        delta = richTextValueToDelta_(richVals[i][7]);
+      if (!taskRows && !taskDelta) {
+        taskDelta = richTextValueToDelta_(richVals[i][7]);
       }
 
       submissions.push({
@@ -292,7 +321,8 @@ function listSubmissions_(e) {
         weekLabel: r[5] || '',
         weekRange: r[6] || '',
         designation: r[3] || '',
-        taskDelta: delta,
+        taskRows: taskRows,
+        taskDelta: taskDelta,
         taskPlain: String(r[7] || '')
       });
     }
@@ -407,6 +437,74 @@ function getOrCreateSheet_() {
     sheet.setColumnWidth(8, 500);
   }
   return sheet;
+}
+
+// ---------- Task rows (new format) → Sheets cell text ----------
+
+/**
+ * Render a `rows-v1` payload as readable text for column 8 (Daily Tasks).
+ * Layout is day-grouped — all rows for Monday under "Monday — date", etc. —
+ * so the sheet view reads naturally. The full HTML is preserved separately
+ * in column K for the editor round-trip.
+ */
+function rowsToSheetText_(rows, weekRange) {
+  if (!rows || !rows.length) return '';
+  const dayLong = {
+    Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday'
+  };
+  const dayDates = parseWeekRangeDates_(weekRange);
+  const sections = [];
+  ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].forEach(function (day) {
+    const entries = [];
+    for (let i = 0; i < rows.length; i++) {
+      const html = rows[i][day];
+      if (!html) continue;
+      const text = stripHtml_(html).trim();
+      if (text) entries.push(text);
+    }
+    if (!entries.length) return;
+    const date = dayDates[day] || '';
+    const header = dayLong[day] + (date ? ' — ' + date : '');
+    const body = entries.map(function (e) {
+      return '  ' + e.replace(/\n/g, '\n  ');
+    }).join('\n');
+    sections.push(header + '\n' + body);
+  });
+  return sections.join('\n\n');
+}
+
+function parseWeekRangeDates_(weekRange) {
+  const m = /(\d{4}-\d{2}-\d{2})\s+to\s+\d{4}-\d{2}-\d{2}/.exec(String(weekRange || ''));
+  if (!m) return {};
+  const start = new Date(m[1] + 'T00:00:00Z');
+  if (isNaN(start.getTime())) return {};
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  const out = {};
+  for (let i = 0; i < 5; i++) {
+    const d = new Date(start);
+    d.setUTCDate(start.getUTCDate() + i);
+    out[days[i]] = d.toISOString().slice(0, 10);
+  }
+  return out;
+}
+
+function stripHtml_(html) {
+  if (!html) return '';
+  return String(html)
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '• ')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 // ---------- Quill Delta → Sheets RichTextValue ----------
