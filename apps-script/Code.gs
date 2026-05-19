@@ -38,7 +38,8 @@ const ALLOWLIST = {
   'zainabali27feb2024@gmail.com': 'Zainab Ali',
   'ttalha063@gmail.com':          'Talha Rizwan',
   'zeeshannasir2001@gmail.com':   'Zeeshan Nasir',
-  'usamabinumar199@gmail.com':    'Usama bin Umar'
+  'usamabinumar199@gmail.com':    'Usama bin Umar',
+  'osamakhan32156@gmail.com':     'Muhammad Osama Khan'
 };
 
 const SHEET_NAME = 'Weekly Submissions';
@@ -214,7 +215,7 @@ function debugLog_(label, data) {
   }
 }
 
-const BACKEND_VERSION = 'v5-upsert-and-list';
+const BACKEND_VERSION = 'v6-richtext-fallback';
 
 function doGet(e) {
   if (e && e.parameter) {
@@ -264,16 +265,27 @@ function listSubmissions_(e) {
     const last = sheet.getLastRow();
     if (last < 2) return jsonOrJsonp_(e, { status: 'ok', submissions: [] });
 
-    const values = sheet.getRange(2, 1, last - 1, HEADERS.length).getValues();
+    const dataRange = sheet.getRange(2, 1, last - 1, HEADERS.length);
+    const values    = dataRange.getValues();
+    const richVals  = dataRange.getRichTextValues();
     const submissions = [];
     for (let i = 0; i < values.length; i++) {
       const r = values[i];
       if (String(r[1] || '').toLowerCase() !== email) continue;
+
+      // Prefer the stored Quill Delta (lossless). Fall back to reconstructing
+      // a Delta from the Daily Tasks cell's RichTextValue for legacy rows
+      // submitted before column K existed — recovers bold/italic/underline/
+      // color/headers but not bullet-prefix lists.
       let delta = null;
       const deltaCell = r[10];
       if (deltaCell) {
         try { delta = JSON.parse(deltaCell); } catch (_e) { delta = null; }
       }
+      if (!delta) {
+        delta = richTextValueToDelta_(richVals[i][7]);
+      }
+
       submissions.push({
         rowIndex: i + 2,
         timestamp: r[0] instanceof Date ? r[0].toISOString() : String(r[0] || ''),
@@ -281,7 +293,7 @@ function listSubmissions_(e) {
         weekRange: r[6] || '',
         designation: r[3] || '',
         taskDelta: delta,
-        taskPlain: delta ? null : String(r[7] || '')
+        taskPlain: String(r[7] || '')
       });
     }
     // Most recent submissions first.
@@ -478,4 +490,80 @@ function attrsToStyle_(attrs) {
 function headerStyle_(level) {
   const sizes = { 1: 18, 2: 15, 3: 13 };
   return SpreadsheetApp.newTextStyle().setBold(true).setFontSize(sizes[level] || 13).build();
+}
+
+/**
+ * Inverse of deltaToRichText_ — best-effort reconstruction of a Quill Delta
+ * from a Sheets RichTextValue. Used for legacy rows submitted before column K
+ * (Task Delta JSON) existed.
+ *
+ * Lossy by design:
+ *  - bold/italic/underline/strike/color → preserved per run
+ *  - font-size {18,15,13} → header level {1,2,3} on the following newline
+ *  - list bullet/number prefixes baked into the text stay as plain text
+ *    (no way to detect them reliably without re-parsing line prefixes)
+ *
+ * Returns null on empty input or any unexpected failure (so the caller can
+ * decide whether to render plain text instead).
+ */
+function richTextValueToDelta_(rtv) {
+  try {
+    if (!rtv) return null;
+    const text = rtv.getText() || '';
+    if (!text) return null;
+
+    const runs = rtv.getRuns();
+    const ops = [];
+    for (let ri = 0; ri < runs.length; ri++) {
+      const run = runs[ri];
+      const runText = run.getText() || '';
+      if (!runText) continue;
+      const style = run.getTextStyle();
+      const attrs = {};
+      try { if (style.isBold && style.isBold()) attrs.bold = true; } catch (_e) {}
+      try { if (style.isItalic && style.isItalic()) attrs.italic = true; } catch (_e) {}
+      try { if (style.isUnderline && style.isUnderline()) attrs.underline = true; } catch (_e) {}
+      try { if (style.isStrikethrough && style.isStrikethrough()) attrs.strike = true; } catch (_e) {}
+      try {
+        const fg = style.getForegroundColor && style.getForegroundColor();
+        if (fg && fg !== '#000000' && fg !== '#000') attrs.color = fg;
+      } catch (_e) {}
+
+      let header = null;
+      try {
+        const size = style.getFontSize && style.getFontSize();
+        if (size === 18) header = 1;
+        else if (size === 15) header = 2;
+        else if (size === 13) header = 3;
+      } catch (_e) {}
+
+      // Newlines carry line attributes (header) in Quill; split this run on
+      // '\n' and emit segments + newlines separately so the header attaches
+      // to the right place.
+      const parts = runText.split('\n');
+      for (let i = 0; i < parts.length; i++) {
+        const seg = parts[i];
+        if (seg.length) {
+          if (Object.keys(attrs).length > 0) {
+            ops.push({ insert: seg, attributes: Object.assign({}, attrs) });
+          } else {
+            ops.push({ insert: seg });
+          }
+        }
+        if (i < parts.length - 1) {
+          if (header) ops.push({ insert: '\n', attributes: { header: header } });
+          else ops.push({ insert: '\n' });
+        }
+      }
+    }
+
+    // Quill docs must end with a newline.
+    const last = ops[ops.length - 1];
+    const lastText = last ? String(last.insert || '') : '';
+    if (!lastText.endsWith('\n')) ops.push({ insert: '\n' });
+
+    return { ops: ops };
+  } catch (_err) {
+    return null;
+  }
 }

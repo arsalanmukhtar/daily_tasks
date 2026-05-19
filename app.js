@@ -26,7 +26,8 @@ const ALLOWLIST = {
   'zainabali27feb2024@gmail.com': 'Zainab Ali',
   'ttalha063@gmail.com':          'Talha Rizwan',
   'zeeshannasir2001@gmail.com':   'Zeeshan Nasir',
-  'usamabinumar199@gmail.com': 'Usama bin Umar'
+  'usamabinumar199@gmail.com':    'Usama bin Umar',
+  'osamakhan32156@gmail.com':     'Muhammad Osama Khan'
 };
 
 // =====================================================
@@ -304,7 +305,8 @@ signInBtn.addEventListener('click', async () => {
 signOutBtn.addEventListener('click', () => signOut(auth));
 
 // ---------- Form actions ----------
-function setStatus(kind, msg) {
+let statusClearTimer = null;
+function setStatus(kind, msg, autoClearMs) {
   const colors = {
     info: 'text-slate-500',
     ok: 'text-emerald-600 font-semibold',
@@ -312,6 +314,14 @@ function setStatus(kind, msg) {
   };
   statusEl.className = 'mt-2 text-sm min-h-[1.25rem] ' + (colors[kind] || '');
   statusEl.textContent = msg;
+  // Cancel any pending auto-clear from a previous status; the latest call wins.
+  if (statusClearTimer) {
+    clearTimeout(statusClearTimer);
+    statusClearTimer = null;
+  }
+  if (autoClearMs && msg) {
+    statusClearTimer = setTimeout(() => setStatus('info', ''), autoClearMs);
+  }
 }
 
 resetBtn.addEventListener('click', () => {
@@ -368,7 +378,7 @@ form.addEventListener('submit', async (e) => {
       body: formBody,
       redirect: 'follow'
     });
-    setStatus('ok', 'Submitted.');
+    setStatus('ok', 'Submitted.', 5000);
   } catch (err) {
     setStatus('error', 'Submit failed: ' + err.message);
   } finally {
@@ -474,6 +484,17 @@ async function fetchSubmissions() {
   }
 }
 
+function buildPreviewSnippet(plainText) {
+  if (!plainText) return '';
+  // Strip the auto-seeded day headers so the preview surfaces real content.
+  const cleaned = String(plainText)
+    .replace(/(Monday|Tuesday|Wednesday|Thursday|Friday)\s*[—-]\s*\d{4}-\d{2}-\d{2}/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (cleaned.length <= 160) return cleaned;
+  return cleaned.substring(0, 160).trim() + '…';
+}
+
 function renderSubmissions(subs) {
   if (!subs.length) {
     submissionsList.innerHTML =
@@ -485,17 +506,30 @@ function renderSubmissions(subs) {
     const card = document.createElement('button');
     card.type = 'button';
     card.className =
-      'group w-full text-left bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-xl p-3.5 transition shadow-sm hover:shadow';
-    card.innerHTML = `
-      <div class="flex items-center justify-between gap-3">
-        <div class="min-w-0">
-          <div class="font-semibold text-slate-800 text-sm truncate">${escapeHtml(s.weekLabel)}</div>
-          <div class="text-xs text-slate-500 mt-0.5 truncate">${escapeHtml(s.weekRange)}</div>
-        </div>
-        <span class="text-xs text-emerald-700 font-semibold opacity-0 group-hover:opacity-100 transition shrink-0">Edit →</span>
-      </div>
-      <div class="text-[11px] text-slate-400 mt-2">Last submitted ${escapeHtml(formatTimestamp(s.timestamp))}</div>
-    `;
+      'group w-full text-left bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-xl p-4 transition shadow-sm hover:shadow';
+
+    const preview = buildPreviewSnippet(s.taskPlain);
+    const ts = formatTimestamp(s.timestamp);
+    const designation = s.designation || '';
+
+    const previewBlock = preview
+      ? '<div class="text-xs text-slate-600 mb-2 leading-relaxed line-clamp-3">' + escapeHtml(preview) + '</div>'
+      : '<div class="text-xs text-slate-400 italic mb-2">(no content)</div>';
+
+    card.innerHTML =
+      '<div class="flex items-start justify-between gap-3 mb-2">' +
+        '<div class="min-w-0 flex-1">' +
+          '<div class="font-semibold text-slate-800 text-sm truncate">' + escapeHtml(s.weekLabel) + '</div>' +
+          '<div class="text-xs text-slate-500 mt-0.5 truncate">' + escapeHtml(s.weekRange) + '</div>' +
+        '</div>' +
+        '<span class="text-xs text-emerald-700 font-semibold opacity-0 group-hover:opacity-100 transition shrink-0">Edit →</span>' +
+      '</div>' +
+      previewBlock +
+      '<div class="text-[11px] text-slate-400 flex flex-wrap items-center gap-1.5">' +
+        '<span class="font-medium">' + escapeHtml(designation) + '</span>' +
+        (designation ? '<span aria-hidden="true">·</span>' : '') +
+        '<span>Last submitted ' + escapeHtml(ts) + '</span>' +
+      '</div>';
     card.addEventListener('click', () => loadSubmissionIntoForm(s));
     submissionsList.appendChild(card);
   }
