@@ -1,0 +1,90 @@
+html,
+body,
+button,
+input,
+select,
+textarea {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tailwind's `.hidden` must always beat responsive display utilities like lg:flex */
+.hidden {
+  display: none !important;
+}
+
+.ql-toolbar.ql-snow {
+  border: 1px solid #cbd5e1;
+  border-bottom: none;
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+  background: #f8fafc;
+}
+
+.ql-container.ql-snow {
+  border: 1px solid #cbd5e1;
+  border-bottom-left-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
+  font-family: inherit;
+}
+
+/* Mobile / tablet: editor has fixed pixel cap and scrolls internally. */
+.ql-editor {
+  min-height: 280px;
+  max-height: 50vh;
+  overflow-y: auto;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: #1e293b;
+  font-family: inherit;
+}
+
+@media (min-width: 768px) {
+  .ql-editor {
+    max-height: 420px;
+  }
+}
+
+/* lg+: the editor section is a flex column inside a flex-1 row; the Quill
+   container flex-fills the remaining height and the editor scrolls within it.
+   Page itself does not scroll. */
+@media (min-width: 1024px) {
+  section.editor-fill #editor.ql-container {
+    flex: 1 1 0%;
+    min-height: 0;
+  }
+  section.editor-fill .ql-editor {
+    max-height: none;
+    height: 100%;
+  }
+}
+
+.ql-editor.ql-blank::before {
+  font-style: normal;
+  color: #94a3b8;
+  font-family: inherit;
+}
+
+.ql-editor::-webkit-scrollbar {
+  width: 8px;
+}
+.ql-editor::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ql-editor::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 4px;
+}
+.ql-editor::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+}
+
+#weekInput::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.7;
+}
+#weekInput::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
