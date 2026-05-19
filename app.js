@@ -307,17 +307,42 @@ const HILITE_COLORS = [
 
 const colorPalette = document.createElement('div');
 colorPalette.className = 'tb-color-palette';
+const defaultSwatch = document.createElement('button');
+defaultSwatch.type = 'button';
+defaultSwatch.className = 'default-swatch';
 const colorSwatches = document.createElement('div');
 colorSwatches.className = 'swatches';
+colorPalette.appendChild(defaultSwatch);
 colorPalette.appendChild(colorSwatches);
 document.body.appendChild(colorPalette);
 
 let activeColorBtn = null;
 
+// Default button: black for text, transparent for highlight. Mousedown
+// preventDefault keeps the cell focused so execCommand has a selection.
+defaultSwatch.addEventListener('mousedown', (e) => e.preventDefault());
+defaultSwatch.addEventListener('click', () => {
+  if (!activeColorBtn) return;
+  const action = activeColorBtn.dataset.colorAction;
+  const isHilite = action === 'hiliteColor';
+  applyColor(action, isHilite ? 'transparent' : '#000000');
+  const bar = activeColorBtn.querySelector('.tb-color-bar');
+  if (bar) bar.style.backgroundColor = isHilite ? '#ffffff' : '#000000';
+  closeColorPalette();
+});
+
 function openColorPalette(btn) {
   activeColorBtn = btn;
   const action = btn.dataset.colorAction;
-  const colors = action === 'hiliteColor' ? HILITE_COLORS : FORE_COLORS;
+  const isHilite = action === 'hiliteColor';
+  const colors = isHilite ? HILITE_COLORS : FORE_COLORS;
+
+  // The default-swatch button is its own 24×24 visual (no inner markup):
+  // solid black for text default, diagonal-slash for highlight default.
+  defaultSwatch.innerHTML = '';
+  defaultSwatch.classList.toggle('transparent-style', isHilite);
+  defaultSwatch.title = isHilite ? 'Remove highlight' : 'Default (black)';
+
   colorSwatches.innerHTML = '';
   colors.forEach((c) => {
     const sw = document.createElement('button');
