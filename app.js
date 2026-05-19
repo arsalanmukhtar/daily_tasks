@@ -226,7 +226,9 @@ Array.from(taskToolbar.querySelectorAll('[data-cmd]')).forEach((btn) => {
     if (!activeCell) return;
     activeCell.focus();
     try { document.execCommand(btn.dataset.cmd, false, null); } catch (_e) {}
-    refreshToolbarState();
+    // Wait one frame so the DOM (and the selection's ancestry) reflects the
+    // execCommand change before we read state from it.
+    requestAnimationFrame(refreshToolbarState);
   });
 });
 
@@ -253,11 +255,10 @@ function selectionIsInside_(tagName) {
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return false;
   let node = sel.getRangeAt(0).startContainer;
-  while (node && node !== document.body) {
-    if (node.nodeType === 1 && node.tagName === tagName) return true;
-    node = node.parentNode;
-  }
-  return false;
+  // startContainer is usually a text node; .closest() only exists on Elements.
+  if (node && node.nodeType === 3) node = node.parentNode;
+  if (!node || node.nodeType !== 1) return false;
+  return !!node.closest(tagName);
 }
 
 document.addEventListener('selectionchange', () => {
@@ -562,7 +563,7 @@ form.addEventListener('submit', async (e) => {
       body: formBody,
       redirect: 'follow'
     });
-    setStatus('ok', 'Submitted.');
+    setStatus('ok', '');
   } catch (err) {
     setStatus('error', 'Submit failed: ' + err.message);
   } finally {

@@ -181,10 +181,9 @@
           <div class="px-5 py-4 border-t border-slate-100 bg-slate-50/60">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div id="status" class="flex-1 min-w-0 flex items-center gap-3 min-h-[2rem]">
-                <!-- Submitting: 4-dot loader inside a dark pill so the white dots stay visible.
-                     Hidden by default; toggled via .hidden by setStatus(). -->
-                <span id="statusSpinner" class="hidden inline-flex items-center justify-center rounded-md bg-slate-800 relative"
-                  style="width: 128px; height: 32px;">
+                <!-- Submitting: dotted dual-ring loader. Hidden by default;
+                     toggled via .hidden by setStatus(). -->
+                <span id="statusSpinner" class="hidden inline-flex items-center">
                   <span class="loader"></span>
                 </span>
                 <!-- Tick: appears on success, gets .status-tick-fade for the 5s fade-out. -->

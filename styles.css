@@ -115,10 +115,18 @@ textarea {
   background: #ecfdf5;
   box-shadow: inset 0 0 0 1.5px #6ee7b7;
 }
-.cell-editor ul,
-.cell-editor ol {
+/* Tailwind's preflight resets ul/ol to list-style: none, so we restore
+   the markers explicitly for cells — otherwise B/I/U works but the bullet
+   and number buttons look like they do nothing. */
+.cell-editor ul {
+  list-style: disc;
   margin: 0;
-  padding-left: 1.25rem;
+  padding-left: 1.5rem;
+}
+.cell-editor ol {
+  list-style: decimal;
+  margin: 0;
+  padding-left: 1.5rem;
 }
 .cell-editor li { margin: 0; }
 .cell-editor p { margin: 0; }
@@ -190,44 +198,6 @@ textarea {
   border-radius: 4px;
 }
 #submissionsList::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
-
-/* Dual-ring spinner for the drawer's loading state. Outer ring is slate,
-   inner counter-rotating ring is emerald to match the brand accent. */
-.loader {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  position: relative;
-  animation: loader-rotate 1s linear infinite;
-}
-.loader::before,
-.loader::after {
-  content: "";
-  box-sizing: border-box;
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 5px solid #cbd5e1;
-  animation: loader-clip 2s linear infinite;
-}
-.loader::after {
-  border-color: #059669;
-  animation: loader-clip 2s linear infinite, loader-rotate 0.5s linear infinite reverse;
-  inset: 6px;
-}
-
-@keyframes loader-rotate {
-  0%   { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-@keyframes loader-clip {
-  0%   { clip-path: polygon(50% 50%, 0 0, 0 0, 0 0, 0 0, 0 0); }
-  25%  { clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 0, 100% 0, 100% 0); }
-  50%  { clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 100%, 100% 100%, 100% 100%); }
-  75%  { clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 100%, 0 100%, 0 100%); }
-  100% { clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 100%, 0 100%, 0 0); }
-}
 
 /* ---------- Custom designation dropdown ---------- */
 .select-pro-trigger {
@@ -304,38 +274,45 @@ textarea {
 }
 
 /* ---------- Submit status icons ----------
-   4-dot loader (white dots + orange sliding dot) lives inside a dark
-   slate-800 pill so the white dots are actually visible — using the
-   original color scheme from the source snippet. */
+   Dual dotted-ring spinner (scaled to ~2/3 of the original 48px). Sits
+   inline next to the tick — no dark pill wrapper. The outer ring uses
+   #FFF as in the source snippet (invisible on white surfaces); the orange
+   inner ring carries the visible spin. */
 .loader {
-  width: 16px;
-  height: 16px;
-  position: relative;
-  left: -32px;
+  width: 32px;
+  height: 32px;
+  border: 2px dotted #4b5563;
+  border-style: solid solid dotted dotted;
   border-radius: 50%;
-  color: #fff;
-  background: currentColor;
-  box-shadow: 32px 0, -32px 0, 64px 0;
+  display: inline-block;
+  position: relative;
+  box-sizing: border-box;
+  animation: loader-rotate 2s linear infinite;
 }
 .loader::after {
   content: '';
+  box-sizing: border-box;
   position: absolute;
-  left: -32px;
+  left: 0;
+  right: 0;
   top: 0;
+  bottom: 0;
+  margin: auto;
+  border: 2px dotted #FF3D00;
+  border-style: solid solid dotted;
   width: 16px;
   height: 16px;
-  border-radius: 10px;
-  background: #FF3D00;
-  animation: loader-move 3s linear infinite alternate;
+  border-radius: 50%;
+  animation: loader-rotate-back 1s linear infinite;
+  transform-origin: center center;
 }
-@keyframes loader-move {
-  0%, 5%    { left: -32px; width: 16px; }
-  15%, 20%  { left: -32px; width: 48px; }
-  30%, 35%  { left: 0;     width: 16px; }
-  45%, 50%  { left: 0;     width: 48px; }
-  60%, 65%  { left: 32px;  width: 16px; }
-  75%, 80%  { left: 32px;  width: 48px; }
-  95%, 100% { left: 64px;  width: 16px; }
+@keyframes loader-rotate {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes loader-rotate-back {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(-360deg); }
 }
 
 /* Tick stays solid for ~4s, then fades over the last second. */
