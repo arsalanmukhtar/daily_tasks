@@ -120,3 +120,115 @@ textarea {
   border-radius: 4px;
 }
 #submissionsList::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+
+/* Dual-ring spinner for the drawer's loading state. Outer ring is slate,
+   inner counter-rotating ring is emerald to match the brand accent. */
+.loader {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  position: relative;
+  animation: loader-rotate 1s linear infinite;
+}
+.loader::before,
+.loader::after {
+  content: "";
+  box-sizing: border-box;
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 5px solid #cbd5e1;
+  animation: loader-clip 2s linear infinite;
+}
+.loader::after {
+  border-color: #059669;
+  animation: loader-clip 2s linear infinite, loader-rotate 0.5s linear infinite reverse;
+  inset: 6px;
+}
+
+@keyframes loader-rotate {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes loader-clip {
+  0%   { clip-path: polygon(50% 50%, 0 0, 0 0, 0 0, 0 0, 0 0); }
+  25%  { clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 0, 100% 0, 100% 0); }
+  50%  { clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 100%, 100% 100%, 100% 100%); }
+  75%  { clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 100%, 0 100%, 0 100%); }
+  100% { clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 100%, 0 100%, 0 0); }
+}
+
+/* ---------- Custom designation dropdown ---------- */
+.select-pro-trigger {
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.select-pro-trigger:hover {
+  border-color: #94a3b8;
+}
+.select-pro-trigger:focus {
+  outline: none;
+  border-color: #059669;
+  box-shadow: 0 0 0 1px #059669;
+}
+.select-pro.open .select-pro-trigger {
+  border-color: #059669;
+  box-shadow: 0 0 0 1px #059669;
+}
+.select-pro.open #designationChevron {
+  transform: rotate(180deg);
+}
+
+/* Menu is appended to <body> by JS so the card's overflow:hidden never clips it.
+   Positioned via JS using getBoundingClientRect on the trigger. */
+.select-pro-menu {
+  position: fixed;
+  z-index: 60;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  box-shadow:
+    0 10px 25px -5px rgba(15, 23, 42, 0.18),
+    0 4px 6px -4px rgba(15, 23, 42, 0.1);
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.select-pro-menu.open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.select-pro-menu li {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #334155;
+  cursor: pointer;
+  border-radius: 0.375rem;
+  transition: background 80ms, color 80ms;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  user-select: none;
+}
+.select-pro-menu li:hover {
+  background: #ecfdf5;
+  color: #065f46;
+}
+.select-pro-menu li.selected {
+  background: #d1fae5;
+  color: #065f46;
+  font-weight: 600;
+}
+.select-pro-menu li.selected::after {
+  content: "✓";
+  color: #059669;
+  font-weight: 700;
+  flex-shrink: 0;
+}

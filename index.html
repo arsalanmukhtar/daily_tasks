@@ -86,7 +86,7 @@
               <input type="week" id="weekInput" name="week" required lang="en-GB"
                 class="flex-1 min-w-[10rem] rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition" />
               <button id="lastWeekBtn" type="button"
-                class="text-sm px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 font-semibold hover:bg-emerald-100 hover:border-emerald-300 transition whitespace-nowrap">
+                class="text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-900 font-semibold hover:bg-slate-50 hover:border-slate-400 transition whitespace-nowrap">
                 Last week
               </button>
               <button id="thisWeekBtn" type="button"
@@ -101,34 +101,46 @@
             <div id="weekSummary" class="mt-2 text-xs text-emerald-700 font-semibold"></div>
           </div>
 
-          <!-- Metadata: absorbs leftover height on lg+ via flex-1 + center alignment -->
-          <div class="px-5 py-5 border-t border-slate-100 lg:flex-1 lg:flex lg:flex-col lg:justify-center lg:min-h-0">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-5">
+          <!-- Week days preview: absorbs leftover height on lg+ via flex-1.
+               Each day row spaces evenly when there's spare room. -->
+          <div class="px-5 py-4 border-t border-slate-100 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-3">Week days</div>
+            <div id="weekDaysList" class="lg:h-[calc(100%-1.75rem)] lg:flex lg:flex-col lg:justify-around space-y-1.5 lg:space-y-0"></div>
+          </div>
+
+          <!-- Metadata -->
+          <div class="px-5 py-4 border-t border-slate-100 shrink-0">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
               <!-- Submitting as -->
               <div class="min-w-0">
                 <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Submitting as</div>
                 <div id="submittingAsName" class="mt-1 font-semibold text-slate-800 text-sm break-words leading-snug">&mdash;</div>
                 <div id="submittingAsEmail" class="text-xs text-slate-500 break-all"></div>
-                <button id="viewSubmissionsBtn" type="button"
-                  class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800 transition">
-                  View my submissions
-                  <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
-                  </svg>
-                </button>
               </div>
 
-              <!-- Designation -->
+              <!-- Designation: custom dropdown so the popup is themed too,
+                   not the OS-native one. Hidden native <select> preserves
+                   form submission and the existing `form.designation.value` API. -->
               <div class="min-w-0">
-                <label for="designationSelect" class="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Designation</label>
-                <select id="designationSelect" name="designation"
-                  class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition">
-                  <option value="Intern">Intern</option>
-                  <option value="Assistant Manager - I" selected>Assistant Manager - I</option>
-                  <option value="Assistant Manager - II">Assistant Manager - II</option>
-                  <option value="Assistant Manager - III">Assistant Manager - III</option>
-                  <option value="Deputy Manager - I">Deputy Manager - I</option>
-                </select>
+                <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Designation</div>
+                <div id="designationDropdown" class="select-pro relative mt-1">
+                  <button type="button" id="designationTrigger"
+                    class="select-pro-trigger w-full flex items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700"
+                    aria-haspopup="listbox" aria-expanded="false">
+                    <span id="designationLabel" class="truncate">Assistant Manager - I</span>
+                    <svg id="designationChevron" class="w-4 h-4 text-slate-500 transition-transform shrink-0"
+                      viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M6 8l4 4 4-4"/>
+                    </svg>
+                  </button>
+                  <select id="designationSelect" name="designation" class="sr-only" tabindex="-1" aria-hidden="true">
+                    <option value="Intern">Intern</option>
+                    <option value="Assistant Manager - I" selected>Assistant Manager - I</option>
+                    <option value="Assistant Manager - II">Assistant Manager - II</option>
+                    <option value="Assistant Manager - III">Assistant Manager - III</option>
+                    <option value="Deputy Manager - I">Deputy Manager - I</option>
+                  </select>
+                </div>
               </div>
 
               <!-- Domain -->
@@ -143,6 +155,27 @@
                 <div class="mt-1 font-semibold text-slate-700 text-sm leading-snug">Muhammad Arsalan Mukhtar</div>
               </div>
             </div>
+          </div>
+
+          <!-- View my submissions: prominent CTA opening the right-side drawer -->
+          <div class="px-5 py-4 border-t border-slate-100 shrink-0">
+            <button id="viewSubmissionsBtn" type="button"
+              class="group w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/70 hover:from-emerald-100 hover:to-emerald-200/70 border border-emerald-200 hover:border-emerald-300 shadow-sm hover:shadow transition">
+              <div class="flex items-center gap-3 min-w-0">
+                <span class="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9h6m-6 4h4"/>
+                  </svg>
+                </span>
+                <div class="text-left min-w-0">
+                  <div class="text-sm font-semibold text-emerald-900">My Submissions</div>
+                  <div class="text-xs text-emerald-700/80 mt-0.5 truncate">View &amp; edit your past entries</div>
+                </div>
+              </div>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-emerald-700 group-hover:translate-x-0.5 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+              </svg>
+            </button>
           </div>
 
           <!-- Action bar: bottom footer of the unified panel -->
@@ -183,7 +216,7 @@
 
   <!-- ============ MY SUBMISSIONS DRAWER ============ -->
   <div id="submissionsBackdrop" class="drawer-backdrop fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"></div>
-  <aside id="submissionsDrawer" class="drawer-panel fixed top-0 right-0 h-full w-full sm:w-[28rem] max-w-full bg-white shadow-2xl ring-1 ring-slate-200 z-50 flex flex-col">
+  <aside id="submissionsDrawer" class="drawer-panel fixed top-0 right-0 h-full w-full sm:w-[32rem] lg:w-[38rem] max-w-full bg-white shadow-2xl ring-1 ring-slate-200 z-50 flex flex-col">
     <header class="px-5 py-4 border-b border-slate-200 flex items-start justify-between gap-3 shrink-0 bg-gradient-to-r from-slate-50 to-emerald-50/60">
       <div class="min-w-0">
         <h2 class="text-base font-semibold text-slate-800">My Submissions</h2>

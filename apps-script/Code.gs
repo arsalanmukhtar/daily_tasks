@@ -246,23 +246,23 @@ function doGet(e) {
 function listSubmissions_(e) {
   try {
     const idToken = e && e.parameter && e.parameter.idToken;
-    if (!idToken) return jsonResponse_({ status: 'error', message: 'Missing auth token.' });
+    if (!idToken) return jsonOrJsonp_(e, { status: 'error', message: 'Missing auth token.' });
 
     let verified;
     try {
       verified = verifyIdToken_(idToken);
     } catch (err) {
-      return jsonResponse_({ status: 'error', message: 'Unauthorized: ' + err.message });
+      return jsonOrJsonp_(e, { status: 'error', message: 'Unauthorized: ' + err.message });
     }
     const email = (verified.email || '').toLowerCase();
     if (!ALLOWLIST[email]) {
-      return jsonResponse_({ status: 'error', message: 'Email ' + email + ' is not authorized.' });
+      return jsonOrJsonp_(e, { status: 'error', message: 'Email ' + email + ' is not authorized.' });
     }
 
     const sheet = getOrCreateSheet_();
     ensureExtendedHeaders_(sheet);
     const last = sheet.getLastRow();
-    if (last < 2) return jsonResponse_({ status: 'ok', submissions: [] });
+    if (last < 2) return jsonOrJsonp_(e, { status: 'ok', submissions: [] });
 
     const values = sheet.getRange(2, 1, last - 1, HEADERS.length).getValues();
     const submissions = [];
@@ -287,9 +287,9 @@ function listSubmissions_(e) {
     // Most recent submissions first.
     submissions.sort(function (a, b) { return String(b.timestamp).localeCompare(String(a.timestamp)); });
 
-    return jsonResponse_({ status: 'ok', submissions: submissions });
+    return jsonOrJsonp_(e, { status: 'ok', submissions: submissions });
   } catch (err) {
-    return jsonResponse_({ status: 'error', message: String(err && err.message || err) });
+    return jsonOrJsonp_(e, { status: 'error', message: String(err && err.message || err) });
   }
 }
 
@@ -330,6 +330,23 @@ function jsonResponse_(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Apps Script `/exec` responses are served from googleusercontent.com after a
+ * 302 and don't reliably carry Access-Control-Allow-Origin, so cross-origin
+ * `fetch` reads fail. JSONP sidesteps this: the browser loads our response as
+ * a <script>, which has no CORS check. We invoke the named callback with the
+ * payload. The callback regex prevents arbitrary JS injection from the URL.
+ */
+function jsonOrJsonp_(e, obj) {
+  const callback = e && e.parameter && e.parameter.callback;
+  if (callback && /^[a-zA-Z_$][a-zA-Z0-9_$]{0,63}$/.test(callback)) {
+    return ContentService
+      .createTextOutput(callback + '(' + JSON.stringify(obj) + ');')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return jsonResponse_(obj);
 }
 
 /**

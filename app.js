@@ -72,6 +72,7 @@ const thisWeekBtn      = document.getElementById('thisWeekBtn');
 const clearWeekBtn     = document.getElementById('clearWeekBtn');
 const submittingAsName = document.getElementById('submittingAsName');
 const submittingAsEmail= document.getElementById('submittingAsEmail');
+const weekDaysList     = document.getElementById('weekDaysList');
 const viewSubmissionsBtn = document.getElementById('viewSubmissionsBtn');
 const submissionsBackdrop = document.getElementById('submissionsBackdrop');
 const submissionsDrawer  = document.getElementById('submissionsDrawer');
@@ -140,10 +141,35 @@ function getPreviousIsoWeekString() {
 
 function refreshWeekSummary() {
   const info = weekdaysFor(weekInput.value);
-  if (!info) { weekSummary.textContent = ''; return null; }
+  if (!info) {
+    weekSummary.textContent = '';
+    renderWeekDaysList(null);
+    return null;
+  }
   weekSummary.textContent =
     `Week ${info.week}, ${info.year}  ·  ${fmtLong(info.days[0].date)} – ${fmtLong(info.days[4].date)}, ${info.year}`;
+  renderWeekDaysList(info);
   return info;
+}
+
+function renderWeekDaysList(info) {
+  if (!weekDaysList) return;
+  if (!info) {
+    weekDaysList.innerHTML = '<div class="text-xs text-slate-400 italic">Pick a week to see the days.</div>';
+    return;
+  }
+  weekDaysList.innerHTML = '';
+  info.days.forEach((d) => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center justify-between gap-3 text-sm py-1';
+    const longDate = d.date.toLocaleDateString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC'
+    });
+    row.innerHTML =
+      '<span class="font-semibold text-slate-700">' + d.name + '</span>' +
+      '<span class="text-slate-500 tabular-nums">' + longDate + '</span>';
+    weekDaysList.appendChild(row);
+  });
 }
 
 function isEditorEmpty() { return quill.getText().trim().length === 0; }
@@ -376,7 +402,10 @@ function openSubmissionsDrawer() {
   submissionsDrawer.classList.add('open');
   submissionsBackdrop.classList.add('open');
   submissionsList.innerHTML =
-    '<div class="text-center py-10 text-slate-500 text-sm">Loading…</div>';
+    '<div class="flex flex-col items-center justify-center py-16 gap-3">' +
+      '<span class="loader"></span>' +
+      '<span class="text-xs text-slate-500">Loading your submissions…</span>' +
+    '</div>';
   fetchSubmissions();
 }
 
@@ -385,16 +414,57 @@ function closeSubmissionsDrawer() {
   submissionsBackdrop.classList.remove('open');
 }
 
+/**
+ * JSONP fetch — Apps Script `/exec` GET responses lack a reliable
+ * Access-Control-Allow-Origin header (they 302 to googleusercontent.com),
+ * so cross-origin `fetch` reads fail. Loading the response via <script>
+ * tag bypasses CORS entirely; the server wraps the payload in `callback(...)`
+ * which calls our locally-registered global.
+ */
+function jsonpFetch(url, params, timeoutMs) {
+  return new Promise(function (resolve, reject) {
+    const cbName = '__jsonp_cb_' + Math.random().toString(36).slice(2) + '_' + Date.now();
+    const script = document.createElement('script');
+    let settled = false;
+
+    function cleanup() {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { delete window[cbName]; } catch (_e) { window[cbName] = undefined; }
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    const timer = setTimeout(function () {
+      cleanup();
+      reject(new Error('Request timed out.'));
+    }, timeoutMs || 30000);
+
+    window[cbName] = function (data) {
+      cleanup();
+      resolve(data);
+    };
+
+    const qs = new URLSearchParams(Object.assign({}, params, { callback: cbName }));
+    script.src = url + '?' + qs.toString();
+    script.onerror = function () {
+      cleanup();
+      reject(new Error('Could not reach the submissions endpoint.'));
+    };
+    document.head.appendChild(script);
+  });
+}
+
 async function fetchSubmissions() {
   try {
     const idToken = await currentUserContext.user.getIdToken(false);
-    // GET avoids the POST-preflight problem; Apps Script returns JSON with
-    // permissive CORS for GET /exec, so we can actually read the response.
-    const url = APPS_SCRIPT_URL +
-      '?action=list&idToken=' + encodeURIComponent(idToken);
-    const res = await fetch(url, { method: 'GET' });
-    const data = await res.json();
-    if (data.status !== 'ok') throw new Error(data.message || 'Failed to load submissions.');
+    const data = await jsonpFetch(APPS_SCRIPT_URL, {
+      action: 'list',
+      idToken: idToken
+    });
+    if (!data || data.status !== 'ok') {
+      throw new Error((data && data.message) || 'Failed to load submissions.');
+    }
     renderSubmissions(data.submissions || []);
   } catch (err) {
     submissionsList.innerHTML =
@@ -438,7 +508,10 @@ function loadSubmissionIntoForm(s) {
 
   if (s.designation) {
     const opt = Array.from(form.designation.options).find(o => o.value === s.designation);
-    if (opt) form.designation.value = s.designation;
+    if (opt) {
+      form.designation.value = s.designation;
+      syncDesignationLabel();
+    }
   }
 
   if (s.taskDelta && s.taskDelta.ops) {
@@ -461,6 +534,92 @@ document.addEventListener('keydown', (e) => {
     closeSubmissionsDrawer();
   }
 });
+
+// ---------- Custom designation dropdown ----------
+// Replaces the OS-native select popup with a themed one. The native <select>
+// stays in the DOM as a .sr-only sibling so form submission and existing
+// `form.designation.value` reads keep working unchanged.
+let syncDesignationLabel = function () {};
+(function initDesignationDropdown() {
+  const wrap    = document.getElementById('designationDropdown');
+  const trigger = document.getElementById('designationTrigger');
+  const labelEl = document.getElementById('designationLabel');
+  const select  = document.getElementById('designationSelect');
+  if (!wrap || !trigger || !labelEl || !select) return;
+
+  // Menu lives directly on <body> so the card's overflow:hidden can't clip it.
+  const menu = document.createElement('ul');
+  menu.className = 'select-pro-menu';
+  menu.setAttribute('role', 'listbox');
+  document.body.appendChild(menu);
+
+  function renderMenu() {
+    menu.innerHTML = '';
+    Array.from(select.options).forEach((opt) => {
+      const li = document.createElement('li');
+      li.dataset.value = opt.value;
+      li.textContent = opt.text;
+      li.setAttribute('role', 'option');
+      if (opt.value === select.value) {
+        li.classList.add('selected');
+        li.setAttribute('aria-selected', 'true');
+      }
+      li.addEventListener('click', () => {
+        select.value = opt.value;
+        labelEl.textContent = opt.text;
+        closeMenu();
+      });
+      menu.appendChild(li);
+    });
+  }
+
+  function positionMenu() {
+    const rect = trigger.getBoundingClientRect();
+    menu.style.left  = rect.left + 'px';
+    menu.style.top   = (rect.bottom + 4) + 'px';
+    menu.style.width = rect.width + 'px';
+  }
+
+  function openMenu() {
+    renderMenu();
+    positionMenu();
+    menu.classList.add('open');
+    wrap.classList.add('open');
+    trigger.setAttribute('aria-expanded', 'true');
+  }
+  function closeMenu() {
+    menu.classList.remove('open');
+    wrap.classList.remove('open');
+    trigger.setAttribute('aria-expanded', 'false');
+  }
+  function toggleMenu() {
+    menu.classList.contains('open') ? closeMenu() : openMenu();
+  }
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleMenu();
+  });
+  document.addEventListener('click', (e) => {
+    if (!menu.contains(e.target) && !trigger.contains(e.target)) closeMenu();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeMenu();
+  });
+  window.addEventListener('scroll', closeMenu, true);
+  window.addEventListener('resize', closeMenu);
+
+  // Initial label from whichever option was marked `selected` in the HTML.
+  const initial = select.options[select.selectedIndex];
+  if (initial) labelEl.textContent = initial.text;
+
+  // Exposed so loadSubmissionIntoForm() can re-sync after it sets select.value
+  // programmatically (changes via JS don't fire any native event we can listen to).
+  syncDesignationLabel = function () {
+    const cur = select.options[select.selectedIndex];
+    if (cur) labelEl.textContent = cur.text;
+  };
+})();
 
 // Initial UI state
 showLoading();
