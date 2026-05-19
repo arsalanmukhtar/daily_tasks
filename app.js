@@ -25,7 +25,8 @@ const ALLOWLIST = {
   'ahad.khan.work01@gmail.com':   'Muhammad Ahad Khan',
   'zainabali27feb2024@gmail.com': 'Zainab Ali',
   'ttalha063@gmail.com':          'Talha Rizwan',
-  'zeeshannasir2001@gmail.com':   'Zeeshan Nasir'
+  'zeeshannasir2001@gmail.com':   'Zeeshan Nasir',
+  'usamabinumar199@gmail.com': 'Usama bin Umar'
 };
 
 // =====================================================
