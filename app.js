@@ -271,6 +271,115 @@ addRowBtn.addEventListener('click', () => {
   if (firstCell) firstCell.focus();
 });
 
+// Color buttons (text colour + highlight): each opens a small swatch popup
+// anchored under the trigger. Click a swatch → apply via execCommand and
+// update the button's bar to remember the last-used colour.
+// 12 muted swatches per palette (4 cols × 3 rows). Deep / desaturated for
+// text, soft pastels for highlight — keeps the look editorial, never neon.
+const FORE_COLORS = [
+  '#000000', // Black
+  '#1f2937', // Charcoal
+  '#475569', // Slate
+  '#44403c', // Stone
+  '#78350f', // Brown
+  '#991b1b', // Burgundy
+  '#b45309', // Dark amber
+  '#166534', // Forest
+  '#115e59', // Teal
+  '#1e3a8a', // Navy
+  '#5b21b6', // Royal purple
+  '#831843'  // Maroon
+];
+const HILITE_COLORS = [
+  '#fef9c3', // Pale yellow
+  '#fef3c7', // Cream
+  '#ffedd5', // Peach
+  '#fecdd3', // Soft pink
+  '#fce7f3', // Light pink
+  '#f3e8ff', // Lavender
+  '#e0e7ff', // Periwinkle
+  '#dbeafe', // Sky
+  '#cffafe', // Cyan
+  '#d1fae5', // Mint
+  '#ecfccb', // Sage
+  '#f5f5f4'  // Stone
+];
+
+const colorPalette = document.createElement('div');
+colorPalette.className = 'tb-color-palette';
+const colorSwatches = document.createElement('div');
+colorSwatches.className = 'swatches';
+colorPalette.appendChild(colorSwatches);
+document.body.appendChild(colorPalette);
+
+let activeColorBtn = null;
+
+function openColorPalette(btn) {
+  activeColorBtn = btn;
+  const action = btn.dataset.colorAction;
+  const colors = action === 'hiliteColor' ? HILITE_COLORS : FORE_COLORS;
+  colorSwatches.innerHTML = '';
+  colors.forEach((c) => {
+    const sw = document.createElement('button');
+    sw.type = 'button';
+    sw.className = 'swatch';
+    sw.style.backgroundColor = c;
+    sw.title = c;
+    sw.addEventListener('mousedown', (e) => e.preventDefault());
+    sw.addEventListener('click', () => {
+      applyColor(action, c);
+      const bar = activeColorBtn && activeColorBtn.querySelector('.tb-color-bar');
+      if (bar) bar.style.backgroundColor = c;
+      closeColorPalette();
+    });
+    colorSwatches.appendChild(sw);
+  });
+  const rect = btn.getBoundingClientRect();
+  colorPalette.style.left = rect.left + 'px';
+  colorPalette.style.top  = (rect.bottom + 4) + 'px';
+  colorPalette.classList.add('open');
+}
+
+function closeColorPalette() {
+  colorPalette.classList.remove('open');
+  activeColorBtn = null;
+}
+
+function applyColor(action, color) {
+  if (!activeCell) return;
+  activeCell.focus();
+  try {
+    if (action === 'hiliteColor') {
+      // Firefox uses hiliteColor; Chrome/Edge accept it too but historically
+      // implemented backColor — try one, fall back to the other.
+      const ok = document.execCommand('hiliteColor', false, color);
+      if (!ok) document.execCommand('backColor', false, color);
+    } else {
+      document.execCommand('foreColor', false, color);
+    }
+  } catch (_e) {}
+}
+
+taskToolbar.querySelectorAll('[data-color-action]').forEach((btn) => {
+  btn.addEventListener('mousedown', (e) => e.preventDefault());
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (colorPalette.classList.contains('open') && activeColorBtn === btn) {
+      closeColorPalette();
+    } else {
+      openColorPalette(btn);
+    }
+  });
+});
+
+document.addEventListener('click', (e) => {
+  if (!colorPalette.contains(e.target) && !e.target.closest('[data-color-action]')) {
+    closeColorPalette();
+  }
+});
+window.addEventListener('scroll', closeColorPalette, true);
+window.addEventListener('resize', closeColorPalette);
+
 // Seed with a single empty row on startup.
 addTaskRow();
 
