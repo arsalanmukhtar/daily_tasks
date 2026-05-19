@@ -67,6 +67,7 @@ const resetBtn         = document.getElementById('resetBtn');
 const statusEl         = document.getElementById('status');
 const weekInput        = document.getElementById('weekInput');
 const weekSummary      = document.getElementById('weekSummary');
+const lastWeekBtn      = document.getElementById('lastWeekBtn');
 const thisWeekBtn      = document.getElementById('thisWeekBtn');
 const clearWeekBtn     = document.getElementById('clearWeekBtn');
 const submittingAsName = document.getElementById('submittingAsName');
@@ -115,14 +116,21 @@ function weekdaysFor(weekStr) {
   return { year, week, days };
 }
 
-function getCurrentIsoWeekString() {
-  const now = new Date();
-  const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+function dateToIsoWeekString(date) {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   const dayNum = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   const weekNum = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
   return `${d.getUTCFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+}
+function getCurrentIsoWeekString() {
+  const now = new Date();
+  return dateToIsoWeekString(new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())));
+}
+function getPreviousIsoWeekString() {
+  const now = new Date();
+  return dateToIsoWeekString(new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() - 7)));
 }
 
 function refreshWeekSummary() {
@@ -177,6 +185,12 @@ weekInput.addEventListener('input', handleWeekChange);
 // Custom buttons — bypass the native picker's "Clear" / "This week" controls
 // (unreliable in some Chrome builds) AND bypass the pristine-state guard.
 // These are explicit user actions, so they always act on the editor.
+lastWeekBtn.addEventListener('click', () => {
+  weekInput.value = getPreviousIsoWeekString();
+  const info = refreshWeekSummary();
+  if (info) seedEditor(info.days);
+});
+
 thisWeekBtn.addEventListener('click', () => {
   weekInput.value = getCurrentIsoWeekString();
   const info = refreshWeekSummary();
