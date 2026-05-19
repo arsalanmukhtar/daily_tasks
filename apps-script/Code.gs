@@ -27,30 +27,25 @@ const FIREBASE_API_KEY    = 'AIzaSyA1exz20sN1WqLQdNkP986JX5wHuICYolg';
 const FIREBASE_PROJECT_ID = 'devteam-daily-tasks';
 
 // Must mirror the ALLOWLIST in app.js. Emails MUST be lowercase here.
+// Each entry is { name, designation } — server treats both as fixed for
+// that user. The frontend no longer lets users pick a designation; the
+// server uses this map as the source of truth.
 const ALLOWLIST = {
-  'developer.ndma@gmail.com':     'Muhammad Arsalan Mukhtar',
-  'as2040704@gmail.com':          'Abdul Sattar Sheikh',
-  'mustafa.haider2011@gmail.com': 'Syed Mustafa Haider',
-  'shehzadalikhan586@gmail.com':  'Shehzad Ali',
-  'seemalnaeem100@gmail.com':     'Seemal Naeem',
-  'muddasir.ndma25@gmail.com':    'Muddasir Shah',
-  'ahad.khan.work01@gmail.com':   'Muhammad Ahad Khan',
-  'zainabali27feb2024@gmail.com': 'Zainab Ali',
-  'ttalha063@gmail.com':          'Talha Rizwan',
-  'zeeshannasir2001@gmail.com':   'Zeeshan Nasir',
-  'usamabinumar199@gmail.com':    'Usama bin Umar',
-  'osamakhan32156@gmail.com':     'Muhammad Osama Khan'
+  'developer.ndma@gmail.com':     { name: 'Muhammad Arsalan Mukhtar', designation: 'Deputy Manager - I' },
+  'as2040704@gmail.com':          { name: 'Abdul Sattar Sheikh',      designation: 'Assistant Manager - II' },
+  'mustafa.haider2011@gmail.com': { name: 'Syed Mustafa Haider',      designation: 'Assistant Manager - I' },
+  'shehzadalikhan586@gmail.com':  { name: 'Shehzad Ali',              designation: 'Assistant Manager - I' },
+  'seemalnaeem100@gmail.com':     { name: 'Seemal Naeem',             designation: 'Assistant Manager - I' },
+  'muddasir.ndma25@gmail.com':    { name: 'Muddasir Shah',            designation: 'Assistant Manager - I' },
+  'ahad.khan.work01@gmail.com':   { name: 'Muhammad Ahad Khan',       designation: 'Assistant Manager - I' },
+  'zainabali27feb2024@gmail.com': { name: 'Zainab Ali',               designation: 'Assistant Manager - I' },
+  'ttalha063@gmail.com':          { name: 'Talha Rizwan',             designation: 'Assistant Manager - I' },
+  'zeeshannasir2001@gmail.com':   { name: 'Zeeshan Nasir',            designation: 'Assistant Manager - I' },
+  'usamabinumar199@gmail.com':    { name: 'Usama bin Umar',           designation: 'Intern' },
+  'osamakhan32156@gmail.com':     { name: 'Muhammad Osama Khan',      designation: 'Intern' }
 };
 
 const SHEET_NAME = 'Weekly Submissions';
-
-const VALID_DESIGNATIONS = [
-  'Intern',
-  'Assistant Manager - I',
-  'Assistant Manager - II',
-  'Assistant Manager - III',
-  'Deputy Manager - I'
-];
 
 // Column 11 stores the raw Quill Delta JSON so we can round-trip into the
 // editor losslessly when a user reloads their own submission for editing.
@@ -114,19 +109,14 @@ function processSubmission_(e) {
     debugLog_('5. verified email', verified.email);
 
     const email = (verified.email || '').toLowerCase();
-    const displayName = ALLOWLIST[email];
-    if (!displayName) {
+    const entry = ALLOWLIST[email];
+    if (!entry) {
       debugLog_('6a. ABORT: email not in allowlist', email + ' / allowed=' + Object.keys(ALLOWLIST).join(','));
       return jsonResponse_({ status: 'error', message: 'Email ' + email + ' is not authorized.' });
     }
-    debugLog_('6. allowlist hit', email + ' → ' + displayName);
-
-    const designation = body.designation;
-    if (VALID_DESIGNATIONS.indexOf(designation) === -1) {
-      debugLog_('7a. ABORT: invalid designation', String(designation));
-      return jsonResponse_({ status: 'error', message: 'Invalid designation: ' + designation });
-    }
-    debugLog_('7. designation ok', designation);
+    const displayName = entry.name;
+    const designation = entry.designation;
+    debugLog_('6. allowlist hit', email + ' → ' + displayName + ' (' + designation + ')');
 
     const sheet = getOrCreateSheet_();
     ensureExtendedHeaders_(sheet);
@@ -235,7 +225,7 @@ function debugLog_(label, data) {
   }
 }
 
-const BACKEND_VERSION = 'v7-task-rows';
+const BACKEND_VERSION = 'v8-fixed-designations';
 
 function doGet(e) {
   if (e && e.parameter) {

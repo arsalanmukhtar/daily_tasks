@@ -110,36 +110,18 @@
           <!-- Metadata -->
           <div class="px-5 py-4 border-t border-slate-100 shrink-0">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
-              <!-- Submitting as -->
+              <!-- Submitting as: name tinted emerald to stand out; email muted. -->
               <div class="min-w-0">
                 <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Submitting as</div>
-                <div id="submittingAsName" class="mt-1 font-semibold text-slate-800 text-sm break-words leading-snug">&mdash;</div>
+                <div id="submittingAsName" class="mt-1 font-semibold text-emerald-700 text-sm break-words leading-snug">&mdash;</div>
                 <div id="submittingAsEmail" class="text-xs text-slate-500 break-all"></div>
               </div>
 
-              <!-- Designation: custom dropdown so the popup is themed too,
-                   not the OS-native one. Hidden native <select> preserves
-                   form submission and the existing `form.designation.value` API. -->
+              <!-- Designation: fixed per-user value pulled from the ALLOWLIST,
+                   not editable. Server enforces this anyway. -->
               <div class="min-w-0">
                 <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Designation</div>
-                <div id="designationDropdown" class="select-pro relative mt-1">
-                  <button type="button" id="designationTrigger"
-                    class="select-pro-trigger w-full flex items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700"
-                    aria-haspopup="listbox" aria-expanded="false">
-                    <span id="designationLabel" class="truncate">Assistant Manager - I</span>
-                    <svg id="designationChevron" class="w-4 h-4 text-slate-500 transition-transform shrink-0"
-                      viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M6 8l4 4 4-4"/>
-                    </svg>
-                  </button>
-                  <select id="designationSelect" name="designation" class="sr-only" tabindex="-1" aria-hidden="true">
-                    <option value="Intern">Intern</option>
-                    <option value="Assistant Manager - I" selected>Assistant Manager - I</option>
-                    <option value="Assistant Manager - II">Assistant Manager - II</option>
-                    <option value="Assistant Manager - III">Assistant Manager - III</option>
-                    <option value="Deputy Manager - I">Deputy Manager - I</option>
-                  </select>
-                </div>
+                <div id="designationDisplay" class="mt-1 font-semibold text-slate-900 text-sm leading-snug">&mdash;</div>
               </div>
 
               <!-- Domain -->

@@ -12,22 +12,23 @@ const FIREBASE_CONFIG = {
 // 2. Deployed Apps Script web app URL (ends in /exec)
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz6njgCzwRK1i1aXzW9dmlZzlYfexxx72snoSB46L20u4ecitTTTYrLUnrHY_T_rkUmDQ/exec';
 
-// 3. Allowlist — email → display name. Emails must be lowercase.
-//    The SAME map must be pasted into apps-script/Code.gs.
-//    Server enforces this; the client copy is just for UX.
+// 3. Allowlist — email → { name, designation }. Emails must be lowercase.
+//    The SAME map must be pasted into apps-script/Code.gs (the server is
+//    the enforcer; this copy drives the UX). Designation is fixed per user
+//    — it isn't editable in the UI, the server uses this map's value.
 const ALLOWLIST = {
-  'developer.ndma@gmail.com':     'Muhammad Arsalan Mukhtar',
-  'as2040704@gmail.com':          'Abdul Sattar Sheikh',
-  'mustafa.haider2011@gmail.com': 'Syed Mustafa Haider',
-  'shehzadalikhan586@gmail.com':  'Shehzad Ali',
-  'seemalnaeem100@gmail.com':     'Seemal Naeem',
-  'muddasir.ndma25@gmail.com':    'Muddasir Shah',
-  'ahad.khan.work01@gmail.com':   'Muhammad Ahad Khan',
-  'zainabali27feb2024@gmail.com': 'Zainab Ali',
-  'ttalha063@gmail.com':          'Talha Rizwan',
-  'zeeshannasir2001@gmail.com':   'Zeeshan Nasir',
-  'usamabinumar199@gmail.com':    'Usama bin Umar',
-  'osamakhan32156@gmail.com':     'Muhammad Osama Khan'
+  'developer.ndma@gmail.com':     { name: 'Muhammad Arsalan Mukhtar', designation: 'Deputy Manager - I' },
+  'as2040704@gmail.com':          { name: 'Abdul Sattar Sheikh',      designation: 'Assistant Manager - II' },
+  'mustafa.haider2011@gmail.com': { name: 'Syed Mustafa Haider',      designation: 'Assistant Manager - I' },
+  'shehzadalikhan586@gmail.com':  { name: 'Shehzad Ali',              designation: 'Assistant Manager - I' },
+  'seemalnaeem100@gmail.com':     { name: 'Seemal Naeem',             designation: 'Assistant Manager - I' },
+  'muddasir.ndma25@gmail.com':    { name: 'Muddasir Shah',            designation: 'Assistant Manager - I' },
+  'ahad.khan.work01@gmail.com':   { name: 'Muhammad Ahad Khan',       designation: 'Assistant Manager - I' },
+  'zainabali27feb2024@gmail.com': { name: 'Zainab Ali',               designation: 'Assistant Manager - I' },
+  'ttalha063@gmail.com':          { name: 'Talha Rizwan',             designation: 'Assistant Manager - I' },
+  'zeeshannasir2001@gmail.com':   { name: 'Zeeshan Nasir',            designation: 'Assistant Manager - I' },
+  'usamabinumar199@gmail.com':    { name: 'Usama bin Umar',           designation: 'Intern' },
+  'osamakhan32156@gmail.com':     { name: 'Muhammad Osama Khan',      designation: 'Intern' }
 };
 
 // =====================================================
@@ -74,8 +75,9 @@ const weekSummary      = document.getElementById('weekSummary');
 const lastWeekBtn      = document.getElementById('lastWeekBtn');
 const thisWeekBtn      = document.getElementById('thisWeekBtn');
 const clearWeekBtn     = document.getElementById('clearWeekBtn');
-const submittingAsName = document.getElementById('submittingAsName');
-const submittingAsEmail= document.getElementById('submittingAsEmail');
+const submittingAsName  = document.getElementById('submittingAsName');
+const submittingAsEmail = document.getElementById('submittingAsEmail');
+const designationDisplay = document.getElementById('designationDisplay');
 const weekDaysList     = document.getElementById('weekDaysList');
 const taskTable        = document.getElementById('taskTable');
 const taskTbody        = document.getElementById('taskTbody');
@@ -550,7 +552,7 @@ function showAuthGate(errMsg) {
   if (errMsg) { authError.textContent = errMsg; authError.classList.remove('hidden'); }
   else { authError.classList.add('hidden'); authError.textContent = ''; }
 }
-function showForm(user, displayName) {
+function showForm(user, displayName, designation) {
   loadingState.classList.add('hidden');
   authGate.classList.add('hidden');
   form.classList.remove('hidden');
@@ -563,8 +565,9 @@ function showForm(user, displayName) {
   userName.textContent  = displayName;
   userEmail.textContent = user.email;
 
-  submittingAsName.textContent  = displayName;
-  submittingAsEmail.textContent = user.email;
+  submittingAsName.textContent   = displayName;
+  submittingAsEmail.textContent  = user.email;
+  if (designationDisplay) designationDisplay.textContent = designation || '';
 
   // Default to the current ISO week if nothing's selected yet. We don't
   // touch the task table — the user controls its content.
@@ -581,15 +584,15 @@ onAuthStateChanged(auth, (user) => {
     return;
   }
   const email = (user.email || '').toLowerCase();
-  const displayName = ALLOWLIST[email];
-  if (!displayName) {
+  const entry = ALLOWLIST[email];
+  if (!entry) {
     signOut(auth).finally(() => {
       showAuthGate(`The account ${user.email} isn't authorized. Contact your manager.`);
     });
     return;
   }
-  currentUserContext = { user, displayName };
-  showForm(user, displayName);
+  currentUserContext = { user, displayName: entry.name, designation: entry.designation };
+  showForm(user, entry.name, entry.designation);
 });
 
 signInBtn.addEventListener('click', async () => {
@@ -674,7 +677,9 @@ form.addEventListener('submit', async (e) => {
     idToken,
     weekLabel: `Week ${info.week}, ${info.year}`,
     weekRange: `${fmtISO(info.days[0].date)} to ${fmtISO(info.days[4].date)}`,
-    designation: form.designation.value,
+    // Designation is server-enforced from ALLOWLIST — included here only as
+    // a hint; the server ignores it and uses its own value.
+    designation: currentUserContext.designation,
     taskFormat: TASK_FORMAT_VERSION,
     taskRows: serializeTaskTable()
   };
@@ -859,13 +864,10 @@ function loadSubmissionIntoForm(s) {
   if (isoWeek) weekInput.value = isoWeek;
   refreshWeekSummary();
 
-  if (s.designation) {
-    const opt = Array.from(form.designation.options).find(o => o.value === s.designation);
-    if (opt) {
-      form.designation.value = s.designation;
-      syncDesignationLabel();
-    }
-  }
+  // Designation is now fixed per user — past submissions' designations are
+  // ignored on edit; the server will write the current ALLOWLIST value on
+  // resubmit. (Useful when someone gets promoted: their old rows keep the
+  // historical title, new submits pick up the new one.)
 
   // Prefer the new rows format. Fall back to deriving rows from a legacy
   // Quill Delta (day-header split). Last resort: dump plain text into Monday.
@@ -893,91 +895,6 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ---------- Custom designation dropdown ----------
-// Replaces the OS-native select popup with a themed one. The native <select>
-// stays in the DOM as a .sr-only sibling so form submission and existing
-// `form.designation.value` reads keep working unchanged.
-let syncDesignationLabel = function () {};
-(function initDesignationDropdown() {
-  const wrap    = document.getElementById('designationDropdown');
-  const trigger = document.getElementById('designationTrigger');
-  const labelEl = document.getElementById('designationLabel');
-  const select  = document.getElementById('designationSelect');
-  if (!wrap || !trigger || !labelEl || !select) return;
-
-  // Menu lives directly on <body> so the card's overflow:hidden can't clip it.
-  const menu = document.createElement('ul');
-  menu.className = 'select-pro-menu';
-  menu.setAttribute('role', 'listbox');
-  document.body.appendChild(menu);
-
-  function renderMenu() {
-    menu.innerHTML = '';
-    Array.from(select.options).forEach((opt) => {
-      const li = document.createElement('li');
-      li.dataset.value = opt.value;
-      li.textContent = opt.text;
-      li.setAttribute('role', 'option');
-      if (opt.value === select.value) {
-        li.classList.add('selected');
-        li.setAttribute('aria-selected', 'true');
-      }
-      li.addEventListener('click', () => {
-        select.value = opt.value;
-        labelEl.textContent = opt.text;
-        closeMenu();
-      });
-      menu.appendChild(li);
-    });
-  }
-
-  function positionMenu() {
-    const rect = trigger.getBoundingClientRect();
-    menu.style.left  = rect.left + 'px';
-    menu.style.top   = (rect.bottom + 4) + 'px';
-    menu.style.width = rect.width + 'px';
-  }
-
-  function openMenu() {
-    renderMenu();
-    positionMenu();
-    menu.classList.add('open');
-    wrap.classList.add('open');
-    trigger.setAttribute('aria-expanded', 'true');
-  }
-  function closeMenu() {
-    menu.classList.remove('open');
-    wrap.classList.remove('open');
-    trigger.setAttribute('aria-expanded', 'false');
-  }
-  function toggleMenu() {
-    menu.classList.contains('open') ? closeMenu() : openMenu();
-  }
-
-  trigger.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleMenu();
-  });
-  document.addEventListener('click', (e) => {
-    if (!menu.contains(e.target) && !trigger.contains(e.target)) closeMenu();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeMenu();
-  });
-  window.addEventListener('scroll', closeMenu, true);
-  window.addEventListener('resize', closeMenu);
-
-  // Initial label from whichever option was marked `selected` in the HTML.
-  const initial = select.options[select.selectedIndex];
-  if (initial) labelEl.textContent = initial.text;
-
-  // Exposed so loadSubmissionIntoForm() can re-sync after it sets select.value
-  // programmatically (changes via JS don't fire any native event we can listen to).
-  syncDesignationLabel = function () {
-    const cur = select.options[select.selectedIndex];
-    if (cur) labelEl.textContent = cur.text;
-  };
-})();
 
 // Initial UI state
 showLoading();
