@@ -41,6 +41,7 @@ const ALLOWLIST = {
   'zainabali27feb2024@gmail.com': { name: 'Zainab Ali',               designation: 'Assistant Manager - I' },
   'ttalha063@gmail.com':          { name: 'Talha Rizwan',             designation: 'Assistant Manager - I' },
   'zeeshannasir2001@gmail.com':   { name: 'Zeeshan Nasir',            designation: 'Assistant Manager - I' },
+  'ibrahimabdullahh84@gmail.com': { name: 'Ibrahim Abdullah',         designation: 'Assistant Manager - I' },
   'usamabinumar199@gmail.com':    { name: 'Usama bin Umar',           designation: 'Intern' },
   'osamakhan32156@gmail.com':     { name: 'Muhammad Osama Khan',      designation: 'Intern' }
 };
@@ -225,7 +226,7 @@ function debugLog_(label, data) {
   }
 }
 
-const BACKEND_VERSION = 'v9-ordered-list-numbering';
+const BACKEND_VERSION = 'v10-new-user-addition';
 
 function doGet(e) {
   if (e && e.parameter) {

@@ -575,24 +575,119 @@ function showForm(user, displayName, designation) {
   refreshWeekSummary();
 }
 
+// ---------- Idle session timeout (security) ----------
+// A signed-in session is force-signed-out after 8 hours with no real user
+// input. Firebase ID tokens auto-refresh, so without this an unattended (but
+// unlocked) device would stay signed in indefinitely. The last-activity time
+// is mirrored to localStorage so the limit also survives a tab close/reopen —
+// a Firebase-persisted session restored past the deadline is signed out before
+// the form is ever shown.
+const INACTIVITY_LIMIT_MS = 8 * 60 * 60 * 1000; // 8 hours
+const LAST_ACTIVITY_KEY   = 'techew_lastActivityTs';
+const ACTIVITY_EVENTS     = ['mousedown', 'keydown', 'wheel', 'touchstart'];
+
+let lastActivityTs   = 0;
+let lastStorageWrite = 0;
+let inactivityTimer  = null;
+
+function readStoredActivity() {
+  try {
+    const raw = Number(localStorage.getItem(LAST_ACTIVITY_KEY));
+    return Number.isFinite(raw) && raw > 0 ? raw : 0;
+  } catch (_e) { return 0; }
+}
+function writeStoredActivity(ts) {
+  try { localStorage.setItem(LAST_ACTIVITY_KEY, String(ts)); } catch (_e) {}
+}
+function clearStoredActivity() {
+  try { localStorage.removeItem(LAST_ACTIVITY_KEY); } catch (_e) {}
+}
+
+// Newest activity across this tab and any other open tab (localStorage is
+// shared), so staying active in one tab keeps the others alive.
+function effectiveLastActivity() {
+  return Math.max(lastActivityTs, readStoredActivity());
+}
+
+// True when a restored session has been idle past the limit.
+function isSessionIdleExpired() {
+  const stored = readStoredActivity();
+  return stored > 0 && (Date.now() - stored) > INACTIVITY_LIMIT_MS;
+}
+
+function recordActivity() {
+  const now = Date.now();
+  lastActivityTs = now;
+  // These events fire rapidly — throttle the localStorage write to once a minute.
+  if (now - lastStorageWrite > 60000) {
+    lastStorageWrite = now;
+    writeStoredActivity(now);
+  }
+  scheduleIdleCheck();
+}
+
+function scheduleIdleCheck() {
+  if (inactivityTimer) clearTimeout(inactivityTimer);
+  const remaining = effectiveLastActivity() + INACTIVITY_LIMIT_MS - Date.now();
+  inactivityTimer = setTimeout(onIdleCheck, Math.max(remaining, 0));
+}
+
+function onIdleCheck() {
+  // setTimeout can fire late (device sleep) or stale relative to activity in
+  // another tab — re-check the real elapsed time before signing out.
+  const remaining = effectiveLastActivity() + INACTIVITY_LIMIT_MS - Date.now();
+  if (remaining > 0) { scheduleIdleCheck(); return; }
+  stopInactivityTracking();
+  signOut(auth).finally(() => {
+    showAuthGate('Signed out after 8 hours of inactivity. Please sign in again.');
+  });
+}
+
+function startInactivityTracking() {
+  stopInactivityTracking();      // idempotent — drop any prior listeners/timer
+  lastStorageWrite = 0;          // force the first write through the throttle
+  recordActivity();              // stamp "now" and arm the timer
+  ACTIVITY_EVENTS.forEach((evt) =>
+    window.addEventListener(evt, recordActivity, { passive: true }));
+}
+
+function stopInactivityTracking() {
+  if (inactivityTimer) { clearTimeout(inactivityTimer); inactivityTimer = null; }
+  ACTIVITY_EVENTS.forEach((evt) => window.removeEventListener(evt, recordActivity));
+}
+
 let currentUserContext = null; // { user, displayName }
 
 onAuthStateChanged(auth, (user) => {
   if (!user) {
     currentUserContext = null;
+    stopInactivityTracking();
+    clearStoredActivity();
     showAuthGate();
     return;
   }
   const email = (user.email || '').toLowerCase();
   const entry = ALLOWLIST[email];
   if (!entry) {
+    stopInactivityTracking();
     signOut(auth).finally(() => {
       showAuthGate(`The account ${user.email} isn't authorized. Contact your manager.`);
     });
     return;
   }
+  // Security: a session restored from persistence that has been idle beyond
+  // the 8-hour limit is signed out before the form is ever shown.
+  if (isSessionIdleExpired()) {
+    stopInactivityTracking();
+    clearStoredActivity();
+    signOut(auth).finally(() => {
+      showAuthGate('Signed out after 8 hours of inactivity. Please sign in again.');
+    });
+    return;
+  }
   currentUserContext = { user, displayName: entry.name, designation: entry.designation };
   showForm(user, entry.name, entry.designation);
+  startInactivityTracking();
 });
 
 signInBtn.addEventListener('click', async () => {

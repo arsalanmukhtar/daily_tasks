@@ -9,6 +9,45 @@ Internal web app where the GIS team logs weekly tasks. Static frontend on GitHub
 
 ---
 
+## Running locally
+
+The site is plain static files — [index.html](index.html), [app.js](app.js), [styles.css](styles.css) — with **no build step**. But you can't just double-click `index.html`: `app.js` loads as an ES module (`type="module"`) and the Firebase modular SDK imports won't run over the `file://` protocol. You need a local HTTP server.
+
+`localhost` is already in the Firebase **Authorized domains** list, so Google Sign-In works locally on any port — no extra setup.
+
+Pick **one** of the options below, then open the printed `http://localhost:…` URL in a browser.
+
+### Option A — Python (ships with Python, nothing to install)
+
+```powershell
+cd d:\muhammad_arsalan\daily_tasks
+python -m http.server 9000
+```
+
+Open http://localhost:8000/
+
+### Option B — Node
+
+```powershell
+cd d:\muhammad_arsalan\daily_tasks
+npx serve -l 9000
+```
+
+`npx` downloads `serve` on first run. Open the URL it prints.
+
+### Option C — VS Code Live Server
+
+Install the **Live Server** extension → right-click `index.html` → **Open with Live Server**.
+
+### Notes
+
+- **Internet is required even locally.** Tailwind, the Firebase SDK, and the Apps Script backend all load/call over the network.
+- **There is no separate test backend.** `APPS_SCRIPT_URL` in [app.js](app.js) points at the production Apps Script web app, so anything you submit from localhost writes to the **real `Weekly Submissions` sheet**. Submissions upsert by (email, week), so testing under your own account just overwrites your own row — it won't pollute anyone else's. Delete the test row afterwards if needed.
+- **Frontend changes** (`index.html`, `app.js`, `styles.css`) only need a browser refresh — hard-refresh with **Ctrl+Shift+R** to bypass cache. **Backend changes** (`apps-script/Code.gs`) are *not* served locally; they require the Apps Script redeploy in §3.
+- Stop the server with **Ctrl+C** in the terminal.
+
+---
+
 ## Adding a new team member to the allowlist
 
 There are **four steps**, and the order matters. Skipping any one leaves the system in a confusing half-broken state.
@@ -69,7 +108,7 @@ https://script.google.com/macros/s/AKfycbz6njgCzwRK1i1aXzW9dmlZzlYfexxx72snoSB46
 Expected:
 
 ```json
-{"status":"ok","message":"Tech EW endpoint live","version":"v6-richtext-fallback"}
+{"status":"ok","message":"Tech EW endpoint live","version":"v9-ordered-list-numbering"}
 ```
 
 If `version` doesn't match the `BACKEND_VERSION` constant in [apps-script/Code.gs](apps-script/Code.gs), the "New version" step in **§3.4** was skipped — redo it.
