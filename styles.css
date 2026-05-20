@@ -221,6 +221,17 @@ textarea {
   background: #fff7ed;
   box-shadow: inset 0 0 0 1.5px #fdba74;
 }
+
+/* Future-day lock — weekday columns that haven't happened yet (e.g. this
+   week's Thu/Fri when today is Wed) can't be edited; the header and the
+   matching "Week days" row are faded to signal it. */
+.cell-editor.cell-locked {
+  background: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+.tb-th.is-future { opacity: 0.5; }
+.weekday-row.is-future { opacity: 0.4; }
 /* Tailwind's preflight resets ul/ol to list-style: none, so we restore
    the markers explicitly for cells — otherwise B/I/U works but the bullet
    and number buttons look like they do nothing. */

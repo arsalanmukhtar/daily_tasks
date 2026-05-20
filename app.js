@@ -117,6 +117,11 @@ const TASK_FORMAT_VERSION = 'rows-v1';
 
 let activeCell = null;
 
+// Weekday column keys (Mon..Fri) that fall after today for the selected week.
+// Cells in these columns are locked — you can't log time for a day that hasn't
+// happened yet. Kept in sync by applyFutureDayLocks().
+let futureDays = new Set();
+
 function createTaskRow(rowData) {
   const tr = document.createElement('tr');
   tr.className = 'task-row';
@@ -125,10 +130,13 @@ function createTaskRow(rowData) {
     td.className = 'task-cell';
     const cell = document.createElement('div');
     cell.className = 'cell-editor';
-    cell.contentEditable = 'true';
     cell.dataset.day = day;
-    cell.dataset.placeholder = day + ' tasks…';
     cell.spellcheck = true;
+    // Lock columns whose day is still in the future for the selected week.
+    const locked = futureDays.has(day);
+    cell.contentEditable = locked ? 'false' : 'true';
+    cell.classList.toggle('cell-locked', locked);
+    cell.dataset.placeholder = locked ? 'Upcoming' : (day + ' tasks…');
     if (rowData && rowData[day]) cell.innerHTML = rowData[day];
     cell.addEventListener('focus', () => { activeCell = cell; });
     td.appendChild(cell);
@@ -480,6 +488,7 @@ function refreshWeekSummary() {
     updateWeekTriggerLabel(null);
     renderWeekDaysList(null);
     updateColumnHeaderDates(null);
+    applyFutureDayLocks(null);
     return null;
   }
   weekSummary.textContent =
@@ -487,6 +496,7 @@ function refreshWeekSummary() {
   updateWeekTriggerLabel(info);
   renderWeekDaysList(info);
   updateColumnHeaderDates(info);
+  applyFutureDayLocks(info);
   return info;
 }
 
@@ -496,6 +506,38 @@ function isTodayDate(date) {
   return date.getUTCFullYear() === now.getFullYear() &&
          date.getUTCMonth()    === now.getMonth() &&
          date.getUTCDate()     === now.getDate();
+}
+
+// True when `date` (a UTC calendar date) falls after the user's current local
+// day — i.e. a day that hasn't happened yet.
+function isFutureDate(date) {
+  const now = new Date();
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const d = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  return d > today;
+}
+
+// Locks the weekday columns that fall after today for the selected week, so
+// users can't log time for days that haven't happened yet. Past weeks and
+// already-elapsed days stay editable. Re-applied whenever the week changes.
+function applyFutureDayLocks(info) {
+  futureDays = new Set();
+  if (info) {
+    info.days.forEach((d, i) => {
+      if (isFutureDate(d.date)) futureDays.add(TASK_DAYS[i]);
+    });
+  }
+  taskTbody.querySelectorAll('.cell-editor').forEach((cell) => {
+    const day = cell.dataset.day;
+    const locked = futureDays.has(day);
+    cell.contentEditable = locked ? 'false' : 'true';
+    cell.classList.toggle('cell-locked', locked);
+    cell.dataset.placeholder = locked ? 'Upcoming' : (day + ' tasks…');
+    if (locked && activeCell === cell) activeCell = null;
+  });
+  taskTable.querySelectorAll('thead th[data-day]').forEach((th) => {
+    th.classList.toggle('is-future', futureDays.has(th.dataset.day));
+  });
 }
 
 function renderWeekDaysList(info) {
@@ -509,7 +551,8 @@ function renderWeekDaysList(info) {
     const isToday = isTodayDate(d.date);
     const row = document.createElement('div');
     row.className = 'weekday-row flex items-center justify-between gap-3 text-sm' +
-      (isToday ? ' is-today' : '');
+      (isToday ? ' is-today' : '') +
+      (isFutureDate(d.date) ? ' is-future' : '');
     const longDate = d.date.toLocaleDateString('en-GB', {
       day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC'
     });
