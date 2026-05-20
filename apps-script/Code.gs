@@ -23,7 +23,12 @@
 // =====================================================
 // CONFIG — fill these in.
 // =====================================================
-const FIREBASE_API_KEY    = 'AIzaSyA1exz20sN1WqLQdNkP986JX5wHuICYolg';
+
+// Bump this on EVERY redeploy. doGet() echoes it back, so opening the /exec
+// URL and checking the "version" field confirms the new code actually went live.
+const BACKEND_VERSION = 'v15-variables-organized';
+
+const FIREBASE_API_KEY = 'AIzaSyA1exz20sN1WqLQdNkP986JX5wHuICYolg';
 const FIREBASE_PROJECT_ID = 'devteam-daily-tasks';
 
 // Must mirror the ALLOWLIST in app.js. Emails MUST be lowercase here.
@@ -32,19 +37,19 @@ const FIREBASE_PROJECT_ID = 'devteam-daily-tasks';
 // to; it is written to BOTH the "Assigned By" and "Report To" sheet columns
 // and shown on the form. The server uses this map as the source of truth.
 const ALLOWLIST = {
-  'developer.ndma@gmail.com':     { name: 'Muhammad Arsalan Mukhtar', designation: 'Deputy Manager - I',     reportedTo: 'Junaid Aziz Khan' },
-  'as2040704@gmail.com':          { name: 'Abdul Sattar Sheikh',      designation: 'Assistant Manager - II', reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'mustafa.haider2011@gmail.com': { name: 'Syed Mustafa Haider',      designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'shehzadalikhan586@gmail.com':  { name: 'Shehzad Ali',              designation: 'Assistant Manager - I',  reportedTo: 'Kashif Iqbal' },
-  'seemalnaeem100@gmail.com':     { name: 'Seemal Naeem',             designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'muddasir.ndma25@gmail.com':    { name: 'Muddasir Shah',            designation: 'Assistant Manager - I',  reportedTo: 'Imtiaz Nabi' },
-  'ahad.khan.work01@gmail.com':   { name: 'Muhammad Ahad Khan',       designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'zainabali27feb2004@gmail.com': { name: 'Zainab Ali',               designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'ttalha063@gmail.com':          { name: 'Talha Rizwan',             designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'zeeshannasir2001@gmail.com':   { name: 'Zeeshan Nasir',            designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'ibrahimabdullahh84@gmail.com': { name: 'Ibrahim Abdullah',         designation: 'Assistant Manager - I',  reportedTo: 'Imtiaz Nabi' },
-  'usamabinumar199@gmail.com':    { name: 'Usama bin Umar',           designation: 'Intern',                 reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'osamakhan32156@gmail.com':     { name: 'Muhammad Osama Khan',      designation: 'Intern',                 reportedTo: 'Muhammad Arsalan Mukhtar' }
+  'developer.ndma@gmail.com': { name: 'Muhammad Arsalan Mukhtar', designation: 'Deputy Manager - I', reportedTo: 'Junaid Aziz Khan' },
+  'as2040704@gmail.com': { name: 'Abdul Sattar Sheikh', designation: 'Assistant Manager - II', reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'mustafa.haider2011@gmail.com': { name: 'Syed Mustafa Haider', designation: 'Assistant Manager - III', reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'shehzadalikhan586@gmail.com': { name: 'Shehzad Ali', designation: 'Assistant Manager - I', reportedTo: 'Kashif Iqbal' },
+  'seemalnaeem100@gmail.com': { name: 'Seemal Naeem', designation: 'Assistant Manager - I', reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'muddasir.ndma25@gmail.com': { name: 'Muddasir Shah', designation: 'Assistant Manager - I', reportedTo: 'Imtiaz Nabi' },
+  'ahad.khan.work01@gmail.com': { name: 'Muhammad Ahad Khan', designation: 'Assistant Manager - I', reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'zainabali27feb2004@gmail.com': { name: 'Zainab Ali', designation: 'Assistant Manager - I', reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'ttalha063@gmail.com': { name: 'Talha Rizwan', designation: 'Assistant Manager - I', reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'zeeshannasir2001@gmail.com': { name: 'Zeeshan Nasir', designation: 'Assistant Manager - I', reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'ibrahimabdullahh84@gmail.com': { name: 'Ibrahim Abdullah', designation: 'Assistant Manager - I', reportedTo: 'Imtiaz Nabi' },
+  'usamabinumar199@gmail.com': { name: 'Usama bin Umar', designation: 'Intern', reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'osamakhan32156@gmail.com': { name: 'Muhammad Osama Khan', designation: 'Intern', reportedTo: 'Muhammad Arsalan Mukhtar' }
 };
 
 // The account owner — the only user allowed to export the team-wide weekly
@@ -121,7 +126,7 @@ function processSubmission_(e) {
     }
     const displayName = entry.name;
     const designation = entry.designation;
-    const reportedTo  = entry.reportedTo || '';
+    const reportedTo = entry.reportedTo || '';
     debugLog_('6. allowlist hit', email + ' → ' + displayName + ' (' + designation + ') reportedTo=' + (reportedTo || '(unset)'));
 
     const sheet = getOrCreateSheet_();
@@ -141,7 +146,7 @@ function processSubmission_(e) {
       taskJson = JSON.stringify({ format: 'rows-v1', rows: body.taskRows });
       sheetCellWriter = function (cellRange) {
         cellRange.setValue(rowsToSheetText_(body.taskRows, weekRange))
-                 .setWrap(true).setVerticalAlignment('top');
+          .setWrap(true).setVerticalAlignment('top');
       };
     } else {
       taskJson = JSON.stringify(body.taskDelta || { ops: [] });
@@ -203,7 +208,7 @@ function testBinding() {
   console.log('Bound spreadsheet NAME: ' + ss.getName());
   console.log('Bound spreadsheet ID:   ' + ss.getId());
   console.log('Bound spreadsheet URL:  ' + ss.getUrl());
-  console.log('Tabs in this sheet:     ' + ss.getSheets().map(function(s){return s.getName();}).join(', '));
+  console.log('Tabs in this sheet:     ' + ss.getSheets().map(function (s) { return s.getName(); }).join(', '));
 }
 
 /**
@@ -229,8 +234,6 @@ function debugLog_(label, data) {
     // best-effort logger — swallow failures so they don't mask the real error
   }
 }
-
-const BACKEND_VERSION = 'v13-zainab-email-fix';
 
 function doGet(e) {
   if (e && e.parameter) {
@@ -284,8 +287,8 @@ function listSubmissions_(e) {
     if (last < 2) return jsonOrJsonp_(e, { status: 'ok', submissions: [] });
 
     const dataRange = sheet.getRange(2, 1, last - 1, HEADERS.length);
-    const values    = dataRange.getValues();
-    const richVals  = dataRange.getRichTextValues();
+    const values = dataRange.getValues();
+    const richVals = dataRange.getRichTextValues();
     const submissions = [];
     for (let i = 0; i < values.length; i++) {
       const r = values[i];
@@ -383,14 +386,14 @@ function exportWeek_(e) {
         }
 
         submissions.push({
-          email:       String(r[1] || '').toLowerCase(),
-          name:        r[2] || '',
+          email: String(r[1] || '').toLowerCase(),
+          name: r[2] || '',
           designation: r[3] || '',
-          weekLabel:   r[5] || '',
-          weekRange:   r[6] || '',
-          reportedTo:  r[8] || '',
-          taskPlain:   String(r[7] || ''),
-          taskRows:    taskRows
+          weekLabel: r[5] || '',
+          weekRange: r[6] || '',
+          reportedTo: r[8] || '',
+          taskPlain: String(r[7] || ''),
+          taskRows: taskRows
         });
       }
     }
@@ -411,7 +414,7 @@ function findRowByEmailAndWeek_(sheet, email, weekLabel) {
   const values = sheet.getRange(2, 1, last - 1, 6).getValues();
   for (let i = 0; i < values.length; i++) {
     if (String(values[i][1] || '').toLowerCase() === email &&
-        String(values[i][5] || '') === weekLabel) {
+      String(values[i][5] || '') === weekLabel) {
       return i + 2;
     }
   }
@@ -647,7 +650,7 @@ function deltaToRichText_(delta) {
 
   const builder = SpreadsheetApp.newRichTextValue().setText(plain || '');
   for (const r of ranges) {
-    try { builder.setTextStyle(r.start, r.end, r.style); } catch (e) {}
+    try { builder.setTextStyle(r.start, r.end, r.style); } catch (e) { }
   }
   return builder.build();
 }
@@ -660,7 +663,7 @@ function attrsToStyle_(attrs) {
   if (attrs.italic) { b.setItalic(true); any = true; }
   if (attrs.underline) { b.setUnderline(true); any = true; }
   if (attrs.strike) { b.setStrikethrough(true); any = true; }
-  if (attrs.color) { try { b.setForegroundColor(attrs.color); any = true; } catch (e) {} }
+  if (attrs.color) { try { b.setForegroundColor(attrs.color); any = true; } catch (e) { } }
   return any ? b.build() : null;
 }
 
@@ -697,14 +700,14 @@ function richTextValueToDelta_(rtv) {
       if (!runText) continue;
       const style = run.getTextStyle();
       const attrs = {};
-      try { if (style.isBold && style.isBold()) attrs.bold = true; } catch (_e) {}
-      try { if (style.isItalic && style.isItalic()) attrs.italic = true; } catch (_e) {}
-      try { if (style.isUnderline && style.isUnderline()) attrs.underline = true; } catch (_e) {}
-      try { if (style.isStrikethrough && style.isStrikethrough()) attrs.strike = true; } catch (_e) {}
+      try { if (style.isBold && style.isBold()) attrs.bold = true; } catch (_e) { }
+      try { if (style.isItalic && style.isItalic()) attrs.italic = true; } catch (_e) { }
+      try { if (style.isUnderline && style.isUnderline()) attrs.underline = true; } catch (_e) { }
+      try { if (style.isStrikethrough && style.isStrikethrough()) attrs.strike = true; } catch (_e) { }
       try {
         const fg = style.getForegroundColor && style.getForegroundColor();
         if (fg && fg !== '#000000' && fg !== '#000') attrs.color = fg;
-      } catch (_e) {}
+      } catch (_e) { }
 
       let header = null;
       try {
@@ -712,7 +715,7 @@ function richTextValueToDelta_(rtv) {
         if (size === 18) header = 1;
         else if (size === 15) header = 2;
         else if (size === 13) header = 3;
-      } catch (_e) {}
+      } catch (_e) { }
 
       // Newlines carry line attributes (header) in Quill; split this run on
       // '\n' and emit segments + newlines separately so the header attaches

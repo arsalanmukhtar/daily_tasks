@@ -391,6 +391,8 @@
        card's overflow never clips it. Positioned under the trigger by app.js. -->
   <div id="exportWeekPanel" class="ew-panel" role="listbox" aria-label="Week to export"></div>
 
-  <script type="module" src="app.js"></script>
+  <!-- ?v= is a cache-buster: bump it whenever app.js changes so browsers
+       fetch the new file instead of serving a stale cached copy. -->
+  <script type="module" src="app.js?v=20260520"></script>
 </body>
 </html>

@@ -122,6 +122,10 @@ let activeCell = null;
 // happened yet. Kept in sync by applyFutureDayLocks().
 let futureDays = new Set();
 
+// The signed-in user's submissions, cached so the form can auto-load a week's
+// saved content when the week changes (no network round-trip per change).
+let submissionsCache = null;
+
 function createTaskRow(rowData) {
   const tr = document.createElement('tr');
   tr.className = 'task-row';
@@ -500,6 +504,41 @@ function isoWeekToMonday(year, week) {
 function fmtISO(d) { return d.toISOString().slice(0, 10); }
 function fmtLong(d) { return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }); }
 
+// "18 May 2026" — a single date with month and year spelled out.
+function fmtFull(d) {
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+// "May 2026"
+function fmtMonthYear(d) {
+  return d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+
+// A Mon–Fri week range that always carries its month(s) + year, so every week
+// reads as a true calendar date. Handles ranges that straddle a month or year:
+//   same month  → "18–22 May 2026"
+//   cross-month → "27 Apr – 1 May 2026"
+//   cross-year  → "29 Dec 2025 – 2 Jan 2026"
+function fmtWeekRange(start, end) {
+  const dayMon = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  if (start.getUTCFullYear() !== end.getUTCFullYear()) {
+    return fmtFull(start) + ' – ' + fmtFull(end);
+  }
+  if (start.getUTCMonth() !== end.getUTCMonth()) {
+    return dayMon(start) + ' – ' + dayMon(end) + ' ' + end.getUTCFullYear();
+  }
+  return start.getUTCDate() + '–' + end.getUTCDate() + ' ' + fmtMonthYear(end);
+}
+
+// Renders a stored "YYYY-MM-DD to YYYY-MM-DD" range in the readable form above.
+function prettyWeekRange(rangeStr) {
+  const m = /(\d{4})-(\d{2})-(\d{2})\s+to\s+(\d{4})-(\d{2})-(\d{2})/.exec(String(rangeStr || ''));
+  if (!m) return String(rangeStr || '');
+  return fmtWeekRange(
+    new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])),
+    new Date(Date.UTC(+m[4], +m[5] - 1, +m[6]))
+  );
+}
+
 function weekdaysFor(weekStr) {
   const m = /^(\d{4})-W(\d{2})$/.exec(weekStr || '');
   if (!m) return null;
@@ -543,7 +582,7 @@ function refreshWeekSummary() {
     return null;
   }
   weekSummary.textContent =
-    `Week ${info.week}, ${info.year}  ·  ${fmtLong(info.days[0].date)} – ${fmtLong(info.days[4].date)}, ${info.year}`;
+    `Week ${info.week}, ${info.year}  ·  ${fmtWeekRange(info.days[0].date, info.days[4].date)}`;
   updateWeekTriggerLabel(info);
   renderWeekDaysList(info);
   updateColumnHeaderDates(info);
@@ -661,7 +700,7 @@ let calOpen      = false;
 
 function updateWeekTriggerLabel(info) {
   if (info) {
-    weekTriggerLabel.textContent = `Week ${info.week}, ${info.year}`;
+    weekTriggerLabel.textContent = `Week ${info.week} · ${fmtMonthYear(info.days[0].date)}`;
     weekTriggerLabel.classList.remove('placeholder');
   } else {
     weekTriggerLabel.textContent = 'Select a week';
@@ -785,6 +824,7 @@ function shiftCalMonth(delta) {
 function pickWeekFromCalendar(weekKey) {
   weekInput.value = weekKey;
   refreshWeekSummary();
+  syncTableToSelectedWeek();
   closeCalendar();
   weekTrigger.focus();
 }
@@ -806,6 +846,7 @@ calPopup.addEventListener('click', (e) => {
   if (e.target.closest('.week-cal-clear')) {
     weekInput.value = '';
     refreshWeekSummary();
+    syncTableToSelectedWeek();
     closeCalendar();
     return;
   }
@@ -848,7 +889,7 @@ function updateColumnHeaderDates(info) {
     if (info) {
       const d = info.days[dayIndex[th.dataset.day]].date;
       dateEl.textContent = d.toLocaleDateString('en-GB', {
-        day: '2-digit', month: 'short', timeZone: 'UTC'
+        day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC'
       });
       th.classList.toggle('is-today', isTodayDate(d));
     } else {
@@ -863,16 +904,19 @@ function updateColumnHeaderDates(info) {
 lastWeekBtn.addEventListener('click', () => {
   weekInput.value = getPreviousIsoWeekString();
   refreshWeekSummary();
+  syncTableToSelectedWeek();
 });
 
 thisWeekBtn.addEventListener('click', () => {
   weekInput.value = getCurrentIsoWeekString();
   refreshWeekSummary();
+  syncTableToSelectedWeek();
 });
 
 clearWeekBtn.addEventListener('click', () => {
   weekInput.value = '';
   refreshWeekSummary();
+  syncTableToSelectedWeek();
 });
 
 // ---------- Auth state machine ----------
@@ -1034,6 +1078,7 @@ onAuthStateChanged(auth, (user) => {
     });
     return;
   }
+  submissionsCache = null;
   currentUserContext = {
     user,
     displayName: entry.name,
@@ -1042,6 +1087,11 @@ onAuthStateChanged(auth, (user) => {
   };
   showForm(user, entry.name, entry.designation, entry.reportedTo);
   startInactivityTracking();
+  // Pre-load this user's submissions, then reflect the current week's saved
+  // content in the table — but only if they haven't already started typing.
+  fetchUserSubmissions_()
+    .then(function () { if (isTaskTableEmpty()) syncTableToSelectedWeek(); })
+    .catch(function () { /* offline — the form still works */ });
 });
 
 signInBtn.addEventListener('click', async () => {
@@ -1111,8 +1161,9 @@ const editBanner      = document.getElementById('editBanner');
 const editBannerTitle = document.getElementById('editBannerTitle');
 const cancelEditBtn   = document.getElementById('cancelEditBtn');
 
-function enterEditMode(weekLabel) {
-  editBannerTitle.textContent = 'Editing ' + weekLabel;
+function enterEditMode(weekLabel, weekRange) {
+  const range = prettyWeekRange(weekRange);
+  editBannerTitle.textContent = 'Editing ' + weekLabel + (range ? ' · ' + range : '');
   editBanner.classList.remove('hidden');
   cancelEditBtn.classList.remove('hidden');
 }
@@ -1197,6 +1248,8 @@ form.addEventListener('submit', async (e) => {
     });
     setStatus('ok', '');
     exitEditMode();
+    // Refresh the cache so a later week-switch reflects this submission.
+    fetchUserSubmissions_().catch(function () {});
   } catch (err) {
     setStatus('error', 'Submit failed: ' + err.message);
   } finally {
@@ -1283,17 +1336,22 @@ function jsonpFetch(url, params, timeoutMs) {
   });
 }
 
+// Fetches the signed-in user's submissions and refreshes the cache. Throws on
+// failure so callers can surface it however they need.
+async function fetchUserSubmissions_() {
+  const idToken = await currentUserContext.user.getIdToken(false);
+  const data = await jsonpFetch(APPS_SCRIPT_URL, { action: 'list', idToken: idToken });
+  if (!data || data.status !== 'ok') {
+    throw new Error((data && data.message) || 'Failed to load submissions.');
+  }
+  submissionsCache = data.submissions || [];
+  return submissionsCache;
+}
+
 async function fetchSubmissions() {
   try {
-    const idToken = await currentUserContext.user.getIdToken(false);
-    const data = await jsonpFetch(APPS_SCRIPT_URL, {
-      action: 'list',
-      idToken: idToken
-    });
-    if (!data || data.status !== 'ok') {
-      throw new Error((data && data.message) || 'Failed to load submissions.');
-    }
-    renderSubmissions(data.submissions || []);
+    await fetchUserSubmissions_();
+    renderSubmissions(submissionsCache || []);
   } catch (err) {
     submissionsList.innerHTML =
       '<div class="error-callout">' +
@@ -1411,7 +1469,7 @@ function renderSubmissions(subs) {
       '<div class="flex items-start justify-between gap-3 mb-2">' +
         '<div class="min-w-0 flex-1">' +
           '<div class="font-semibold text-slate-800 text-sm truncate">' + escapeHtml(s.weekLabel) + '</div>' +
-          '<div class="text-xs text-slate-500 mt-0.5 truncate">' + escapeHtml(s.weekRange) + '</div>' +
+          '<div class="text-xs text-slate-500 mt-0.5 truncate">' + escapeHtml(prettyWeekRange(s.weekRange)) + '</div>' +
         '</div>' +
         '<button type="button" class="edit-week-btn shrink-0 w-8 h-8 rounded-lg bg-orange-100 text-orange-700 inline-flex items-center justify-center hover:bg-orange-200 hover:text-orange-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 transition" ' +
           'title="Edit this submission" aria-label="Edit ' + escapeHtml(s.weekLabel) + '">' +
@@ -1432,16 +1490,10 @@ function renderSubmissions(subs) {
   }
 }
 
-function loadSubmissionIntoForm(s) {
-  const isoWeek = weekLabelToIsoInput(s.weekLabel);
-  if (isoWeek) weekInput.value = isoWeek;
-  refreshWeekSummary();
-
-  // Designation is now fixed per user — past submissions' designations are
-  // ignored on edit; the server will write the current ALLOWLIST value on
-  // resubmit. (Useful when someone gets promoted: their old rows keep the
-  // historical title, new submits pick up the new one.)
-
+// Loads a submission's saved rows into the task table and shows the edit
+// banner. The week must already be selected + refreshed before this runs, so
+// the future-day locks apply to the freshly-created cells.
+function applySubmissionToTable(s) {
   // Prefer the new rows format. Fall back to deriving rows from a legacy
   // Quill Delta (day-header split). Last resort: dump plain text into Monday.
   if (Array.isArray(s.taskRows) && s.taskRows.length) {
@@ -1454,9 +1506,40 @@ function loadSubmissionIntoForm(s) {
   } else {
     clearTaskTable();
   }
+  enterEditMode(s.weekLabel, s.weekRange);
+}
 
+// Makes the task table reflect the currently-selected week: loads that week's
+// saved submission if one exists, otherwise resets to a fresh empty table.
+// Runs on every explicit week change.
+async function syncTableToSelectedWeek() {
+  const info = weekdaysFor(weekInput.value);
+  if (!info) {                          // week cleared
+    clearTaskTable();
+    exitEditMode();
+    setStatus('info', '');
+    return;
+  }
+  if (submissionsCache === null && currentUserContext) {
+    try { await fetchUserSubmissions_(); } catch (_e) { /* offline — treat as none */ }
+  }
+  const weekLabel = 'Week ' + info.week + ', ' + info.year;
+  const existing = (submissionsCache || []).find(function (s) { return s.weekLabel === weekLabel; });
+  if (existing) {
+    applySubmissionToTable(existing);
+  } else {
+    clearTaskTable();
+    exitEditMode();
+  }
   setStatus('info', '');
-  enterEditMode(s.weekLabel);
+}
+
+function loadSubmissionIntoForm(s) {
+  const isoWeek = weekLabelToIsoInput(s.weekLabel);
+  if (isoWeek) weekInput.value = isoWeek;
+  refreshWeekSummary();
+  applySubmissionToTable(s);
+  setStatus('info', '');
   closeSubmissionsDrawer();
 }
 
@@ -1508,7 +1591,7 @@ function populateExportWeeks() {
     if (!info) continue;
     const text =
       'Week ' + info.week + ', ' + info.year + '  ·  ' +
-      fmtLong(info.days[0].date) + ' – ' + fmtLong(info.days[4].date);
+      fmtWeekRange(info.days[0].date, info.days[4].date);
     if (!firstValue) { firstValue = isoStr; firstText = text; }
     exportWeekPanel.appendChild(makeWeekOption(isoStr, text));
   }
@@ -1629,7 +1712,7 @@ async function buildExportWorkbook(ExcelJSlib, info, weekLabel, submissions) {
   const byEmail = {};
   for (const s of (submissions || [])) byEmail[(s.email || '').toLowerCase()] = s;
 
-  const weekRange = fmtISO(info.days[0].date) + ' to ' + fmtISO(info.days[4].date);
+  const weekRange = fmtWeekRange(info.days[0].date, info.days[4].date);
   const dayKeys = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
   const border = {
     top:    { style: 'thin', color: { argb: 'FFE2E8F0' } },
@@ -1674,7 +1757,7 @@ async function buildExportWorkbook(ExcelJSlib, info, weekLabel, submissions) {
     const headerRow = ws.getRow(5);
     info.days.forEach(function (d, i) {
       const cell = headerRow.getCell(i + 1);
-      cell.value = d.name + '\n' + fmtISO(d.date);
+      cell.value = d.name + '\n' + fmtFull(d.date);
       cell.font = { bold: true, color: { argb: 'FF1E293B' } };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2FF' } };
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };

@@ -13,5 +13,6 @@ Thumbs.db
 # Local-only theme picker helper (not part of the app)
 theme-preview.html
 
-# One-time data-seed script (run once in Apps Script, not part of the app)
+# One-time data-seed scripts (run once in Apps Script, not part of the app)
 apps-script/seed-mustafa-haider.gs
+apps-script/seed-arsalan-mukhtar.gs
