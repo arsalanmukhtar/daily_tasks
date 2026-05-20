@@ -26,15 +26,30 @@
             <p class="mt-0.5 text-slate-300 text-[11px] sm:text-xs">Log your weekly tasks &middot; submissions sync directly to the team sheet.</p>
           </div>
 
-          <div id="userChip" class="hidden items-center gap-2.5 sm:gap-3 bg-white/10 backdrop-blur rounded-xl px-3 py-1.5 text-sm shrink-0 w-full md:w-auto">
-            <img id="userPhoto" alt="" referrerpolicy="no-referrer" class="w-8 h-8 sm:w-9 sm:h-9 rounded-full ring-2 ring-white/40 shrink-0 bg-white/20 object-cover" />
-            <div class="leading-tight min-w-0 flex-1">
-              <div id="userName" class="font-medium truncate text-sm"></div>
-              <div id="userEmail" class="text-slate-300 text-xs truncate"></div>
-            </div>
-            <button id="signOutBtn" type="button" class="text-xs px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/25 transition whitespace-nowrap shrink-0">
-              Sign out
+          <div class="flex flex-col sm:flex-row sm:items-stretch gap-2.5 sm:gap-3 w-full md:w-auto">
+            <!-- Owner-only weekly-summary export — revealed by app.js for the
+                 account owner (developer.ndma@gmail.com). sm:items-stretch on
+                 the wrapper makes this match the user chip's height. -->
+            <button id="exportSummaryBtn" type="button"
+              class="hidden items-center justify-center gap-2 w-full sm:w-auto px-3.5 py-2 rounded-xl bg-white/95 backdrop-blur text-slate-800 text-xs sm:text-sm font-semibold shadow-sm hover:bg-white active:bg-slate-100 transition shrink-0 whitespace-nowrap">
+              <svg class="w-4 h-4 text-orange-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 3v12"/>
+                <path d="m8 11 4 4 4-4"/>
+                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+              </svg>
+              <span>Export weekly summary</span>
             </button>
+
+            <div id="userChip" class="hidden items-center gap-2.5 sm:gap-3 bg-white/10 backdrop-blur rounded-xl px-3 py-1.5 text-sm shrink-0 w-full sm:w-auto">
+              <img id="userPhoto" alt="" referrerpolicy="no-referrer" class="w-8 h-8 sm:w-9 sm:h-9 rounded-full ring-2 ring-white/40 shrink-0 bg-white/20 object-cover" />
+              <div class="leading-tight min-w-0 flex-1">
+                <div id="userName" class="font-medium truncate text-sm"></div>
+                <div id="userEmail" class="text-slate-300 text-xs truncate"></div>
+              </div>
+              <button id="signOutBtn" type="button" class="text-xs px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/25 transition whitespace-nowrap shrink-0">
+                Sign out
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -318,6 +333,63 @@
     </header>
     <div id="submissionsList" class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5"></div>
   </aside>
+
+  <!-- ============ EXPORT WEEKLY SUMMARY MODAL (owner only) ============ -->
+  <div id="exportBackdrop" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60]"></div>
+  <div id="exportModal" class="hidden fixed inset-0 z-[70] items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl ring-1 ring-slate-200 w-full max-w-md overflow-hidden">
+      <header class="px-5 py-4 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-orange-50/60 flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <h2 class="text-base font-semibold text-slate-800">Export Weekly Summary</h2>
+          <p class="text-xs text-slate-500 mt-0.5">Download every developer's tasks for a week as an Excel workbook.</p>
+        </div>
+        <button type="button" id="exportCloseBtn"
+          class="text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition p-1.5 rounded-md shrink-0" aria-label="Close">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </header>
+      <div class="px-5 py-5 space-y-4">
+        <div>
+          <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">
+            Week to export
+          </div>
+          <div class="ew-select">
+            <button type="button" id="exportWeekTrigger" class="ew-trigger" aria-haspopup="listbox" aria-expanded="false">
+              <svg class="ew-trigger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/>
+                <path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>
+              </svg>
+              <span id="exportWeekLabel" class="ew-trigger-label">Select a week</span>
+              <svg class="ew-trigger-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M6 9l6 6 6-6"/>
+              </svg>
+            </button>
+          </div>
+          <p class="mt-2 text-xs text-slate-500 leading-relaxed">
+            The workbook holds one worksheet per developer. You'll be asked where to
+            save the <span class="font-medium text-slate-600">.xlsx</span> file.
+          </p>
+        </div>
+        <div id="exportStatus" class="hidden"></div>
+      </div>
+      <footer class="px-5 py-4 border-t border-slate-100 bg-slate-50/60 flex items-center gap-2">
+        <button type="button" id="exportCancelBtn"
+          class="flex-1 px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-400 transition">
+          Cancel
+        </button>
+        <button type="button" id="exportRunBtn"
+          class="flex-1 px-3 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold shadow-sm hover:bg-orange-700 active:bg-orange-800 disabled:opacity-60 disabled:cursor-not-allowed transition">
+          <span id="exportRunLabel">Export</span>
+        </button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Export week dropdown panel — body-level (position:fixed) so the modal
+       card's overflow never clips it. Positioned under the trigger by app.js. -->
+  <div id="exportWeekPanel" class="ew-panel" role="listbox" aria-label="Week to export"></div>
 
   <script type="module" src="app.js"></script>
 </body>

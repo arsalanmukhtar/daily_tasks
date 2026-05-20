@@ -32,6 +32,11 @@ const ALLOWLIST = {
   'osamakhan32156@gmail.com':     { name: 'Muhammad Osama Khan',      designation: 'Intern',                 reportedTo: 'Muhammad Arsalan Mukhtar' }
 };
 
+// The account owner — the only user who sees the "Export weekly summary"
+// action. Must be lowercase and present in ALLOWLIST. The server enforces
+// this independently in apps-script/Code.gs (OWNER_EMAIL there).
+const OWNER_EMAIL = 'developer.ndma@gmail.com';
+
 // =====================================================
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
@@ -90,6 +95,17 @@ const submissionsBackdrop = document.getElementById('submissionsBackdrop');
 const submissionsDrawer  = document.getElementById('submissionsDrawer');
 const closeDrawerBtn     = document.getElementById('closeDrawerBtn');
 const submissionsList    = document.getElementById('submissionsList');
+const exportSummaryBtn   = document.getElementById('exportSummaryBtn');
+const exportBackdrop     = document.getElementById('exportBackdrop');
+const exportModal        = document.getElementById('exportModal');
+const exportCloseBtn     = document.getElementById('exportCloseBtn');
+const exportCancelBtn    = document.getElementById('exportCancelBtn');
+const exportRunBtn       = document.getElementById('exportRunBtn');
+const exportRunLabel     = document.getElementById('exportRunLabel');
+const exportWeekTrigger  = document.getElementById('exportWeekTrigger');
+const exportWeekLabel    = document.getElementById('exportWeekLabel');
+const exportWeekPanel    = document.getElementById('exportWeekPanel');
+const exportStatus       = document.getElementById('exportStatus');
 
 // ---------- Task table editor ----------
 // Replaces the previous single Quill editor. Each cell is contenteditable;
@@ -769,6 +785,8 @@ clearWeekBtn.addEventListener('click', () => {
 function showLoading()  {
   loadingState.classList.remove('hidden'); authGate.classList.add('hidden'); form.classList.add('hidden');
   userChip.classList.add('hidden'); userChip.classList.remove('flex');
+  exportSummaryBtn.classList.add('hidden'); exportSummaryBtn.classList.remove('flex');
+  closeExportModal();
   submissionsDrawer.classList.remove('open'); submissionsBackdrop.classList.remove('open');
 }
 function showAuthGate(errMsg) {
@@ -777,6 +795,8 @@ function showAuthGate(errMsg) {
   form.classList.add('hidden');
   userChip.classList.add('hidden');
   userChip.classList.remove('flex');
+  exportSummaryBtn.classList.add('hidden'); exportSummaryBtn.classList.remove('flex');
+  closeExportModal();
   submissionsDrawer.classList.remove('open'); submissionsBackdrop.classList.remove('open');
   if (errMsg) { authError.textContent = errMsg; authError.classList.remove('hidden'); }
   else { authError.classList.add('hidden'); authError.textContent = ''; }
@@ -787,6 +807,11 @@ function showForm(user, displayName, designation, reportedTo) {
   form.classList.remove('hidden');
   userChip.classList.remove('hidden');
   userChip.classList.add('flex');
+
+  // Owner-only: reveal the weekly-summary export button in the header.
+  const isOwner = (user.email || '').toLowerCase() === OWNER_EMAIL;
+  exportSummaryBtn.classList.toggle('hidden', !isOwner);
+  exportSummaryBtn.classList.toggle('flex', isOwner);
 
   const FALLBACK_AVATAR = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22white%22%3E%3Cpath d=%22M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z%22/%3E%3C/svg%3E';
   userPhoto.onerror = () => { userPhoto.onerror = null; userPhoto.src = FALLBACK_AVATAR; };
@@ -1348,6 +1373,370 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && submissionsDrawer.classList.contains('open')) {
     closeSubmissionsDrawer();
   }
+});
+
+
+// ========================================================================
+// Export weekly summary (owner only)
+// Builds a multi-sheet .xlsx — one worksheet per developer, five day columns
+// — from every developer's submissions for one chosen week.
+// ========================================================================
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+// ---- Custom week dropdown (replaces the un-styleable native <select>) ----
+let exportWeekValue = '';
+
+function makeWeekOption(isoStr, text) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'ew-option';
+  btn.setAttribute('role', 'option');
+  btn.dataset.value = isoStr;
+  btn.innerHTML =
+    '<svg class="ew-option-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M20 6 9 17l-5-5"/></svg>' +
+    '<span>' + escapeHtml(text) + '</span>';
+  btn.addEventListener('click', function () { selectExportWeek(isoStr, text); });
+  return btn;
+}
+
+// Fill the dropdown with the 20 most recent weeks, newest first.
+function populateExportWeeks() {
+  exportWeekPanel.innerHTML = '';
+  const monday = currentWeekMonday();
+  let firstValue = '', firstText = '';
+  for (let i = 0; i < 20; i++) {
+    const m = new Date(monday);
+    m.setUTCDate(monday.getUTCDate() - i * 7);
+    const isoStr = dateToIsoWeekString(m);
+    const info = weekdaysFor(isoStr);
+    if (!info) continue;
+    const text =
+      'Week ' + info.week + ', ' + info.year + '  ·  ' +
+      fmtLong(info.days[0].date) + ' – ' + fmtLong(info.days[4].date);
+    if (!firstValue) { firstValue = isoStr; firstText = text; }
+    exportWeekPanel.appendChild(makeWeekOption(isoStr, text));
+  }
+  // Default to the current (most recent) week.
+  if (firstValue) selectExportWeek(firstValue, firstText);
+}
+
+function selectExportWeek(isoStr, text) {
+  exportWeekValue = isoStr;
+  exportWeekLabel.textContent = text;
+  exportWeekPanel.querySelectorAll('.ew-option').forEach(function (opt) {
+    const on = opt.dataset.value === isoStr;
+    opt.classList.toggle('is-selected', on);
+    opt.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  closeExportWeekPanel();
+}
+
+// The panel is position:fixed at <body> level — position it under the trigger,
+// flipping above when there isn't room below.
+function positionExportWeekPanel() {
+  const r = exportWeekTrigger.getBoundingClientRect();
+  exportWeekPanel.style.left  = r.left + 'px';
+  exportWeekPanel.style.width = r.width + 'px';
+  const panelH = Math.min(exportWeekPanel.scrollHeight, 256);
+  const roomBelow = window.innerHeight - r.bottom;
+  if (roomBelow < panelH + 14 && r.top > roomBelow) {
+    exportWeekPanel.style.top = Math.max(8, r.top - panelH - 6) + 'px';
+  } else {
+    exportWeekPanel.style.top = (r.bottom + 6) + 'px';
+  }
+}
+
+function openExportWeekPanel() {
+  exportWeekPanel.classList.add('open');
+  exportWeekTrigger.classList.add('is-open');
+  exportWeekTrigger.setAttribute('aria-expanded', 'true');
+  positionExportWeekPanel();
+  const sel = exportWeekPanel.querySelector('.ew-option.is-selected');
+  if (sel) sel.scrollIntoView({ block: 'nearest' });
+}
+
+function closeExportWeekPanel() {
+  exportWeekPanel.classList.remove('open');
+  exportWeekTrigger.classList.remove('is-open');
+  exportWeekTrigger.setAttribute('aria-expanded', 'false');
+}
+
+function setExportStatus(kind, msg) {
+  if (!msg) { exportStatus.className = 'hidden'; exportStatus.textContent = ''; return; }
+  if (kind === 'loading') {
+    // Centred text above a full-width progress bar. Build the structure once
+    // so repeated step updates don't restart the bar's animation.
+    if (!exportStatus.classList.contains('ew-status-loading')) {
+      exportStatus.className = 'ew-status-loading';
+      exportStatus.innerHTML =
+        '<span class="ew-status-text"></span>' +
+        '<div class="ew-progress">' +
+        '<span></span><span></span><span></span><span></span><span></span><span></span>' +
+        '</div>';
+    }
+    exportStatus.querySelector('.ew-status-text').textContent = msg;
+    return;
+  }
+  exportStatus.textContent = msg;
+  if (kind === 'error')   exportStatus.className = 'error-callout';
+  else if (kind === 'ok') exportStatus.className = 'text-xs text-orange-600 font-semibold';
+  else                    exportStatus.className = 'text-xs text-slate-500';
+}
+
+function openExportModal() {
+  if (!currentUserContext ||
+      (currentUserContext.user.email || '').toLowerCase() !== OWNER_EMAIL) return;
+  populateExportWeeks();
+  setExportStatus('', '');
+  exportRunBtn.disabled = false;
+  exportRunLabel.textContent = 'Export';
+  exportBackdrop.classList.remove('hidden');
+  exportModal.classList.remove('hidden');
+  exportModal.classList.add('flex');
+}
+
+function closeExportModal() {
+  closeExportWeekPanel();
+  exportBackdrop.classList.add('hidden');
+  exportModal.classList.remove('flex');
+  exportModal.classList.add('hidden');
+}
+
+// ExcelJS is ~900 KB — load it lazily, only when the owner actually exports.
+let exceljsPromise = null;
+function loadExcelJS() {
+  if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+  if (exceljsPromise) return exceljsPromise;
+  exceljsPromise = new Promise(function (resolve, reject) {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+    sc.onload = function () {
+      if (window.ExcelJS) resolve(window.ExcelJS);
+      else reject(new Error('Excel library failed to initialise.'));
+    };
+    sc.onerror = function () {
+      exceljsPromise = null;
+      reject(new Error('Could not load the Excel library (check your connection).'));
+    };
+    document.head.appendChild(sc);
+  });
+  return exceljsPromise;
+}
+
+// Builds the workbook Blob: one worksheet per ALLOWLIST developer, with a
+// title block and a five-column day grid. Non-submitters get a marked sheet.
+async function buildExportWorkbook(ExcelJSlib, info, weekLabel, submissions) {
+  const wb = new ExcelJSlib.Workbook();
+  wb.creator = 'Tech EW Weekly Time Sheet';
+  wb.created = new Date();
+
+  const byEmail = {};
+  for (const s of (submissions || [])) byEmail[(s.email || '').toLowerCase()] = s;
+
+  const weekRange = fmtISO(info.days[0].date) + ' to ' + fmtISO(info.days[4].date);
+  const dayKeys = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  const border = {
+    top:    { style: 'thin', color: { argb: 'FFE2E8F0' } },
+    left:   { style: 'thin', color: { argb: 'FFE2E8F0' } },
+    bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+    right:  { style: 'thin', color: { argb: 'FFE2E8F0' } }
+  };
+  const usedNames = {};
+
+  Object.keys(ALLOWLIST).forEach(function (email) {
+    const entry = ALLOWLIST[email];
+    const sub   = byEmail[email.toLowerCase()];
+
+    // Excel worksheet names: ≤31 chars, no \ / ? * [ ] :, and must be unique.
+    let base = String(entry.name || email).replace(/[\\\/\?\*\[\]:]/g, ' ').trim().slice(0, 31);
+    if (!base) base = 'Developer';
+    let name = base, n = 2;
+    while (usedNames[name.toLowerCase()]) { name = base.slice(0, 27) + ' (' + n + ')'; n++; }
+    usedNames[name.toLowerCase()] = true;
+
+    const ws = wb.addWorksheet(name);
+    ws.columns = [{ width: 32 }, { width: 32 }, { width: 32 }, { width: 32 }, { width: 32 }];
+    ws.views = [{ state: 'frozen', ySplit: 5 }];
+
+    ws.mergeCells('A1:E1');
+    const c1 = ws.getCell('A1');
+    c1.value = entry.name || email;
+    c1.font = { bold: true, size: 14, color: { argb: 'FF0F172A' } };
+    ws.getRow(1).height = 22;
+
+    ws.mergeCells('A2:E2');
+    const c2 = ws.getCell('A2');
+    c2.value = (entry.designation || '') + '      Reports to: ' + (entry.reportedTo || '—');
+    c2.font = { size: 10, color: { argb: 'FF64748B' } };
+
+    ws.mergeCells('A3:E3');
+    const c3 = ws.getCell('A3');
+    c3.value = weekLabel + '      ' + weekRange;
+    c3.font = { size: 10, color: { argb: 'FF64748B' } };
+
+    // Day header row (row 5).
+    const headerRow = ws.getRow(5);
+    info.days.forEach(function (d, i) {
+      const cell = headerRow.getCell(i + 1);
+      cell.value = d.name + '\n' + fmtISO(d.date);
+      cell.font = { bold: true, color: { argb: 'FF1E293B' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2FF' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = border;
+    });
+    headerRow.height = 30;
+
+    if (!sub) {
+      ws.mergeCells('A6:E6');
+      const c = ws.getCell('A6');
+      c.value = 'No submission recorded for this week.';
+      c.font = { italic: true, color: { argb: 'FF94A3B8' } };
+      c.alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getRow(6).height = 26;
+      return;
+    }
+
+    const rows = (Array.isArray(sub.taskRows) && sub.taskRows.length) ? sub.taskRows : null;
+    if (rows) {
+      rows.forEach(function (r, ri) {
+        const row = ws.getRow(6 + ri);
+        dayKeys.forEach(function (k, ci) {
+          const cell = row.getCell(ci + 1);
+          cell.value = cellToText(r && r[k]);
+          cell.font = { size: 10, color: { argb: 'FF334155' } };
+          cell.alignment = { vertical: 'top', wrapText: true };
+          cell.border = border;
+        });
+      });
+    } else {
+      // Legacy delta-only row — no per-day split; drop the plain text in.
+      ws.mergeCells('A6:E6');
+      const c = ws.getCell('A6');
+      c.value = sub.taskPlain || '(no task content)';
+      c.font = { size: 10, color: { argb: 'FF334155' } };
+      c.alignment = { vertical: 'top', wrapText: true };
+      c.border = border;
+    }
+  });
+
+  const buf = await wb.xlsx.writeBuffer();
+  return new Blob([buf], { type: XLSX_MIME });
+}
+
+// Writes the workbook. `fileHandle` is a showSaveFilePicker handle grabbed
+// earlier during the click gesture; when null, falls back to a plain download.
+async function saveExportBlob(blob, fileName, fileHandle) {
+  if (fileHandle) {
+    const writable = await fileHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return 'saved';
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+  return 'downloaded';
+}
+
+async function runExport() {
+  if (!currentUserContext) return;
+  const info = weekdaysFor(exportWeekValue);
+  if (!info) { setExportStatus('error', 'Please choose a valid week.'); return; }
+
+  const weekLabel = 'Week ' + info.week + ', ' + info.year;
+  // Filename is stamped with the chosen week's Friday.
+  const fileName = 'developers-weekly-report-Friday-' + fmtISO(info.days[4].date) + '.xlsx';
+
+  // Open the save-location picker FIRST, before any await — showSaveFilePicker
+  // requires the click's transient user activation, which the async work
+  // (library load, network fetch) below would otherwise consume.
+  let fileHandle = null;
+  if (window.showSaveFilePicker) {
+    try {
+      fileHandle = await window.showSaveFilePicker({
+        suggestedName: fileName,
+        types: [{ description: 'Excel workbook', accept: { [XLSX_MIME]: ['.xlsx'] } }]
+      });
+    } catch (err) {
+      if (err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) {
+        setExportStatus('info', 'Export cancelled — no file was saved.');
+      } else {
+        setExportStatus('error', (err && err.message) ? err.message : 'Could not open the save dialog.');
+      }
+      return;
+    }
+  }
+
+  exportRunBtn.disabled = true;
+  exportRunLabel.textContent = 'Exporting…';
+  setExportStatus('loading', 'Loading the Excel library…');
+
+  try {
+    const ExcelJSlib = await loadExcelJS();
+    setExportStatus('loading', 'Fetching submissions…');
+    const idToken = await currentUserContext.user.getIdToken(false);
+    const data = await jsonpFetch(APPS_SCRIPT_URL,
+      { action: 'export', week: weekLabel, idToken: idToken }, 45000);
+    if (!data || data.status !== 'ok') {
+      throw new Error((data && data.message) || 'Export request failed.');
+    }
+    setExportStatus('loading', 'Building the workbook…');
+    const blob = await buildExportWorkbook(ExcelJSlib, info, weekLabel, data.submissions);
+    const result = await saveExportBlob(blob, fileName, fileHandle);
+    setExportStatus('ok', (result === 'saved' ? 'Saved ' : 'Downloaded ') + fileName);
+  } catch (err) {
+    if (err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) {
+      setExportStatus('info', 'Export cancelled — no file was saved.');
+    } else {
+      setExportStatus('error', (err && err.message) ? err.message : 'Export failed.');
+    }
+  } finally {
+    exportRunBtn.disabled = false;
+    exportRunLabel.textContent = 'Export';
+  }
+}
+
+exportSummaryBtn.addEventListener('click', openExportModal);
+exportCloseBtn.addEventListener('click', closeExportModal);
+exportCancelBtn.addEventListener('click', closeExportModal);
+exportBackdrop.addEventListener('click', closeExportModal);
+exportModal.addEventListener('click', function (e) {
+  if (e.target === exportModal) closeExportModal();
+});
+exportRunBtn.addEventListener('click', runExport);
+
+exportWeekTrigger.addEventListener('click', function (e) {
+  e.stopPropagation();
+  if (exportWeekPanel.classList.contains('open')) closeExportWeekPanel();
+  else openExportWeekPanel();
+});
+document.addEventListener('click', function (e) {
+  if (exportWeekPanel.classList.contains('open') &&
+      !exportWeekPanel.contains(e.target) && !exportWeekTrigger.contains(e.target)) {
+    closeExportWeekPanel();
+  }
+});
+window.addEventListener('resize', closeExportWeekPanel);
+// Close when the page or an ancestor scrolls (the trigger moves away) — but
+// NOT when the user scrolls within the panel's own option list.
+window.addEventListener('scroll', function (e) {
+  if (exportWeekPanel.classList.contains('open') && e.target !== exportWeekPanel) {
+    closeExportWeekPanel();
+  }
+}, true);
+
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  // Escape closes the dropdown first, then (next press) the modal.
+  if (exportWeekPanel.classList.contains('open')) { closeExportWeekPanel(); return; }
+  if (!exportModal.classList.contains('hidden')) closeExportModal();
 });
 
 

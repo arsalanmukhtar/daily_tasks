@@ -47,10 +47,14 @@ const ALLOWLIST = {
   'osamakhan32156@gmail.com':     { name: 'Muhammad Osama Khan',      designation: 'Intern',                 reportedTo: 'Muhammad Arsalan Mukhtar' }
 };
 
+// The account owner — the only user allowed to export the team-wide weekly
+// summary. Must be lowercase and present in ALLOWLIST.
+const OWNER_EMAIL = 'developer.ndma@gmail.com';
+
 const SHEET_NAME = 'Weekly Submissions';
 
-// Column 11 stores the raw Quill Delta JSON so we can round-trip into the
-// editor losslessly when a user reloads their own submission for editing.
+// The last column stores the raw Quill Delta JSON so we can round-trip into
+// the editor losslessly when a user reloads their own submission for editing.
 const HEADERS = [
   'Timestamp',
   'Email',
@@ -60,7 +64,6 @@ const HEADERS = [
   'Week',
   'Week Range',
   'Daily Tasks',
-  'Assigned By',
   'Report To',
   'Task Delta JSON'
 ];
@@ -157,7 +160,6 @@ function processSubmission_(e) {
       weekLabel,
       weekRange,
       '',
-      reportedTo,   // Assigned By
       reportedTo,   // Report To
       taskJson
     ];
@@ -228,12 +230,15 @@ function debugLog_(label, data) {
   }
 }
 
-const BACKEND_VERSION = 'v11-dynamic-reported-to';
+const BACKEND_VERSION = 'v12-weekly-export';
 
 function doGet(e) {
   if (e && e.parameter) {
     if (e.parameter.action === 'list') {
       return listSubmissions_(e);
+    }
+    if (e.parameter.action === 'export') {
+      return exportWeek_(e);
     }
     // If a payload arrives as a GET parameter, treat it as a submission
     // (some browsers downgrade POST→GET on Apps Script's 302 redirect).
@@ -286,14 +291,14 @@ function listSubmissions_(e) {
       const r = values[i];
       if (String(r[1] || '').toLowerCase() !== email) continue;
 
-      // Column K stores either:
+      // The Task Delta JSON column stores either:
       //   - { format: 'rows-v1', rows: [...] }   (new, table editor)
       //   - { ops: [...] }                       (legacy, Quill Delta)
       // Fall back to reconstructing a Delta from the visible rich-text cell
-      // for very old rows where column K didn't exist yet.
+      // for very old rows where that column didn't exist yet.
       let taskRows = null;
       let taskDelta = null;
-      const cellJson = r[10];
+      const cellJson = r[9];
       if (cellJson) {
         try {
           const parsed = JSON.parse(cellJson);
@@ -323,6 +328,74 @@ function listSubmissions_(e) {
     submissions.sort(function (a, b) { return String(b.timestamp).localeCompare(String(a.timestamp)); });
 
     return jsonOrJsonp_(e, { status: 'ok', submissions: submissions });
+  } catch (err) {
+    return jsonOrJsonp_(e, { status: 'error', message: String(err && err.message || err) });
+  }
+}
+
+/**
+ * Owner-only: returns every developer's submission for a single week. Powers
+ * the "Export weekly summary" button, which builds a multi-sheet Excel
+ * workbook (one worksheet per developer) on the client.
+ *
+ * GET ?action=export&week=Week%2021%2C%202026&idToken=...&callback=...
+ */
+function exportWeek_(e) {
+  try {
+    const idToken = e && e.parameter && e.parameter.idToken;
+    if (!idToken) return jsonOrJsonp_(e, { status: 'error', message: 'Missing auth token.' });
+
+    let verified;
+    try {
+      verified = verifyIdToken_(idToken);
+    } catch (err) {
+      return jsonOrJsonp_(e, { status: 'error', message: 'Unauthorized: ' + err.message });
+    }
+    const email = (verified.email || '').toLowerCase();
+    if (email !== OWNER_EMAIL) {
+      return jsonOrJsonp_(e, { status: 'error', message: 'Only the account owner can export the weekly summary.' });
+    }
+
+    const week = e && e.parameter && e.parameter.week;
+    if (!week) return jsonOrJsonp_(e, { status: 'error', message: 'Missing week.' });
+
+    const sheet = getOrCreateSheet_();
+    ensureExtendedHeaders_(sheet);
+    const last = sheet.getLastRow();
+    const submissions = [];
+    if (last >= 2) {
+      const values = sheet.getRange(2, 1, last - 1, HEADERS.length).getValues();
+      for (let i = 0; i < values.length; i++) {
+        const r = values[i];
+        if (String(r[5] || '') !== week) continue;
+
+        // Prefer the structured rows-v1 payload so the client can rebuild a
+        // per-day grid; legacy delta-only rows fall back to plain text.
+        let taskRows = null;
+        const cellJson = r[9];
+        if (cellJson) {
+          try {
+            const parsed = JSON.parse(cellJson);
+            if (parsed && parsed.format === 'rows-v1' && Array.isArray(parsed.rows)) {
+              taskRows = parsed.rows;
+            }
+          } catch (_e) { /* ignore — fall back to plain text */ }
+        }
+
+        submissions.push({
+          email:       String(r[1] || '').toLowerCase(),
+          name:        r[2] || '',
+          designation: r[3] || '',
+          weekLabel:   r[5] || '',
+          weekRange:   r[6] || '',
+          reportedTo:  r[8] || '',
+          taskPlain:   String(r[7] || ''),
+          taskRows:    taskRows
+        });
+      }
+    }
+
+    return jsonOrJsonp_(e, { status: 'ok', week: week, submissions: submissions });
   } catch (err) {
     return jsonOrJsonp_(e, { status: 'error', message: String(err && err.message || err) });
   }
