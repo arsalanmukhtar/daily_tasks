@@ -12,23 +12,24 @@ const FIREBASE_CONFIG = {
 // 2. Deployed Apps Script web app URL (ends in /exec)
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz6njgCzwRK1i1aXzW9dmlZzlYfexxx72snoSB46L20u4ecitTTTYrLUnrHY_T_rkUmDQ/exec';
 
-// 3. Allowlist — email → { name, designation }. Emails must be lowercase.
-//    The SAME map must be pasted into apps-script/Code.gs (the server is
-//    the enforcer; this copy drives the UX). Designation is fixed per user
-//    — it isn't editable in the UI, the server uses this map's value.
+// 3. Allowlist — email → { name, designation, reportedTo }. Emails must be
+//    lowercase. The SAME map must be pasted into apps-script/Code.gs (the
+//    server is the enforcer; this copy drives the UX). All fields are fixed
+//    per user — not editable in the UI; the server uses this map's values.
 const ALLOWLIST = {
-  'developer.ndma@gmail.com':     { name: 'Muhammad Arsalan Mukhtar', designation: 'Deputy Manager - I' },
-  'as2040704@gmail.com':          { name: 'Abdul Sattar Sheikh',      designation: 'Assistant Manager - II' },
-  'mustafa.haider2011@gmail.com': { name: 'Syed Mustafa Haider',      designation: 'Assistant Manager - I' },
-  'shehzadalikhan586@gmail.com':  { name: 'Shehzad Ali',              designation: 'Assistant Manager - I' },
-  'seemalnaeem100@gmail.com':     { name: 'Seemal Naeem',             designation: 'Assistant Manager - I' },
-  'muddasir.ndma25@gmail.com':    { name: 'Muddasir Shah',            designation: 'Assistant Manager - I' },
-  'ahad.khan.work01@gmail.com':   { name: 'Muhammad Ahad Khan',       designation: 'Assistant Manager - I' },
-  'zainabali27feb2024@gmail.com': { name: 'Zainab Ali',               designation: 'Assistant Manager - I' },
-  'ttalha063@gmail.com':          { name: 'Talha Rizwan',             designation: 'Assistant Manager - I' },
-  'zeeshannasir2001@gmail.com':   { name: 'Zeeshan Nasir',            designation: 'Assistant Manager - I' },
-  'usamabinumar199@gmail.com':    { name: 'Usama bin Umar',           designation: 'Intern' },
-  'osamakhan32156@gmail.com':     { name: 'Muhammad Osama Khan',      designation: 'Intern' }
+  'developer.ndma@gmail.com':     { name: 'Muhammad Arsalan Mukhtar', designation: 'Deputy Manager - I',     reportedTo: 'Junaid Aziz Khan' },
+  'as2040704@gmail.com':          { name: 'Abdul Sattar Sheikh',      designation: 'Assistant Manager - II', reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'mustafa.haider2011@gmail.com': { name: 'Syed Mustafa Haider',      designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'shehzadalikhan586@gmail.com':  { name: 'Shehzad Ali',              designation: 'Assistant Manager - I',  reportedTo: 'Kashif Iqbal' },
+  'seemalnaeem100@gmail.com':     { name: 'Seemal Naeem',             designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'muddasir.ndma25@gmail.com':    { name: 'Muddasir Shah',            designation: 'Assistant Manager - I',  reportedTo: 'Imtiaz Nabi' },
+  'ahad.khan.work01@gmail.com':   { name: 'Muhammad Ahad Khan',       designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'zainabali27feb2024@gmail.com': { name: 'Zainab Ali',               designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'ttalha063@gmail.com':          { name: 'Talha Rizwan',             designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'zeeshannasir2001@gmail.com':   { name: 'Zeeshan Nasir',            designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'ibrahimabdullahh84@gmail.com': { name: 'Ibrahim Abdullah',         designation: 'Assistant Manager - I',  reportedTo: 'Imtiaz Nabi' },
+  'usamabinumar199@gmail.com':    { name: 'Usama bin Umar',           designation: 'Intern',                 reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'osamakhan32156@gmail.com':     { name: 'Muhammad Osama Khan',      designation: 'Intern',                 reportedTo: 'Muhammad Arsalan Mukhtar' }
 };
 
 // =====================================================
@@ -78,6 +79,7 @@ const clearWeekBtn     = document.getElementById('clearWeekBtn');
 const submittingAsName  = document.getElementById('submittingAsName');
 const submittingAsEmail = document.getElementById('submittingAsEmail');
 const designationDisplay = document.getElementById('designationDisplay');
+const reportedToDisplay  = document.getElementById('reportedToDisplay');
 const weekDaysList     = document.getElementById('weekDaysList');
 const taskTable        = document.getElementById('taskTable');
 const taskTbody        = document.getElementById('taskTbody');
@@ -459,15 +461,25 @@ function refreshWeekSummary() {
   const info = weekdaysFor(weekInput.value);
   if (!info) {
     weekSummary.textContent = '';
+    updateWeekTriggerLabel(null);
     renderWeekDaysList(null);
     updateColumnHeaderDates(null);
     return null;
   }
   weekSummary.textContent =
     `Week ${info.week}, ${info.year}  ·  ${fmtLong(info.days[0].date)} – ${fmtLong(info.days[4].date)}, ${info.year}`;
+  updateWeekTriggerLabel(info);
   renderWeekDaysList(info);
   updateColumnHeaderDates(info);
   return info;
+}
+
+// True when `date` (a UTC calendar date) is the user's current local day.
+function isTodayDate(date) {
+  const now = new Date();
+  return date.getUTCFullYear() === now.getFullYear() &&
+         date.getUTCMonth()    === now.getMonth() &&
+         date.getUTCDate()     === now.getDate();
 }
 
 function renderWeekDaysList(info) {
@@ -478,24 +490,245 @@ function renderWeekDaysList(info) {
   }
   weekDaysList.innerHTML = '';
   info.days.forEach((d) => {
+    const isToday = isTodayDate(d.date);
     const row = document.createElement('div');
-    row.className = 'flex items-center justify-between gap-3 text-sm py-1';
+    row.className = 'weekday-row flex items-center justify-between gap-3 text-sm' +
+      (isToday ? ' is-today' : '');
     const longDate = d.date.toLocaleDateString('en-GB', {
       day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC'
     });
-    row.innerHTML =
-      '<span class="font-semibold text-slate-700">' + d.name + '</span>' +
-      '<span class="text-slate-500 tabular-nums">' + longDate + '</span>';
+    if (isToday) {
+      row.innerHTML =
+        '<span class="font-bold text-orange-800 flex items-center gap-2">' + d.name +
+          '<span class="weekday-today-tag">Today</span></span>' +
+        '<span class="tabular-nums font-semibold text-orange-700">' + longDate + '</span>';
+    } else {
+      row.innerHTML =
+        '<span class="font-semibold text-slate-700">' + d.name + '</span>' +
+        '<span class="text-slate-500 tabular-nums">' + longDate + '</span>';
+    }
     weekDaysList.appendChild(row);
   });
 }
 
-function handleWeekChange() {
-  // Just refresh the date display in the week summary, days panel, and the
-  // column header dates. The table editor's content is owned by the user;
-  // we never overwrite it on week change.
-  refreshWeekSummary();
+// ---------- Custom week picker (themed calendar) ----------
+// The native <input type="week"> picker can't be styled and handles a
+// future-week cap inconsistently across browsers. This calendar matches the
+// app theme, selects whole ISO weeks (Mon–Sun), and hard-disables every week
+// after the current one — you can't log time for a week that hasn't started.
+const weekTrigger      = document.getElementById('weekTrigger');
+const weekTriggerLabel = document.getElementById('weekTriggerLabel');
+
+const WEEK_DAY_HEADS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+const CAL_CHEVRON_L = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M15 18l-6-6 6-6"/></svg>';
+const CAL_CHEVRON_R = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M9 18l6-6-6-6"/></svg>';
+
+// Monday (UTC midnight) of the ISO week containing `date`.
+function mondayOfWeek(date) {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const dow = d.getUTCDay() || 7;            // 1 = Mon … 7 = Sun
+  d.setUTCDate(d.getUTCDate() - (dow - 1));
+  return d;
 }
+
+// Monday of the *current* week — the latest week a user may select.
+function currentWeekMonday() {
+  const now = new Date();
+  return mondayOfWeek(new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())));
+}
+
+const calPopup = document.createElement('div');
+calPopup.className = 'week-cal-popup';
+calPopup.setAttribute('role', 'dialog');
+calPopup.setAttribute('aria-label', 'Choose a week');
+document.body.appendChild(calPopup);
+
+let calViewYear  = 0;
+let calViewMonth = 0;   // 0-indexed
+let calOpen      = false;
+
+function updateWeekTriggerLabel(info) {
+  if (info) {
+    weekTriggerLabel.textContent = `Week ${info.week}, ${info.year}`;
+    weekTriggerLabel.classList.remove('placeholder');
+  } else {
+    weekTriggerLabel.textContent = 'Select a week';
+    weekTriggerLabel.classList.add('placeholder');
+  }
+}
+
+function renderCalendar() {
+  const todayMonday   = currentWeekMonday();
+  const todayMondayMs = todayMonday.getTime();
+  const todayKey      = dateToIsoWeekString(todayMonday);
+  const selectedKey   = weekInput.value || '';
+  const now           = new Date();
+  const realDayKey    = now.getFullYear() + '-' + now.getMonth() + '-' + now.getDate();
+
+  // The next-month arrow is disabled once the view reaches the real month —
+  // there are no selectable weeks beyond it.
+  const nextDisabled =
+    calViewYear > now.getFullYear() ||
+    (calViewYear === now.getFullYear() && calViewMonth >= now.getMonth());
+
+  const firstOfMonth = new Date(Date.UTC(calViewYear, calViewMonth, 1));
+  const lastOfMonth  = new Date(Date.UTC(calViewYear, calViewMonth + 1, 0));
+  let rowMonday      = mondayOfWeek(firstOfMonth);
+  const lastRowMs    = mondayOfWeek(lastOfMonth).getTime();
+
+  let rowsHtml = '';
+  while (rowMonday.getTime() <= lastRowMs) {
+    const weekKey  = dateToIsoWeekString(rowMonday);
+    const weekNum  = weekKey.slice(6);
+    const isFuture = rowMonday.getTime() > todayMondayMs;
+    const isSel    = weekKey === selectedKey;
+    const isCur    = weekKey === todayKey;
+
+    let cells = '<span class="week-cal-cell week-cal-wk">' + weekNum + '</span>';
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(rowMonday);
+      day.setUTCDate(rowMonday.getUTCDate() + i);
+      const dayNum = day.getUTCDate();
+      const isToday =
+        day.getUTCFullYear() + '-' + day.getUTCMonth() + '-' + day.getUTCDate() === realDayKey;
+      let cls = 'week-cal-cell';
+      if (day.getUTCMonth() !== calViewMonth) cls += ' is-other-month';
+      // Today gets a filled chip so it stands out from the other days in its week.
+      const inner = isToday ? '<span class="cal-today-chip">' + dayNum + '</span>' : dayNum;
+      cells += '<span class="' + cls + '">' + inner + '</span>';
+    }
+
+    let rowCls = 'week-cal-row';
+    if (isFuture) rowCls += ' is-disabled';
+    if (isSel)    rowCls += ' is-selected';
+    if (isCur)    rowCls += ' is-current';
+    rowsHtml +=
+      '<div class="' + rowCls + '" data-week-key="' + weekKey + '" role="button" ' +
+      'aria-disabled="' + isFuture + '" tabindex="' + (isFuture ? '-1' : '0') + '" ' +
+      'title="ISO week ' + parseInt(weekNum, 10) + '">' + cells + '</div>';
+
+    rowMonday = new Date(rowMonday);
+    rowMonday.setUTCDate(rowMonday.getUTCDate() + 7);
+  }
+
+  calPopup.innerHTML =
+    '<div class="week-cal-head">' +
+      '<button type="button" class="week-cal-nav week-cal-prev" aria-label="Previous month">' + CAL_CHEVRON_L + '</button>' +
+      '<div class="week-cal-title">' + MONTH_NAMES[calViewMonth] + ' ' + calViewYear + '</div>' +
+      '<button type="button" class="week-cal-nav week-cal-next" aria-label="Next month"' +
+        (nextDisabled ? ' disabled' : '') + '>' + CAL_CHEVRON_R + '</button>' +
+    '</div>' +
+    '<div class="week-cal-grid-head"><span>Wk</span>' +
+      WEEK_DAY_HEADS.map(function (d) { return '<span>' + d + '</span>'; }).join('') +
+    '</div>' +
+    '<div class="week-cal-body">' + rowsHtml + '</div>' +
+    '<div class="week-cal-foot">' +
+      '<button type="button" class="week-cal-clear">Clear</button>' +
+      '<button type="button" class="week-cal-link week-cal-thisweek">Go to this week</button>' +
+    '</div>';
+}
+
+function positionCalendar() {
+  const r = weekTrigger.getBoundingClientRect();
+  const w = calPopup.offsetWidth  || 304;
+  const h = calPopup.offsetHeight || 320;
+  const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+  let top = r.bottom + 6;
+  if (top + h > window.innerHeight - 8) {
+    const above = r.top - h - 6;
+    top = above >= 8 ? above : Math.max(8, window.innerHeight - h - 8);
+  }
+  calPopup.style.left = left + 'px';
+  calPopup.style.top  = top + 'px';
+}
+
+function openCalendar() {
+  const info   = weekdaysFor(weekInput.value);
+  const anchor = info ? isoWeekToMonday(info.year, info.week) : currentWeekMonday();
+  calViewYear  = anchor.getUTCFullYear();
+  calViewMonth = anchor.getUTCMonth();
+  renderCalendar();
+  calPopup.classList.add('open');
+  positionCalendar();
+  weekTrigger.classList.add('is-open');
+  weekTrigger.setAttribute('aria-expanded', 'true');
+  calOpen = true;
+}
+
+function closeCalendar() {
+  calPopup.classList.remove('open');
+  weekTrigger.classList.remove('is-open');
+  weekTrigger.setAttribute('aria-expanded', 'false');
+  calOpen = false;
+}
+
+function shiftCalMonth(delta) {
+  calViewMonth += delta;
+  if (calViewMonth < 0)  { calViewMonth = 11; calViewYear -= 1; }
+  if (calViewMonth > 11) { calViewMonth = 0;  calViewYear += 1; }
+  renderCalendar();
+  positionCalendar();
+}
+
+function pickWeekFromCalendar(weekKey) {
+  weekInput.value = weekKey;
+  refreshWeekSummary();
+  closeCalendar();
+  weekTrigger.focus();
+}
+
+weekTrigger.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (calOpen) closeCalendar();
+  else openCalendar();
+});
+
+// All clicks inside the popup are handled here; stopPropagation keeps the
+// document-level outside-click handler from firing (a month re-render detaches
+// the clicked node, which would otherwise read as an "outside" click).
+calPopup.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (e.target.closest('.week-cal-prev')) { shiftCalMonth(-1); return; }
+  const next = e.target.closest('.week-cal-next');
+  if (next) { if (!next.disabled) shiftCalMonth(1); return; }
+  if (e.target.closest('.week-cal-clear')) {
+    weekInput.value = '';
+    refreshWeekSummary();
+    closeCalendar();
+    return;
+  }
+  if (e.target.closest('.week-cal-thisweek')) {
+    pickWeekFromCalendar(getCurrentIsoWeekString());
+    return;
+  }
+  const row = e.target.closest('.week-cal-row');
+  if (row && row.getAttribute('aria-disabled') !== 'true') {
+    pickWeekFromCalendar(row.dataset.weekKey);
+  }
+});
+
+// Enter / Space selects the focused (non-future) week row.
+calPopup.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const row = e.target.closest('.week-cal-row');
+  if (row && row.getAttribute('aria-disabled') !== 'true') {
+    e.preventDefault();
+    pickWeekFromCalendar(row.dataset.weekKey);
+  }
+});
+
+document.addEventListener('click', (e) => {
+  if (calOpen && !calPopup.contains(e.target) && !weekTrigger.contains(e.target)) {
+    closeCalendar();
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && calOpen) { closeCalendar(); weekTrigger.focus(); }
+});
+window.addEventListener('scroll', () => { if (calOpen) closeCalendar(); }, true);
+window.addEventListener('resize', () => { if (calOpen) closeCalendar(); });
 
 function updateColumnHeaderDates(info) {
   const dayIndex = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4 };
@@ -507,20 +740,16 @@ function updateColumnHeaderDates(info) {
       dateEl.textContent = d.toLocaleDateString('en-GB', {
         day: '2-digit', month: 'short', timeZone: 'UTC'
       });
+      th.classList.toggle('is-today', isTodayDate(d));
     } else {
       dateEl.textContent = '—';
+      th.classList.remove('is-today');
     }
   });
 }
 
-// Listen on both events so Chrome's native picker "Clear" / "This week" buttons
-// reliably fire our handler regardless of which event the browser emits.
-weekInput.addEventListener('change', handleWeekChange);
-weekInput.addEventListener('input', handleWeekChange);
-
-// Custom buttons — bypass the native picker's "Clear" / "This week" controls
-// (unreliable in some Chrome builds) AND bypass the pristine-state guard.
-// These are explicit user actions, so they always act on the editor.
+// Quick-pick buttons — set the week value directly, then refresh. "Last week"
+// and "This week" can never yield a future week; "Clear" empties the field.
 lastWeekBtn.addEventListener('click', () => {
   weekInput.value = getPreviousIsoWeekString();
   refreshWeekSummary();
@@ -552,7 +781,7 @@ function showAuthGate(errMsg) {
   if (errMsg) { authError.textContent = errMsg; authError.classList.remove('hidden'); }
   else { authError.classList.add('hidden'); authError.textContent = ''; }
 }
-function showForm(user, displayName, designation) {
+function showForm(user, displayName, designation, reportedTo) {
   loadingState.classList.add('hidden');
   authGate.classList.add('hidden');
   form.classList.remove('hidden');
@@ -568,6 +797,7 @@ function showForm(user, displayName, designation) {
   submittingAsName.textContent   = displayName;
   submittingAsEmail.textContent  = user.email;
   if (designationDisplay) designationDisplay.textContent = designation || '';
+  if (reportedToDisplay) reportedToDisplay.textContent = reportedTo || '—';
 
   // Default to the current ISO week if nothing's selected yet. We don't
   // touch the task table — the user controls its content.
@@ -685,8 +915,13 @@ onAuthStateChanged(auth, (user) => {
     });
     return;
   }
-  currentUserContext = { user, displayName: entry.name, designation: entry.designation };
-  showForm(user, entry.name, entry.designation);
+  currentUserContext = {
+    user,
+    displayName: entry.name,
+    designation: entry.designation,
+    reportedTo: entry.reportedTo || ''
+  };
+  showForm(user, entry.name, entry.designation, entry.reportedTo);
   startInactivityTracking();
 });
 
@@ -705,24 +940,34 @@ signOutBtn.addEventListener('click', () => signOut(auth));
 // `kind` is one of: 'submitting' | 'ok' | 'error' | 'info'.
 // 'submitting' shows the dark-pill loader, no text.
 // 'ok'         shows the green tick (fades over 5s) + optional message.
-// 'error'      shows the message in rose, no icon.
+// 'error'      shows the message in red, no icon.
 // 'info'       clears icons + message; used to reset between states.
 let statusClearTimer = null;
 function setStatus(kind, msg) {
-  const colors = {
-    info: 'text-slate-500',
-    ok: 'text-emerald-600 font-semibold',
-    error: 'text-rose-600 font-medium'
-  };
   // Cancel any pending fade so the latest call always wins.
   if (statusClearTimer) { clearTimeout(statusClearTimer); statusClearTimer = null; }
 
-  // Reset all icons + classes before applying the new state.
+  // Reset icons before applying the new state.
   statusSpinner.classList.add('hidden');
   statusTick.classList.add('hidden');
   statusTick.classList.remove('status-tick-fade');
   statusText.textContent = msg || '';
-  statusText.className = 'text-sm ' + (colors[kind === 'submitting' ? 'info' : kind] || '');
+
+  // Errors get the red left-bar callout; other kinds are plain status text.
+  if (kind === 'error') {
+    statusText.className = 'error-callout';
+    // Force a reflow so the fade restarts when errors fire back-to-back.
+    void statusText.offsetWidth;
+    statusText.classList.add('error-callout-fade');
+    statusClearTimer = setTimeout(() => {
+      statusText.textContent = '';
+      statusText.className = 'text-sm text-slate-500';
+    }, 5000);
+  } else if (kind === 'ok') {
+    statusText.className = 'text-sm text-orange-600 font-semibold';
+  } else {
+    statusText.className = 'text-sm text-slate-500';
+  }
 
   if (kind === 'submitting') {
     statusSpinner.classList.remove('hidden');
@@ -740,12 +985,41 @@ function setStatus(kind, msg) {
   }
 }
 
-resetBtn.addEventListener('click', () => {
-  if (!confirm('Clear the form?')) return;
+// ---------- Edit mode (resubmitting an existing week) ----------
+// Entered when a past submission is loaded from the "My Submissions" drawer.
+// A banner explains the overwrite; a Cancel button backs out of it.
+const editBanner      = document.getElementById('editBanner');
+const editBannerTitle = document.getElementById('editBannerTitle');
+const cancelEditBtn   = document.getElementById('cancelEditBtn');
+
+function enterEditMode(weekLabel) {
+  editBannerTitle.textContent = 'Editing ' + weekLabel;
+  editBanner.classList.remove('hidden');
+  cancelEditBtn.classList.remove('hidden');
+}
+function exitEditMode() {
+  editBanner.classList.add('hidden');
+  cancelEditBtn.classList.add('hidden');
+}
+
+// Return the form to a clean slate for the current week.
+function resetFormToFresh() {
   weekInput.value = getCurrentIsoWeekString();
   refreshWeekSummary();
   clearTaskTable();
   setStatus('info', '');
+}
+
+resetBtn.addEventListener('click', () => {
+  if (!confirm('Clear the form?')) return;
+  exitEditMode();
+  resetFormToFresh();
+});
+
+cancelEditBtn.addEventListener('click', () => {
+  if (!confirm('Discard your changes and stop editing this submission?')) return;
+  exitEditMode();
+  resetFormToFresh();
 });
 
 form.addEventListener('submit', async (e) => {
@@ -755,6 +1029,11 @@ form.addEventListener('submit', async (e) => {
   if (!currentUserContext) return setStatus('error', 'Please sign in again.');
   const info = weekdaysFor(weekInput.value);
   if (!info) return setStatus('error', 'Please pick a valid week.');
+  // Guard: never submit for a week that hasn't started yet (the calendar
+  // disables future weeks, but this backstops any other code path).
+  if (isoWeekToMonday(info.year, info.week).getTime() > currentWeekMonday().getTime()) {
+    return setStatus('error', 'You can only submit for the current or a past week.');
+  }
   if (isTaskTableEmpty()) return setStatus('error', 'Please enter your tasks.');
 
   if (APPS_SCRIPT_URL === 'PASTE_YOUR_DEPLOYED_URL_HERE') {
@@ -798,6 +1077,7 @@ form.addEventListener('submit', async (e) => {
       redirect: 'follow'
     });
     setStatus('ok', '');
+    exitEditMode();
   } catch (err) {
     setStatus('error', 'Submit failed: ' + err.message);
   } finally {
@@ -897,7 +1177,7 @@ async function fetchSubmissions() {
     renderSubmissions(data.submissions || []);
   } catch (err) {
     submissionsList.innerHTML =
-      '<div class="text-center py-10 text-rose-600 text-sm font-medium">' +
+      '<div class="error-callout">' +
       escapeHtml(err.message || 'Failed to load submissions.') +
       '</div>';
   }
@@ -922,10 +1202,9 @@ function renderSubmissions(subs) {
   }
   submissionsList.innerHTML = '';
   for (const s of subs) {
-    const card = document.createElement('button');
-    card.type = 'button';
+    const card = document.createElement('div');
     card.className =
-      'group w-full text-left bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-xl p-4 transition shadow-sm hover:shadow';
+      'group bg-white hover:bg-orange-50 border border-slate-200 hover:border-orange-300 rounded-xl p-4 transition shadow-sm hover:shadow';
 
     const preview = buildPreviewSnippet(s.taskPlain);
     const ts = formatTimestamp(s.timestamp);
@@ -935,13 +1214,20 @@ function renderSubmissions(subs) {
       ? '<div class="text-xs text-slate-600 mb-2 leading-relaxed line-clamp-3">' + escapeHtml(preview) + '</div>'
       : '<div class="text-xs text-slate-400 italic mb-2">(no content)</div>';
 
+    // The card itself only hovers; the pencil button is the sole edit trigger.
     card.innerHTML =
       '<div class="flex items-start justify-between gap-3 mb-2">' +
         '<div class="min-w-0 flex-1">' +
           '<div class="font-semibold text-slate-800 text-sm truncate">' + escapeHtml(s.weekLabel) + '</div>' +
           '<div class="text-xs text-slate-500 mt-0.5 truncate">' + escapeHtml(s.weekRange) + '</div>' +
         '</div>' +
-        '<span class="text-xs text-emerald-700 font-semibold opacity-0 group-hover:opacity-100 transition shrink-0">Edit →</span>' +
+        '<button type="button" class="edit-week-btn shrink-0 w-8 h-8 rounded-lg bg-orange-100 text-orange-700 inline-flex items-center justify-center hover:bg-orange-200 hover:text-orange-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 transition" ' +
+          'title="Edit this submission" aria-label="Edit ' + escapeHtml(s.weekLabel) + '">' +
+          '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+            '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>' +
+            '<path d="m15 5 4 4"/>' +
+          '</svg>' +
+        '</button>' +
       '</div>' +
       previewBlock +
       '<div class="text-[11px] text-slate-400 flex flex-wrap items-center gap-1.5">' +
@@ -949,7 +1235,7 @@ function renderSubmissions(subs) {
         (designation ? '<span aria-hidden="true">·</span>' : '') +
         '<span>Last submitted ' + escapeHtml(ts) + '</span>' +
       '</div>';
-    card.addEventListener('click', () => loadSubmissionIntoForm(s));
+    card.querySelector('.edit-week-btn').addEventListener('click', () => loadSubmissionIntoForm(s));
     submissionsList.appendChild(card);
   }
 }
@@ -977,7 +1263,8 @@ function loadSubmissionIntoForm(s) {
     clearTaskTable();
   }
 
-  setStatus('info', `Loaded ${s.weekLabel} — clicking Submit will overwrite this entry with a fresh timestamp.`);
+  setStatus('info', '');
+  enterEditMode(s.weekLabel);
   closeSubmissionsDrawer();
 }
 

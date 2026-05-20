@@ -12,20 +12,22 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="styles.css" rel="stylesheet" />
 </head>
-<body class="min-h-screen lg:h-screen lg:overflow-hidden bg-gradient-to-br from-slate-200 via-slate-100 to-emerald-100/70">
-  <div class="max-w-[100rem] mx-auto px-4 py-4 sm:py-5 lg:h-full lg:flex lg:flex-col lg:gap-4">
+<!-- `app-shell` drives the desktop single-viewport lock — see the media query
+     in styles.css (engages only when the screen is wide AND tall enough). -->
+<body class="app-shell min-h-screen bg-gradient-to-br from-slate-200 via-slate-100 to-orange-100/70">
+  <div class="max-w-[100rem] w-full mx-auto px-3 sm:px-4 xl:px-6 py-3 sm:py-4 lg:h-full lg:flex lg:flex-col lg:gap-3 xl:gap-4">
 
     <!-- ============ HEADER ============ -->
-    <header class="bg-white rounded-2xl shadow-lg overflow-hidden ring-1 ring-slate-200/70 shrink-0 mb-4 lg:mb-0">
-      <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-800 px-5 sm:px-6 py-3 sm:py-4 text-white">
+    <header class="bg-white rounded-2xl shadow-lg overflow-hidden ring-1 ring-slate-200/70 shrink-0 mb-3 sm:mb-4 lg:mb-0">
+      <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-orange-800 px-4 sm:px-6 xl:px-8 py-3 sm:py-4 text-white">
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div class="min-w-0">
-            <h1 class="text-lg sm:text-xl font-semibold tracking-tight">Tech EW &mdash; Weekly Time Sheet</h1>
-            <p class="mt-0.5 text-slate-300 text-xs">Log your weekly tasks &middot; submissions sync directly to the team sheet.</p>
+            <h1 class="text-base sm:text-lg lg:text-xl xl:text-2xl font-semibold tracking-tight">Tech EW &mdash; Weekly Time Sheet</h1>
+            <p class="mt-0.5 text-slate-300 text-[11px] sm:text-xs">Log your weekly tasks &middot; submissions sync directly to the team sheet.</p>
           </div>
 
-          <div id="userChip" class="hidden items-center gap-3 bg-white/10 backdrop-blur rounded-xl px-3 py-1.5 text-sm shrink-0 w-full md:w-auto">
-            <img id="userPhoto" alt="" referrerpolicy="no-referrer" class="w-8 h-8 rounded-full ring-2 ring-white/40 shrink-0 bg-white/20 object-cover" />
+          <div id="userChip" class="hidden items-center gap-2.5 sm:gap-3 bg-white/10 backdrop-blur rounded-xl px-3 py-1.5 text-sm shrink-0 w-full md:w-auto">
+            <img id="userPhoto" alt="" referrerpolicy="no-referrer" class="w-8 h-8 sm:w-9 sm:h-9 rounded-full ring-2 ring-white/40 shrink-0 bg-white/20 object-cover" />
             <div class="leading-tight min-w-0 flex-1">
               <div id="userName" class="font-medium truncate text-sm"></div>
               <div id="userEmail" class="text-slate-300 text-xs truncate"></div>
@@ -39,19 +41,19 @@
     </header>
 
     <!-- ============ LOADING ============ -->
-    <div id="loadingState" class="bg-white rounded-2xl shadow-lg ring-1 ring-slate-100 p-10 text-center max-w-lg mx-auto w-full">
-      <div class="inline-block w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin"></div>
+    <div id="loadingState" class="bg-white rounded-2xl shadow-lg ring-1 ring-slate-100 p-8 sm:p-10 text-center max-w-lg mx-auto lg:my-auto w-full">
+      <div class="inline-block w-8 h-8 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin"></div>
       <p class="mt-3 text-slate-500 text-sm">Checking sign-in&hellip;</p>
     </div>
 
     <!-- ============ AUTH GATE ============ -->
-    <div id="authGate" class="hidden bg-white rounded-2xl shadow-lg ring-1 ring-slate-100 p-8 sm:p-10 text-center max-w-xl mx-auto w-full">
-      <div class="w-14 h-14 mx-auto rounded-full bg-emerald-100 flex items-center justify-center">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <div id="authGate" class="hidden bg-white rounded-2xl shadow-lg ring-1 ring-slate-100 p-7 sm:p-10 text-center max-w-xl mx-auto lg:my-auto w-full">
+      <div class="w-12 h-12 sm:w-14 sm:h-14 mx-auto rounded-full bg-orange-100 flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 sm:w-7 sm:h-7 text-orange-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm0 2c-2.67 0-8 1.34-8 4v3h16v-3c0-2.66-5.33-4-8-4z"/>
         </svg>
       </div>
-      <h2 class="mt-4 text-xl font-semibold text-slate-800">Sign in to continue</h2>
+      <h2 class="mt-4 text-lg sm:text-xl font-semibold text-slate-800">Sign in to continue</h2>
       <p class="mt-1 text-slate-500 text-sm max-w-md mx-auto">
         This time sheet is restricted to the Tech EW GIS team. Use the Google account your manager has authorized.
       </p>
@@ -64,12 +66,12 @@
         </svg>
         <span class="font-medium text-slate-700">Sign in with Google</span>
       </button>
-      <p id="authError" class="hidden mt-4 text-sm text-rose-600 font-medium"></p>
+      <p id="authError" class="hidden mt-4 error-callout"></p>
     </div>
 
     <!-- ============ FORM ============ -->
     <form id="taskForm"
-      class="hidden space-y-4 lg:space-y-0 lg:flex-1 lg:min-h-0 lg:grid lg:grid-cols-12 lg:gap-4"
+      class="hidden space-y-3 sm:space-y-4 lg:space-y-0 lg:flex-1 lg:min-h-0 lg:grid lg:grid-cols-12 lg:gap-3 xl:gap-4"
       novalidate>
 
       <!-- Left column: single unified panel matching editor height -->
@@ -77,43 +79,62 @@
         <div class="bg-white rounded-2xl shadow-md ring-1 ring-slate-200/70 overflow-hidden lg:h-full lg:flex lg:flex-col">
 
           <!-- Week picker -->
-          <div class="p-5">
+          <div class="p-4 sm:p-5 xl:p-6">
             <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">
-              Week <span class="text-rose-500 normal-case">*</span>
+              Week <span class="text-red-500 normal-case">*</span>
             </label>
-            <div class="flex flex-wrap items-center gap-2">
-              <input type="week" id="weekInput" name="week" required lang="en-GB"
-                class="flex-1 min-w-[10rem] rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition" />
-              <button id="lastWeekBtn" type="button"
-                class="text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-900 font-semibold hover:bg-slate-50 hover:border-slate-400 transition whitespace-nowrap">
-                Last week
-              </button>
-              <button id="thisWeekBtn" type="button"
-                class="text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-600 font-medium hover:bg-slate-50 hover:border-slate-400 transition whitespace-nowrap">
-                This week
-              </button>
-              <button id="clearWeekBtn" type="button"
-                class="text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-600 font-medium hover:bg-slate-50 hover:border-slate-400 transition whitespace-nowrap">
-                Clear
-              </button>
+            <div class="space-y-2">
+              <!-- Custom themed week picker. The native <input type="week">
+                   can't be styled and handles a future-week cap inconsistently,
+                   so it's replaced by a calendar (see app.js / styles.css).
+                   The hidden input keeps the YYYY-Www value the app reads. -->
+              <div>
+                <button type="button" id="weekTrigger" class="week-trigger" aria-haspopup="dialog" aria-expanded="false">
+                  <svg class="wt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/>
+                    <path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>
+                  </svg>
+                  <span id="weekTriggerLabel" class="wt-label placeholder">Select a week</span>
+                  <svg class="wt-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M6 9l6 6 6-6"/>
+                  </svg>
+                </button>
+                <input type="hidden" id="weekInput" name="week" />
+              </div>
+              <!-- Three quick-pick buttons in an even grid so they never wrap
+                   awkwardly — consistent at every panel width. -->
+              <div class="grid grid-cols-3 gap-2">
+                <button id="lastWeekBtn" type="button"
+                  class="text-xs sm:text-sm px-2 py-2 rounded-lg border border-slate-300 bg-white text-slate-900 font-semibold hover:bg-slate-50 hover:border-slate-400 transition text-center">
+                  Last week
+                </button>
+                <button id="thisWeekBtn" type="button"
+                  class="text-xs sm:text-sm px-2 py-2 rounded-lg border border-slate-300 bg-white text-slate-600 font-medium hover:bg-slate-50 hover:border-slate-400 transition text-center">
+                  This week
+                </button>
+                <button id="clearWeekBtn" type="button"
+                  class="text-xs sm:text-sm px-2 py-2 rounded-lg border border-slate-300 bg-white text-slate-600 font-medium hover:bg-slate-50 hover:border-slate-400 transition text-center">
+                  Clear
+                </button>
+              </div>
             </div>
-            <div id="weekSummary" class="mt-2 text-xs text-emerald-700 font-semibold"></div>
+            <div id="weekSummary" class="mt-2 text-xs text-orange-700 font-semibold"></div>
           </div>
 
           <!-- Week days preview: absorbs leftover height on lg+ via flex-1.
                Each day row spaces evenly when there's spare room. -->
-          <div class="px-5 py-4 border-t border-slate-100 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+          <div class="px-4 sm:px-5 xl:px-6 py-4 border-t border-slate-100 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
             <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-3">Week days</div>
             <div id="weekDaysList" class="lg:h-[calc(100%-1.75rem)] lg:flex lg:flex-col lg:justify-around space-y-1.5 lg:space-y-0"></div>
           </div>
 
           <!-- Metadata -->
-          <div class="px-5 py-4 border-t border-slate-100 shrink-0">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
-              <!-- Submitting as: name tinted emerald to stand out; email muted. -->
+          <div class="px-4 sm:px-5 xl:px-6 py-4 border-t border-slate-100 shrink-0">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-5 gap-y-3.5 sm:gap-y-4">
+              <!-- Submitting as: name tinted orange to stand out; email muted. -->
               <div class="min-w-0">
                 <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Submitting as</div>
-                <div id="submittingAsName" class="mt-1 font-semibold text-emerald-700 text-sm break-words leading-snug">&mdash;</div>
+                <div id="submittingAsName" class="mt-1 font-semibold text-orange-700 text-sm break-words leading-snug">&mdash;</div>
                 <div id="submittingAsEmail" class="text-xs text-slate-500 break-all"></div>
               </div>
 
@@ -130,60 +151,64 @@
                 <div class="mt-1 font-semibold text-slate-700 text-sm">GIS Developer</div>
               </div>
 
-              <!-- Reported to -->
+              <!-- Reported to: fixed per-user value pulled from the ALLOWLIST,
+                   not editable. Server enforces this anyway. -->
               <div class="min-w-0">
                 <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Reported to</div>
-                <div class="mt-1 font-semibold text-slate-700 text-sm leading-snug">Muhammad Arsalan Mukhtar</div>
+                <div id="reportedToDisplay" class="mt-1 font-semibold text-slate-700 text-sm leading-snug">&mdash;</div>
               </div>
             </div>
           </div>
 
           <!-- View my submissions: prominent CTA opening the right-side drawer -->
-          <div class="px-5 py-4 border-t border-slate-100 shrink-0">
+          <div class="px-4 sm:px-5 xl:px-6 py-4 border-t border-slate-100 shrink-0">
             <button id="viewSubmissionsBtn" type="button"
-              class="group w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/70 hover:from-emerald-100 hover:to-emerald-200/70 border border-emerald-200 hover:border-emerald-300 shadow-sm hover:shadow transition">
+              class="group w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-orange-50 to-orange-100/70 hover:from-orange-100 hover:to-orange-200/70 border border-orange-200 hover:border-orange-300 shadow-sm hover:shadow transition">
               <div class="flex items-center gap-3 min-w-0">
-                <span class="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                <span class="w-9 h-9 rounded-lg bg-orange-600 text-white flex items-center justify-center shadow-sm shrink-0">
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9h6m-6 4h4"/>
                   </svg>
                 </span>
                 <div class="text-left min-w-0">
-                  <div class="text-sm font-semibold text-emerald-900">My Submissions</div>
-                  <div class="text-xs text-emerald-700/80 mt-0.5 truncate">View &amp; edit your past entries</div>
+                  <div class="text-sm font-semibold text-orange-900">My Submissions</div>
+                  <div class="text-xs text-orange-700/80 mt-0.5 truncate">View &amp; edit your past entries</div>
                 </div>
               </div>
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-emerald-700 group-hover:translate-x-0.5 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-orange-700 group-hover:translate-x-0.5 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
               </svg>
             </button>
           </div>
 
           <!-- Action bar: bottom footer of the unified panel -->
-          <div class="px-5 py-4 border-t border-slate-100 bg-slate-50/60">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div id="status" class="flex-1 min-w-0 flex items-center gap-3 min-h-[2rem]">
-                <!-- Submitting: dotted dual-ring loader. Hidden by default;
-                     toggled via .hidden by setStatus(). -->
-                <span id="statusSpinner" class="hidden inline-flex items-center">
-                  <span class="loader"></span>
-                </span>
-                <!-- Tick: appears on success, gets .status-tick-fade for the 5s fade-out. -->
-                <svg id="statusTick" class="hidden w-6 h-6 text-emerald-600" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                </svg>
-                <span id="statusText" class="text-sm"></span>
-              </div>
-              <div class="flex items-center justify-end gap-2 shrink-0">
-                <button type="button" id="resetBtn"
-                  class="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-400 transition">
-                  Reset
-                </button>
-                <button type="submit" id="submitBtn"
-                  class="px-6 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold shadow-sm hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed transition">
-                  Submit
-                </button>
-              </div>
+          <div class="px-4 sm:px-5 xl:px-6 py-4 border-t border-slate-100 bg-slate-50/60">
+            <div id="status" class="flex items-center gap-2.5 min-h-[2rem] mb-2.5">
+              <!-- Submitting: dotted dual-ring loader. Hidden by default;
+                   toggled via .hidden by setStatus(). -->
+              <span id="statusSpinner" class="hidden inline-flex items-center">
+                <span class="loader"></span>
+              </span>
+              <!-- Tick: appears on success, gets .status-tick-fade for the 5s fade-out. -->
+              <svg id="statusTick" class="hidden w-6 h-6 text-orange-600" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+              </svg>
+              <span id="statusText" class="text-sm"></span>
+            </div>
+            <!-- cancelEditBtn is revealed by app.js only while editing an existing submission. -->
+            <div class="flex items-center gap-2">
+              <button type="button" id="cancelEditBtn"
+                class="hidden flex-1 px-3 py-2 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm font-medium hover:bg-red-100 hover:border-red-300 transition">
+                Cancel
+              </button>
+              <button type="button" id="resetBtn"
+                class="flex-1 px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-400 transition">
+                Reset
+              </button>
+              <button type="submit" id="submitBtn"
+                class="flex-1 px-3 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold shadow-sm hover:bg-orange-700 active:bg-orange-800 disabled:opacity-50 disabled:cursor-not-allowed transition">
+                Submit
+              </button>
             </div>
           </div>
 
@@ -192,21 +217,34 @@
 
       <!-- Right column: Table editor (5 day columns × N rows; each cell is
            contenteditable with a shared toolbar). Flex-fills the row height. -->
-      <section class="bg-white rounded-2xl shadow-md ring-1 ring-slate-200/70 p-4 lg:col-span-8 lg:flex lg:flex-col lg:min-h-0">
-        <div class="flex items-baseline justify-between gap-3 mb-3 flex-wrap shrink-0">
-          <label class="text-sm font-semibold text-slate-700">
-            Daily Tasks <span class="text-rose-500">*</span>
+      <section class="bg-white rounded-2xl shadow-md ring-1 ring-slate-200/70 p-3 sm:p-4 xl:p-5 lg:col-span-8 lg:flex lg:flex-col lg:min-h-0">
+        <!-- Edit-mode banner: revealed by app.js when an existing submission is loaded. -->
+        <div id="editBanner" class="hidden shrink-0 mb-3 flex items-center gap-3 rounded-lg border border-orange-200 bg-orange-50 px-3.5 py-2.5">
+          <span class="shrink-0 w-7 h-7 rounded-md bg-orange-100 text-orange-700 flex items-center justify-center">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>
+              <path d="m15 5 4 4"/>
+            </svg>
+          </span>
+          <div class="min-w-0">
+            <div id="editBannerTitle" class="text-[13px] font-semibold text-orange-900 leading-tight">Editing submission</div>
+            <div class="text-xs text-orange-700 leading-tight mt-0.5">Submitting overwrites this entry with a fresh timestamp.</div>
+          </div>
+        </div>
+        <div class="flex items-baseline justify-between gap-3 mb-2.5 sm:mb-3 flex-wrap shrink-0">
+          <label class="text-sm xl:text-base font-semibold text-slate-700">
+            Daily Tasks <span class="text-red-500">*</span>
           </label>
           <p class="text-xs text-slate-500">Add rows for multiple tasks per day. Formatting applies to the focused cell.</p>
         </div>
 
         <!-- Shared formatting toolbar — operates on the currently-focused cell. -->
-        <div id="taskToolbar" class="flex items-center gap-0.5 px-2 py-1.5 rounded-t-lg border border-slate-300 border-b-0 bg-slate-50 shrink-0">
+        <div id="taskToolbar" class="flex flex-wrap items-center gap-0.5 px-2 py-1.5 rounded-t-lg border border-slate-300 border-b-0 bg-slate-50 shrink-0">
           <button type="button" data-cmd="bold"          class="tb-btn" title="Bold (Ctrl+B)"><b>B</b></button>
           <button type="button" data-cmd="italic"        class="tb-btn" title="Italic (Ctrl+I)"><i>I</i></button>
           <button type="button" data-cmd="underline"     class="tb-btn" title="Underline (Ctrl+U)"><u>U</u></button>
           <button type="button" data-cmd="strikethrough" class="tb-btn" title="Strikethrough"><s>S</s></button>
-          <span class="w-px h-5 bg-slate-300 mx-1.5" aria-hidden="true"></span>
+          <span class="w-px h-5 bg-slate-300 mx-1 sm:mx-1.5" aria-hidden="true"></span>
           <button type="button" data-color-action="foreColor" class="tb-btn tb-color-btn" title="Text colour" aria-label="Text colour">
             <span class="tb-color-letter">A</span>
             <span class="tb-color-bar" style="background-color: #1e293b;"></span>
@@ -218,7 +256,7 @@
             </svg>
             <span class="tb-color-bar" style="background-color: #fde047;"></span>
           </button>
-          <span class="w-px h-5 bg-slate-300 mx-1.5" aria-hidden="true"></span>
+          <span class="w-px h-5 bg-slate-300 mx-1 sm:mx-1.5" aria-hidden="true"></span>
           <button type="button" data-cmd="insertUnorderedList" class="tb-btn" title="Bulleted list" aria-label="Bulleted list">
             <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><circle cx="3" cy="5" r="1.5"/><circle cx="3" cy="10" r="1.5"/><circle cx="3" cy="15" r="1.5"/><rect x="7" y="4" width="11" height="2" rx="1"/><rect x="7" y="9" width="11" height="2" rx="1"/><rect x="7" y="14" width="11" height="2" rx="1"/></svg>
           </button>
@@ -227,7 +265,9 @@
           </button>
         </div>
 
-        <!-- Scrollable table body. The container is the flex-1 absorber on lg+. -->
+        <!-- Scrollable table body. The container is the flex-1 absorber on lg+.
+             On phones the table keeps a min-width (see styles.css) and this
+             wrapper scrolls horizontally so day columns stay usable. -->
         <div class="lg:flex-1 lg:min-h-0 overflow-auto border border-slate-300 border-t-0 rounded-b-lg bg-white">
           <table id="taskTable" class="w-full table-fixed border-collapse">
             <thead>
@@ -257,13 +297,13 @@
 
     </form>
 
-    <p class="text-center text-xs text-slate-400 mt-4 lg:mt-0 shrink-0">Tech EW &middot; Internal use only</p>
+    <p class="text-center text-xs text-slate-400 mt-3 sm:mt-4 lg:mt-0 shrink-0">Tech EW &middot; Internal use only</p>
   </div>
 
   <!-- ============ MY SUBMISSIONS DRAWER ============ -->
   <div id="submissionsBackdrop" class="drawer-backdrop fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"></div>
   <aside id="submissionsDrawer" class="drawer-panel fixed top-0 right-0 h-full w-full sm:w-[32rem] lg:w-[38rem] max-w-full bg-white shadow-2xl ring-1 ring-slate-200 z-50 flex flex-col">
-    <header class="px-5 py-4 border-b border-slate-200 flex items-start justify-between gap-3 shrink-0 bg-gradient-to-r from-slate-50 to-emerald-50/60">
+    <header class="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-slate-200 flex items-start justify-between gap-3 shrink-0 bg-gradient-to-r from-slate-50 to-orange-50/60">
       <div class="min-w-0">
         <h2 class="text-base font-semibold text-slate-800">My Submissions</h2>
         <p class="text-xs text-slate-500 mt-0.5">Click any week to edit. Resubmitting overwrites the existing row with a fresh timestamp.</p>
@@ -276,7 +316,7 @@
         </svg>
       </button>
     </header>
-    <div id="submissionsList" class="flex-1 overflow-y-auto p-4 space-y-2.5"></div>
+    <div id="submissionsList" class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5"></div>
   </aside>
 
   <script type="module" src="app.js"></script>

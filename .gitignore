@@ -9,3 +9,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Local-only theme picker helper (not part of the app)
+theme-preview.html

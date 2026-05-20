@@ -27,23 +27,24 @@ const FIREBASE_API_KEY    = 'AIzaSyA1exz20sN1WqLQdNkP986JX5wHuICYolg';
 const FIREBASE_PROJECT_ID = 'devteam-daily-tasks';
 
 // Must mirror the ALLOWLIST in app.js. Emails MUST be lowercase here.
-// Each entry is { name, designation } — server treats both as fixed for
-// that user. The frontend no longer lets users pick a designation; the
-// server uses this map as the source of truth.
+// Each entry is { name, designation, reportedTo } — the server treats all
+// three as fixed for that user. `reportedTo` is the manager this user reports
+// to; it is written to BOTH the "Assigned By" and "Report To" sheet columns
+// and shown on the form. The server uses this map as the source of truth.
 const ALLOWLIST = {
-  'developer.ndma@gmail.com':     { name: 'Muhammad Arsalan Mukhtar', designation: 'Deputy Manager - I' },
-  'as2040704@gmail.com':          { name: 'Abdul Sattar Sheikh',      designation: 'Assistant Manager - II' },
-  'mustafa.haider2011@gmail.com': { name: 'Syed Mustafa Haider',      designation: 'Assistant Manager - I' },
-  'shehzadalikhan586@gmail.com':  { name: 'Shehzad Ali',              designation: 'Assistant Manager - I' },
-  'seemalnaeem100@gmail.com':     { name: 'Seemal Naeem',             designation: 'Assistant Manager - I' },
-  'muddasir.ndma25@gmail.com':    { name: 'Muddasir Shah',            designation: 'Assistant Manager - I' },
-  'ahad.khan.work01@gmail.com':   { name: 'Muhammad Ahad Khan',       designation: 'Assistant Manager - I' },
-  'zainabali27feb2024@gmail.com': { name: 'Zainab Ali',               designation: 'Assistant Manager - I' },
-  'ttalha063@gmail.com':          { name: 'Talha Rizwan',             designation: 'Assistant Manager - I' },
-  'zeeshannasir2001@gmail.com':   { name: 'Zeeshan Nasir',            designation: 'Assistant Manager - I' },
-  'ibrahimabdullahh84@gmail.com': { name: 'Ibrahim Abdullah',         designation: 'Assistant Manager - I' },
-  'usamabinumar199@gmail.com':    { name: 'Usama bin Umar',           designation: 'Intern' },
-  'osamakhan32156@gmail.com':     { name: 'Muhammad Osama Khan',      designation: 'Intern' }
+  'developer.ndma@gmail.com':     { name: 'Muhammad Arsalan Mukhtar', designation: 'Deputy Manager - I',     reportedTo: 'Junaid Aziz Khan' },
+  'as2040704@gmail.com':          { name: 'Abdul Sattar Sheikh',      designation: 'Assistant Manager - II', reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'mustafa.haider2011@gmail.com': { name: 'Syed Mustafa Haider',      designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'shehzadalikhan586@gmail.com':  { name: 'Shehzad Ali',              designation: 'Assistant Manager - I',  reportedTo: 'Kashif Iqbal' },
+  'seemalnaeem100@gmail.com':     { name: 'Seemal Naeem',             designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'muddasir.ndma25@gmail.com':    { name: 'Muddasir Shah',            designation: 'Assistant Manager - I',  reportedTo: 'Imtiaz Nabi' },
+  'ahad.khan.work01@gmail.com':   { name: 'Muhammad Ahad Khan',       designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'zainabali27feb2024@gmail.com': { name: 'Zainab Ali',               designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'ttalha063@gmail.com':          { name: 'Talha Rizwan',             designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'zeeshannasir2001@gmail.com':   { name: 'Zeeshan Nasir',            designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'ibrahimabdullahh84@gmail.com': { name: 'Ibrahim Abdullah',         designation: 'Assistant Manager - I',  reportedTo: 'Imtiaz Nabi' },
+  'usamabinumar199@gmail.com':    { name: 'Usama bin Umar',           designation: 'Intern',                 reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'osamakhan32156@gmail.com':     { name: 'Muhammad Osama Khan',      designation: 'Intern',                 reportedTo: 'Muhammad Arsalan Mukhtar' }
 };
 
 const SHEET_NAME = 'Weekly Submissions';
@@ -117,7 +118,8 @@ function processSubmission_(e) {
     }
     const displayName = entry.name;
     const designation = entry.designation;
-    debugLog_('6. allowlist hit', email + ' → ' + displayName + ' (' + designation + ')');
+    const reportedTo  = entry.reportedTo || '';
+    debugLog_('6. allowlist hit', email + ' → ' + displayName + ' (' + designation + ') reportedTo=' + (reportedTo || '(unset)'));
 
     const sheet = getOrCreateSheet_();
     ensureExtendedHeaders_(sheet);
@@ -155,8 +157,8 @@ function processSubmission_(e) {
       weekLabel,
       weekRange,
       '',
-      'Muhammad Arsalan Mukhtar',
-      'Muhammad Arsalan Mukhtar',
+      reportedTo,   // Assigned By
+      reportedTo,   // Report To
       taskJson
     ];
 
@@ -226,7 +228,7 @@ function debugLog_(label, data) {
   }
 }
 
-const BACKEND_VERSION = 'v10-new-user-addition';
+const BACKEND_VERSION = 'v11-dynamic-reported-to';
 
 function doGet(e) {
   if (e && e.parameter) {

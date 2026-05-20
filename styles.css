@@ -17,14 +17,16 @@ textarea {
 
 /* ---------- Task table editor ---------- */
 
-/* Toolbar buttons: square, monochrome, active-state highlight via JS class */
+/* Toolbar buttons: square, monochrome, active-state highlight via JS class.
+   Size scales fluidly so the toolbar stays compact on phones and comfortable
+   on large screens. */
 .tb-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  font-size: 13px;
+  width: clamp(26px, 3vw + 16px, 31px);
+  height: clamp(26px, 3vw + 16px, 31px);
+  font-size: clamp(12px, 0.8vw + 9px, 13.5px);
   font-family: inherit;
   color: #475569;
   background: transparent;
@@ -35,11 +37,11 @@ textarea {
   padding: 0;
 }
 .tb-btn:hover { background: #e2e8f0; color: #1e293b; }
-.tb-btn:focus { outline: none; box-shadow: 0 0 0 2px #6ee7b7; }
+.tb-btn:focus { outline: none; box-shadow: 0 0 0 2px #fdba74; }
 .tb-btn.active {
-  background: #d1fae5;
-  color: #065f46;
-  border-color: #6ee7b7;
+  background: #ffedd5;
+  color: #9a3412;
+  border-color: #fdba74;
 }
 
 /* Color buttons: stack a letter/icon on top of a thin bar showing the
@@ -100,7 +102,7 @@ textarea {
 }
 .tb-color-palette .default-swatch:hover {
   transform: scale(1.12);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), 0 0 0 2px #6ee7b7;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), 0 0 0 2px #fdba74;
 }
 /* For the highlight palette: same square but with the universal "no fill"
    diagonal slash on white. Toggled via JS by adding `.transparent-style`. */
@@ -134,7 +136,7 @@ textarea {
 }
 .tb-color-palette .swatch:hover {
   transform: scale(1.12);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), 0 0 0 2px #6ee7b7;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), 0 0 0 2px #fdba74;
 }
 
 /* Column headers — duo-tone: slate-100 surface, slate-800 day name, slate-500 date */
@@ -174,6 +176,13 @@ textarea {
   font-weight: 500;
   line-height: 1.2;
 }
+/* Today's column header — orange accent + top bar so the current day pops. */
+.tb-th.is-today {
+  background: #fff7ed;
+  box-shadow: inset 0 3px 0 #ea580c;
+}
+.tb-th.is-today .tb-day  { color: #c2410c; }
+.tb-th.is-today .tb-date { color: #ea580c; }
 
 /* Rows: duo-tone striping (white + slate-50). Hovering the row reveals the × button. */
 .task-row { background: #ffffff; }
@@ -187,11 +196,13 @@ textarea {
 }
 .task-cell:nth-last-child(2) { border-right: 0; }
 
-/* Cell editor — contenteditable div with placeholder, focus accent, soft scrolling */
+/* Cell editor — contenteditable div with placeholder, focus accent, soft
+   scrolling. Font, padding and min-height scale fluidly with viewport width
+   so the editor reads well from phones up to large desktops. */
 .cell-editor {
-  min-height: 84px;
-  padding: 8px 10px;
-  font-size: 13px;
+  min-height: clamp(64px, 5vw + 38px, 100px);
+  padding: clamp(7px, 0.8vw, 10px) clamp(9px, 1vw, 12px);
+  font-size: clamp(12px, 0.4vw + 10.6px, 14px);
   line-height: 1.55;
   color: #1e293b;
   outline: none;
@@ -207,8 +218,8 @@ textarea {
   pointer-events: none;
 }
 .cell-editor:focus {
-  background: #ecfdf5;
-  box-shadow: inset 0 0 0 1.5px #6ee7b7;
+  background: #fff7ed;
+  box-shadow: inset 0 0 0 1.5px #fdba74;
 }
 /* Tailwind's preflight resets ul/ol to list-style: none, so we restore
    the markers explicitly for cells — otherwise B/I/U works but the bullet
@@ -252,14 +263,291 @@ textarea {
 }
 .task-row:hover .remove-row-btn { opacity: 1; }
 .remove-row-btn:hover { background: #fee2e2; color: #b91c1c; }
-.remove-row-btn:focus { opacity: 1; outline: none; box-shadow: 0 0 0 2px #fda4af; }
+.remove-row-btn:focus { opacity: 1; outline: none; box-shadow: 0 0 0 2px #fca5a5; }
 
-#weekInput::-webkit-calendar-picker-indicator {
+/* ---------- Custom week picker ----------
+   Replaces the native <input type="week"> dropdown (which can't be themed).
+   The trigger looks like a form field; the calendar popup is appended to
+   <body> by JS so the card's overflow:hidden never clips it. */
+.week-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  font-size: 0.875rem;
+  color: #1e293b;
   cursor: pointer;
-  opacity: 0.7;
+  text-align: left;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
-#weekInput::-webkit-calendar-picker-indicator:hover {
+.week-trigger:hover { border-color: #94a3b8; }
+.week-trigger:focus-visible,
+.week-trigger.is-open {
+  outline: none;
+  border-color: #64748b;
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.18);
+}
+.wt-icon,
+.wt-chevron {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.wt-icon { color: #475569; }
+.wt-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wt-label.placeholder { color: #94a3b8; font-weight: 500; }
+.wt-chevron {
+  color: #94a3b8;
+  transition: transform 180ms ease;
+}
+.week-trigger.is-open .wt-chevron { transform: rotate(180deg); }
+
+/* Calendar popup */
+.week-cal-popup {
+  position: fixed;
+  z-index: 70;
+  width: 304px;
+  max-width: calc(100vw - 16px);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  padding: 0.75rem;
+  box-shadow:
+    0 18px 42px -10px rgba(15, 23, 42, 0.28),
+    0 6px 14px -8px rgba(15, 23, 42, 0.18);
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+  transform-origin: top center;
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+.week-cal-popup.open {
   opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+/* Header: month title + month-nav arrows */
+.week-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+.week-cal-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+.week-cal-nav {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+.week-cal-nav:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+.week-cal-nav:disabled { opacity: 0.35; cursor: not-allowed; }
+.week-cal-nav:focus-visible { outline: none; box-shadow: 0 0 0 2px #94a3b8; }
+
+/* Grid: week-number column + 7 day columns. Header and rows share a template
+   so columns line up exactly. */
+.week-cal-grid-head,
+.week-cal-row {
+  display: grid;
+  grid-template-columns: 1.9rem repeat(7, 1fr);
+  gap: 2px;
+}
+.week-cal-grid-head {
+  padding-bottom: 5px;
+  margin-bottom: 3px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.week-cal-grid-head span {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  padding: 3px 0;
+}
+.week-cal-grid-head span:first-child { color: #cbd5e1; }
+
+/* ---- Week rows — a whole week is the click target ----
+   Prominence ladder (strongest -> faintest):
+     selected week -> filled slate, lifted with a soft shadow
+     current week  -> slate-tinted block (no ring)
+     past weeks    -> quiet muted grey, but clearly still clickable
+     future weeks  -> disabled: faint, no hover, not-allowed cursor
+   Within a row the current day is a filled chip; other days stay quiet. */
+.week-cal-row {
+  border-radius: 0.55rem;
+  cursor: pointer;
+  margin: 1px 0;
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+.week-cal-row:focus-visible { outline: none; box-shadow: 0 0 0 2px #64748b; }
+.week-cal-row.is-disabled { cursor: not-allowed; }
+
+.week-cal-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  font-size: 12px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #9aa6b6;            /* past weeks (default): quiet */
+  font-weight: 500;
+}
+.week-cal-cell.is-other-month { color: #dce1e8; }
+
+/* Week-number badge */
+.week-cal-wk {
+  font-size: 11px;
+  font-weight: 700;
+  color: #cbd5e1;
+  background: #f6f8fa;
+  border-radius: 0.4rem;
+}
+
+/* Current-day chip — the standout marker in its row. */
+.cal-today-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #1e293b;
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.4);
+}
+
+/* Past-week hover (past = not current / selected / disabled). */
+.week-cal-row:hover:not(.is-disabled):not(.is-selected):not(.is-current) {
+  background: #f1f5f9;
+}
+.week-cal-row:hover:not(.is-disabled):not(.is-selected):not(.is-current) .week-cal-cell {
+  color: #475569;
+}
+.week-cal-row:hover:not(.is-disabled):not(.is-selected):not(.is-current) .week-cal-wk {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+/* Current week — prominent slate-tinted block (no ring). */
+.week-cal-row.is-current:not(.is-selected) {
+  background: #eef1f5;
+}
+.week-cal-row.is-current:not(.is-selected) .week-cal-cell {
+  color: #1e293b;
+  font-weight: 600;
+}
+.week-cal-row.is-current:not(.is-selected) .week-cal-wk {
+  background: #dde3ea;
+  color: #334155;
+}
+.week-cal-row.is-current:not(.is-selected):hover { background: #e2e8f0; }
+
+/* Selected week — the strongest state: filled slate, lifted. */
+.week-cal-row.is-selected {
+  background: #334155;
+  box-shadow: 0 3px 10px -2px rgba(15, 23, 42, 0.4);
+}
+.week-cal-row.is-selected:hover { background: #1e293b; }
+.week-cal-row.is-selected .week-cal-cell {
+  color: rgba(255, 255, 255, 0.82);   /* other days: present but understated */
+  font-weight: 500;
+}
+.week-cal-row.is-selected .week-cal-cell.is-other-month {
+  color: rgba(255, 255, 255, 0.45);
+}
+.week-cal-row.is-selected .week-cal-wk {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+/* Today inside the selected row → white chip, dark slate text — maximum pop. */
+.week-cal-row.is-selected .cal-today-chip {
+  background: #ffffff;
+  color: #1e293b;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Future weeks — disabled. */
+.week-cal-row.is-disabled .week-cal-cell { color: #d8dee8; }
+.week-cal-row.is-disabled .week-cal-wk { background: #fafbfc; color: #e7ebf0; }
+
+/* Footer: Clear + jump-to-current-week shortcuts */
+.week-cal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid #f1f5f9;
+}
+.week-cal-foot button {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.3rem 0.55rem;
+  border: 0;
+  border-radius: 0.4rem;
+  background: transparent;
+  cursor: pointer;
+  transition: background 110ms, color 110ms;
+}
+.week-cal-foot button:focus-visible { outline: none; box-shadow: 0 0 0 2px #94a3b8; }
+.week-cal-link { color: #334155; }
+.week-cal-link:hover { background: #f1f5f9; }
+.week-cal-clear { color: #64748b; }
+.week-cal-clear:hover { background: #f1f5f9; color: #334155; }
+
+/* ---------- Week-days list ----------
+   The "Week days" panel rows. Today's row gets an orange pill so the
+   current day is obvious at a glance. */
+.weekday-row {
+  padding: 7px 10px;
+  border-radius: 0.55rem;
+}
+.weekday-row.is-today {
+  background: #fff7ed;
+  box-shadow: inset 0 0 0 1px #fed7aa;
+}
+.weekday-today-tag {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #c2410c;
+  background: #fed7aa;
+  padding: 2px 6px;
+  border-radius: 999px;
 }
 
 /* ---------- My Submissions drawer ----------
@@ -304,12 +592,12 @@ textarea {
 }
 .select-pro-trigger:focus {
   outline: none;
-  border-color: #059669;
-  box-shadow: 0 0 0 1px #059669;
+  border-color: #ea580c;
+  box-shadow: 0 0 0 1px #ea580c;
 }
 .select-pro.open .select-pro-trigger {
-  border-color: #059669;
-  box-shadow: 0 0 0 1px #059669;
+  border-color: #ea580c;
+  box-shadow: 0 0 0 1px #ea580c;
 }
 .select-pro.open #designationChevron {
   transform: rotate(180deg);
@@ -353,17 +641,17 @@ textarea {
   user-select: none;
 }
 .select-pro-menu li:hover {
-  background: #ecfdf5;
-  color: #065f46;
+  background: #fff7ed;
+  color: #9a3412;
 }
 .select-pro-menu li.selected {
-  background: #d1fae5;
-  color: #065f46;
+  background: #ffedd5;
+  color: #9a3412;
   font-weight: 600;
 }
 .select-pro-menu li.selected::after {
   content: "✓";
-  color: #059669;
+  color: #ea580c;
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -417,4 +705,83 @@ textarea {
 }
 .status-tick-fade {
   animation: status-tick-fade 5s ease-out forwards;
+}
+
+/* Error message — left-bar callout: a red accent bar over a faint wash.
+   Used for form/submit errors, the auth-gate error, and drawer load errors. */
+.error-callout {
+  display: inline-block;
+  max-width: 100%;
+  text-align: left;
+  border-left: 3px solid #dc2626;   /* red-600 — accent bar */
+  background: #fef2f2;               /* red-50  — faint wash */
+  color: #b91c1c;                    /* red-700 — text */
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.45;
+  padding: 6px 10px;
+  border-radius: 0 6px 6px 0;
+}
+
+/* Auto-dismiss: callout holds solid for ~4s, then fades over the last second. */
+@keyframes error-callout-fade {
+  0%, 80% { opacity: 1; }
+  100%    { opacity: 0; }
+}
+.error-callout-fade {
+  animation: error-callout-fade 5s ease-out forwards;
+}
+
+/* =========================================================
+   Responsive behaviour
+   =========================================================
+   The app has three layout modes:
+     • Phone   (< 640px)  — single column, page scrolls, task table
+                            scrolls horizontally inside its wrapper.
+     • Tablet  (640–1023) — single column, page scrolls, table fits.
+     • Desktop (≥ 1024px) — two-column dashboard. Locked to one viewport
+                            (no page scroll) ONLY when the screen is also
+                            tall enough; shorter screens scroll instead.
+   ========================================================= */
+
+/* Desktop single-viewport lock. Engaged only when the screen is both wide
+   (≥1024px → two columns) AND tall enough (≥700px) to hold the whole form
+   without cramping. On shorter screens the body scrolls normally so nothing
+   is clipped. The `lg:h-full / lg:flex-1` utilities in the markup gracefully
+   degrade to content height when the body height is `auto`. */
+@media (min-width: 1024px) and (min-height: 700px) {
+  html,
+  body.app-shell {
+    height: 100%;
+  }
+  body.app-shell {
+    overflow: hidden;
+  }
+}
+
+/* Phones: the 5-day task grid can't shrink to ~60px columns and stay usable,
+   so give the table a comfortable min-width and let its wrapper scroll
+   horizontally. Header cells get tighter padding to claw back space. */
+@media (max-width: 639.98px) {
+  #taskTable {
+    min-width: 36rem;
+  }
+  .tb-th {
+    padding: 0.5rem 0.55rem;
+  }
+}
+
+/* Fine-tune the spacing rhythm on large desktops so the dashboard breathes. */
+@media (min-width: 1536px) {
+  .tb-th {
+    padding: 0.7rem 0.95rem;
+  }
+}
+
+/* Coarse-pointer devices (touch): the remove-row button can't rely on hover,
+   so keep it faintly visible at all times instead of fully transparent. */
+@media (hover: none) {
+  .remove-row-btn {
+    opacity: 0.55;
+  }
 }
