@@ -1194,6 +1194,71 @@ function buildPreviewSnippet(plainText) {
   return cleaned.substring(0, 160).trim() + '…';
 }
 
+// Strip a task cell's HTML down to readable plain text for the drawer
+// preview. Mirrors the server's stripHtml_: <ol> items are numbered,
+// <ul> items get bullets, block tags become line breaks.
+function cellToText(html) {
+  if (!html) return '';
+  let s = String(html).replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, function (_m, inner) {
+    let n = 0;
+    return inner.replace(/<li[^>]*>/gi, function () { n += 1; return '' + n + ''; });
+  });
+  s = s
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '• ')
+    .replace(/<\/(p|div|h[1-6])>/gi, '\n');
+  const tmp = document.createElement('div');
+  tmp.innerHTML = s;
+  const text = (tmp.textContent || '').replace(/(\d+)/g, function (_m, n) { return n + '. '; });
+  return text
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{2,}/g, '\n')
+    .trim();
+}
+
+// Group a submission's task rows into a per-day breakdown table for the
+// "My Submissions" card. Days with no content show a muted dash. Returns
+// null when there are no rows at all (caller falls back to the flat
+// snippet) — e.g. very old delta-only rows with nothing parseable.
+function buildDayBreakdown(s) {
+  let rows = Array.isArray(s.taskRows) && s.taskRows.length ? s.taskRows : null;
+  if (!rows && s.taskDelta && s.taskDelta.ops) {
+    const derived = deltaToTaskRows(s.taskDelta);
+    if (derived && derived.length) rows = derived;
+  }
+  if (!rows) return null;
+
+  const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  let anyContent = false;
+  let body = '';
+  for (const day of DAYS) {
+    const parts = [];
+    for (const r of rows) {
+      const t = cellToText(r && r[day]);
+      if (t) parts.push(t);
+    }
+    const text = parts.join('\n');
+    if (text) {
+      anyContent = true;
+      body +=
+        '<div class="flex gap-2.5 px-2.5 py-1.5">' +
+          '<span class="shrink-0 w-9 text-[10px] font-bold uppercase tracking-wide text-orange-600 pt-px">' + day + '</span>' +
+          '<div class="min-w-0 text-xs text-slate-600 leading-snug whitespace-pre-line line-clamp-3">' + escapeHtml(text) + '</div>' +
+        '</div>';
+    } else {
+      body +=
+        '<div class="flex gap-2.5 px-2.5 py-1.5">' +
+          '<span class="shrink-0 w-9 text-[10px] font-bold uppercase tracking-wide text-slate-300 pt-px">' + day + '</span>' +
+          '<span class="text-xs text-slate-300 italic">&mdash;</span>' +
+        '</div>';
+    }
+  }
+  if (!anyContent) return null;
+  return '<div class="mt-2 mb-2 rounded-lg border border-slate-200 divide-y divide-slate-100 overflow-hidden">' + body + '</div>';
+}
+
 function renderSubmissions(subs) {
   if (!subs.length) {
     submissionsList.innerHTML =
@@ -1206,13 +1271,21 @@ function renderSubmissions(subs) {
     card.className =
       'group bg-white hover:bg-orange-50 border border-slate-200 hover:border-orange-300 rounded-xl p-4 transition shadow-sm hover:shadow';
 
-    const preview = buildPreviewSnippet(s.taskPlain);
     const ts = formatTimestamp(s.timestamp);
     const designation = s.designation || '';
 
-    const previewBlock = preview
-      ? '<div class="text-xs text-slate-600 mb-2 leading-relaxed line-clamp-3">' + escapeHtml(preview) + '</div>'
-      : '<div class="text-xs text-slate-400 italic mb-2">(no content)</div>';
+    // Prefer the per-day breakdown table. Fall back to the flat snippet only
+    // for legacy rows with no parseable per-day structure.
+    const breakdown = buildDayBreakdown(s);
+    let previewBlock;
+    if (breakdown) {
+      previewBlock = breakdown;
+    } else {
+      const preview = buildPreviewSnippet(s.taskPlain);
+      previewBlock = preview
+        ? '<div class="text-xs text-slate-600 mb-2 leading-relaxed line-clamp-3">' + escapeHtml(preview) + '</div>'
+        : '<div class="text-xs text-slate-400 italic mb-2">(no content)</div>';
+    }
 
     // The card itself only hovers; the pencil button is the sole edit trigger.
     card.innerHTML =
