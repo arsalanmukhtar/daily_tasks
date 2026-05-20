@@ -24,7 +24,7 @@ const ALLOWLIST = {
   'seemalnaeem100@gmail.com':     { name: 'Seemal Naeem',             designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
   'muddasir.ndma25@gmail.com':    { name: 'Muddasir Shah',            designation: 'Assistant Manager - I',  reportedTo: 'Imtiaz Nabi' },
   'ahad.khan.work01@gmail.com':   { name: 'Muhammad Ahad Khan',       designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'zainabali27feb2024@gmail.com': { name: 'Zainab Ali',               designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'zainabali27feb2004@gmail.com': { name: 'Zainab Ali',               designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
   'ttalha063@gmail.com':          { name: 'Talha Rizwan',             designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
   'zeeshannasir2001@gmail.com':   { name: 'Zeeshan Nasir',            designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
   'ibrahimabdullahh84@gmail.com': { name: 'Ibrahim Abdullah',         designation: 'Assistant Manager - I',  reportedTo: 'Imtiaz Nabi' },
