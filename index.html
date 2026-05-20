@@ -198,14 +198,14 @@
 
           <!-- Action bar: bottom footer of the unified panel -->
           <div class="px-4 sm:px-5 xl:px-6 py-4 border-t border-slate-100 bg-slate-50/60">
-            <div id="status" class="flex items-center gap-2.5 min-h-[2rem] mb-2.5">
+            <div id="status" class="flex items-center gap-2.5 min-h-[2rem] mb-4">
               <!-- Submitting: dotted dual-ring loader. Hidden by default;
                    toggled via .hidden by setStatus(). -->
               <span id="statusSpinner" class="hidden inline-flex items-center">
                 <span class="loader"></span>
               </span>
               <!-- Tick: appears on success, gets .status-tick-fade for the 5s fade-out. -->
-              <svg id="statusTick" class="hidden w-6 h-6 text-orange-600" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <svg id="statusTick" class="hidden w-6 h-6 text-green-600" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
               </svg>
               <span id="statusText" class="text-sm"></span>

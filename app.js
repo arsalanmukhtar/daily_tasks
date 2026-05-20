@@ -293,6 +293,57 @@ document.addEventListener('selectionchange', () => {
   if (activeCell && document.activeElement === activeCell) refreshToolbarState();
 });
 
+// ---------- Markdown-style list autoformat ----------
+// Typing "1. " at the start of a line turns it into a numbered list; "- " or
+// "* " turns it into a bullet list (like Docs / Notion). The triggering space
+// is swallowed. Delegated on the tbody so it covers every row, current or new.
+function isAtCellLineStart(node) {
+  for (let n = node.previousSibling; n; n = n.previousSibling) {
+    if (n.nodeName === 'BR') return true;                 // a line break before us
+    if ((n.textContent || '').length > 0) return false;   // real content before us
+  }
+  return true;                                            // nothing before — line start
+}
+
+function handleListAutoformat(e) {
+  if (e.inputType !== 'insertText' || e.data !== ' ') return;
+  const cell = e.target;
+  if (!cell || !cell.classList || !cell.classList.contains('cell-editor')) return;
+
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  if (!range.collapsed || range.startContainer.nodeType !== Node.TEXT_NODE) return;
+
+  const node = range.startContainer;
+  const before = node.data.slice(0, range.startOffset);
+  let cmd = null;
+  if (/^1\.$/.test(before)) cmd = 'insertOrderedList';
+  else if (/^[-*]$/.test(before)) cmd = 'insertUnorderedList';
+  if (!cmd) return;
+
+  // Only at the very start of a line, and not when already inside a list.
+  if (!isAtCellLineStart(node)) return;
+  for (let p = node.parentNode; p && p !== cell; p = p.parentNode) {
+    if (p.nodeName === 'LI' || p.nodeName === 'OL' || p.nodeName === 'UL') return;
+  }
+
+  e.preventDefault();
+  // Select the marker, delete it, then convert the now-empty line to a list.
+  const markerRange = document.createRange();
+  markerRange.setStart(node, 0);
+  markerRange.setEnd(node, range.startOffset);
+  sel.removeAllRanges();
+  sel.addRange(markerRange);
+  try {
+    document.execCommand('delete', false, null);
+    document.execCommand(cmd, false, null);
+  } catch (_e) {}
+  requestAnimationFrame(refreshToolbarState);
+}
+
+taskTbody.addEventListener('beforeinput', handleListAutoformat);
+
 addRowBtn.addEventListener('click', () => {
   const tr = addTaskRow();
   const firstCell = tr.querySelector('.cell-editor');
