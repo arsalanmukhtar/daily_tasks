@@ -19,7 +19,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz6njgCzwRK1i1a
 const ALLOWLIST = {
   'developer.ndma@gmail.com':     { name: 'Muhammad Arsalan Mukhtar', designation: 'Deputy Manager - I',     reportedTo: 'Junaid Aziz Khan' },
   'as2040704@gmail.com':          { name: 'Abdul Sattar Sheikh',      designation: 'Assistant Manager - II', reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'mustafa.haider2011@gmail.com': { name: 'Syed Mustafa Haider',      designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'mustafa.haider2011@gmail.com': { name: 'Syed Mustafa Haider',      designation: 'Assistant Manager - III',  reportedTo: 'Muhammad Arsalan Mukhtar' },
   'shehzadalikhan586@gmail.com':  { name: 'Shehzad Ali',              designation: 'Assistant Manager - I',  reportedTo: 'Kashif Iqbal' },
   'seemalnaeem100@gmail.com':     { name: 'Seemal Naeem',             designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
   'muddasir.ndma25@gmail.com':    { name: 'Muddasir Shah',            designation: 'Assistant Manager - I',  reportedTo: 'Imtiaz Nabi' },
