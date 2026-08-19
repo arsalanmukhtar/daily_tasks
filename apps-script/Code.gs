@@ -26,7 +26,7 @@
 
 // Bump this on EVERY redeploy. doGet() echoes it back, so opening the /exec
 // URL and checking the "version" field confirms the new code actually went live.
-const BACKEND_VERSION = 'v15-variables-organized';
+const BACKEND_VERSION = 'v16-add-muqeet-ahmad';
 
 const FIREBASE_API_KEY = 'AIzaSyA1exz20sN1WqLQdNkP986JX5wHuICYolg';
 const FIREBASE_PROJECT_ID = 'devteam-daily-tasks';
@@ -49,7 +49,8 @@ const ALLOWLIST = {
   'zeeshannasir2001@gmail.com': { name: 'Zeeshan Nasir', designation: 'Assistant Manager - I', reportedTo: 'Muhammad Arsalan Mukhtar' },
   'ibrahimabdullahh84@gmail.com': { name: 'Ibrahim Abdullah', designation: 'Assistant Manager - I', reportedTo: 'Imtiaz Nabi' },
   'usamabinumar199@gmail.com': { name: 'Usama bin Umar', designation: 'Intern', reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'osamakhan32156@gmail.com': { name: 'Muhammad Osama Khan', designation: 'Intern', reportedTo: 'Muhammad Arsalan Mukhtar' }
+  'osamakhan32156@gmail.com': { name: 'Muhammad Osama Khan', designation: 'Intern', reportedTo: 'Muhammad Arsalan Mukhtar' },
+  'muqeetahmad155@gmail.com': { name: 'Muqeet Ahmad', designation: 'Assistant Manager - I', reportedTo: 'Imtiaz Nabi' }
 };
 
 // The account owner — the only user allowed to export the team-wide weekly
