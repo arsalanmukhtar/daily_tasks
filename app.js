@@ -3133,9 +3133,13 @@ async function buildDevPerformancePdf_(email) {
           formatter: function (v) { return v; }
         }
       },
-      layout: { padding: { top: 30 } },
+      layout: { padding: { top: 60 } },
       scales: {
-        y: { beginAtZero: true, ticks: { precision: 0, font: { size: 22, weight: 'bold' } } },
+        y: {
+          beginAtZero: true,
+          suggestedMax: best ? Math.ceil(best.v * 1.3) + 2 : undefined,
+          ticks: { precision: 0, font: { size: 22, weight: 'bold' } }
+        },
         x: { ticks: { font: { size: 22, weight: 'bold' } } }
       }
     }
@@ -3413,7 +3417,7 @@ async function buildDevPerformancePdf_(email) {
   doc.setFontSize(13);
   doc.setTextColor(30, 41, 59);
   doc.text('Visual summary', marginX, y);
-  y += 7;
+  y += 14;
 
   setPdfFont_(doc, 'bold');
   doc.setFontSize(10.5);
