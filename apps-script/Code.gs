@@ -12,27 +12,27 @@
  *   6. Copy the /exec URL into app.js
  *
  * Security model:
- *   - Each submission carries a Firebase ID token (JWT) from a signed-in Google user.
- *   - We verify the token by calling Google's identitytoolkit accounts:lookup endpoint.
+ * - Each submission carries a Firebase ID token (JWT) from a signed-in Google user.
+ * - We verify the token by calling Google's identitytoolkit accounts:lookup endpoint.
  *     A valid response proves the token was issued by *this* Firebase project (the API
  *     key scopes the call) and is unexpired.
- *   - We then check the verified email against ALLOWLIST. The submitter's display name
+ * - We then check the verified email against ALLOWLIST. The submitter's display name
  *     is taken from the allowlist, never trusted from the client payload.
  */
 
 // =====================================================
-// CONFIG — fill these in.
+// CONFIG - fill these in.
 // =====================================================
 
 // Bump this on EVERY redeploy. doGet() echoes it back, so opening the /exec
 // URL and checking the "version" field confirms the new code actually went live.
-const BACKEND_VERSION = 'v16-add-muqeet-ahmad';
+const BACKEND_VERSION = 'v18-jsonp-fallback-fix';
 
 const FIREBASE_API_KEY = 'AIzaSyA1exz20sN1WqLQdNkP986JX5wHuICYolg';
 const FIREBASE_PROJECT_ID = 'devteam-daily-tasks';
 
 // Must mirror the ALLOWLIST in app.js. Emails MUST be lowercase here.
-// Each entry is { name, designation, reportedTo } — the server treats all
+// Each entry is { name, designation, reportedTo } - the server treats all
 // three as fixed for that user. `reportedTo` is the manager this user reports
 // to; it is written to BOTH the "Assigned By" and "Report To" sheet columns
 // and shown on the form. The server uses this map as the source of truth.
@@ -53,7 +53,7 @@ const ALLOWLIST = {
   'muqeetahmad155@gmail.com': { name: 'Muqeet Ahmad', designation: 'Assistant Manager - I', reportedTo: 'Imtiaz Nabi' }
 };
 
-// The account owner — the only user allowed to export the team-wide weekly
+// The account owner - the only user allowed to export the team-wide weekly
 // summary. Must be lowercase and present in ALLOWLIST.
 const OWNER_EMAIL = 'developer.ndma@gmail.com';
 
@@ -203,7 +203,7 @@ function processSubmission_(e) {
 function testBinding() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) {
-    console.log('NULL — getActiveSpreadsheet() returned null. The script is not bound to a spreadsheet.');
+    console.log('NULL - getActiveSpreadsheet() returned null. The script is not bound to a spreadsheet.');
     return;
   }
   console.log('Bound spreadsheet NAME: ' + ss.getName());
@@ -232,7 +232,7 @@ function debugLog_(label, data) {
     }
     sheet.appendRow([new Date(), label, typeof data === 'string' ? data : JSON.stringify(data)]);
   } catch (e) {
-    // best-effort logger — swallow failures so they don't mask the real error
+    // best-effort logger - swallow failures so they don't mask the real error
   }
 }
 
@@ -244,6 +244,9 @@ function doGet(e) {
     if (e.parameter.action === 'export') {
       return exportWeek_(e);
     }
+    if (e.parameter.action === 'analytics') {
+      return analyticsData_(e);
+    }
     // If a payload arrives as a GET parameter, treat it as a submission
     // (some browsers downgrade POST→GET on Apps Script's 302 redirect).
     if (e.parameter.payload) {
@@ -252,7 +255,14 @@ function doGet(e) {
     }
   }
   debugLog_('doGet invoked (no payload)', 'parameter=' + JSON.stringify(e && e.parameter || {}));
-  return jsonResponse_({
+  // jsonOrJsonp_ (not jsonResponse_): a JSONP caller (list/export/analytics)
+  // that sends an `action` this deployment doesn't recognise yet - e.g. it
+  // hasn't been redeployed since a new endpoint was added - must still get a
+  // JS-wrapped response. A bare JSON body loaded via <script src> gets
+  // silently blocked by the browser's Cross-Origin Read Blocking, which
+  // surfaces to the caller as a generic "could not reach the endpoint" error
+  // instead of a readable one.
+  return jsonOrJsonp_(e, {
     status: 'ok',
     message: 'Tech EW endpoint live',
     version: BACKEND_VERSION
@@ -296,8 +306,8 @@ function listSubmissions_(e) {
       if (String(r[1] || '').toLowerCase() !== email) continue;
 
       // The Task Delta JSON column stores either:
-      //   - { format: 'rows-v1', rows: [...] }   (new, table editor)
-      //   - { ops: [...] }                       (legacy, Quill Delta)
+      // - { format: 'rows-v1', rows: [...] }   (new, table editor)
+      // - { ops: [...] }                       (legacy, Quill Delta)
       // Fall back to reconstructing a Delta from the visible rich-text cell
       // for very old rows where that column didn't exist yet.
       let taskRows = null;
@@ -383,7 +393,7 @@ function exportWeek_(e) {
             if (parsed && parsed.format === 'rows-v1' && Array.isArray(parsed.rows)) {
               taskRows = parsed.rows;
             }
-          } catch (_e) { /* ignore — fall back to plain text */ }
+          } catch (_e) { /* ignore - fall back to plain text */ }
         }
 
         submissions.push({
@@ -403,6 +413,126 @@ function exportWeek_(e) {
   } catch (err) {
     return jsonOrJsonp_(e, { status: 'error', message: String(err && err.message || err) });
   }
+}
+
+/**
+ * Owner-only: returns every developer's submissions across every week,
+ * aggregated into per-day item/char counts (not raw HTML) so the client can
+ * build the Analytics dashboard without re-parsing task content. Also
+ * returns the full ALLOWLIST roster (even developers with zero submissions)
+ * so the client can compute missed-week/consistency metrics against the
+ * whole team, not just people who happened to submit.
+ *
+ * "Item count" = number of <li> bullets in a day's cell content (or 1 if
+ * there's plain text but no list). This is an activity/volume proxy, not a
+ * quality measure - the sheet has no hours/effort field to draw from.
+ *
+ * GET ?action=analytics&idToken=...&callback=...
+ */
+function analyticsData_(e) {
+  try {
+    const idToken = e && e.parameter && e.parameter.idToken;
+    if (!idToken) return jsonOrJsonp_(e, { status: 'error', message: 'Missing auth token.' });
+
+    let verified;
+    try {
+      verified = verifyIdToken_(idToken);
+    } catch (err) {
+      return jsonOrJsonp_(e, { status: 'error', message: 'Unauthorized: ' + err.message });
+    }
+    const email = (verified.email || '').toLowerCase();
+    if (email !== OWNER_EMAIL) {
+      return jsonOrJsonp_(e, { status: 'error', message: 'Only the account owner can view analytics.' });
+    }
+
+    const sheet = getOrCreateSheet_();
+    ensureExtendedHeaders_(sheet);
+    const last = sheet.getLastRow();
+    const dayKeys = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    const submissions = [];
+
+    if (last >= 2) {
+      const values = sheet.getRange(2, 1, last - 1, HEADERS.length).getValues();
+      for (let i = 0; i < values.length; i++) {
+        const r = values[i];
+        const subEmail = String(r[1] || '').toLowerCase();
+        const allowEntry = ALLOWLIST[subEmail];
+        if (!allowEntry) continue; // orphaned row from a removed team member
+
+        let taskRows = null;
+        const cellJson = r[9];
+        if (cellJson) {
+          try {
+            const parsed = JSON.parse(cellJson);
+            if (parsed && parsed.format === 'rows-v1' && Array.isArray(parsed.rows)) {
+              taskRows = parsed.rows;
+            }
+          } catch (_e) { /* fall through to legacy handling below */ }
+        }
+
+        const dayItemCounts = {};
+        const dayCharCounts = {};
+        let totalItems = 0;
+        let daysWithContent = 0;
+
+        if (taskRows) {
+          dayKeys.forEach(function (d) {
+            let items = 0, chars = 0;
+            taskRows.forEach(function (row) {
+              const html = row && row[d];
+              if (!html) return;
+              items += countDayItems_(html);
+              chars += stripHtml_(html).trim().length;
+            });
+            dayItemCounts[d] = items;
+            dayCharCounts[d] = chars;
+            totalItems += items;
+            if (items > 0) daysWithContent++;
+          });
+        } else {
+          // Legacy delta-only row (pre rows-v1): no per-day split is
+          // recoverable, so count it as one undated item if it has content.
+          dayKeys.forEach(function (d) { dayItemCounts[d] = 0; dayCharCounts[d] = 0; });
+          const plain = String(r[7] || '').trim();
+          if (plain) { totalItems = 1; daysWithContent = 1; }
+        }
+
+        submissions.push({
+          email: subEmail,
+          name: r[2] || allowEntry.name,
+          designation: r[3] || allowEntry.designation,
+          weekLabel: r[5] || '',
+          weekRange: r[6] || '',
+          timestamp: r[0] instanceof Date ? r[0].toISOString() : String(r[0] || ''),
+          dayItemCounts: dayItemCounts,
+          dayCharCounts: dayCharCounts,
+          totalItems: totalItems,
+          daysWithContent: daysWithContent
+        });
+      }
+    }
+
+    const roster = Object.keys(ALLOWLIST).map(function (em) {
+      return { email: em, name: ALLOWLIST[em].name, designation: ALLOWLIST[em].designation };
+    });
+
+    return jsonOrJsonp_(e, { status: 'ok', roster: roster, submissions: submissions });
+  } catch (err) {
+    return jsonOrJsonp_(e, { status: 'error', message: String(err && err.message || err) });
+  }
+}
+
+/**
+ * Counts "bullets" in a day cell's HTML: number of <li> tags, or 1 if there's
+ * plain content with no list markup, or 0 if empty. Mirrors the item-count
+ * semantics analyticsData_ needs; deliberately simpler than stripHtml_ since
+ * it only needs a count, not the rendered text.
+ */
+function countDayItems_(html) {
+  if (!html) return 0;
+  const liCount = (String(html).match(/<li[^>]*>/gi) || []).length;
+  if (liCount > 0) return liCount;
+  return stripHtml_(html).trim() ? 1 : 0;
 }
 
 /**
@@ -513,7 +643,7 @@ function getOrCreateSheet_() {
 
 /**
  * Render a `rows-v1` payload as readable text for column 8 (Daily Tasks).
- * Layout is day-grouped — all rows for Monday under "Monday — date", etc. —
+ * Layout is day-grouped - all rows for Monday under "Monday - date", etc. - 
  * so the sheet view reads naturally. The full HTML is preserved separately
  * in column K for the editor round-trip.
  */
@@ -534,7 +664,7 @@ function rowsToSheetText_(rows, weekRange) {
     }
     if (!entries.length) return;
     const date = dayDates[day] || '';
-    const header = dayLong[day] + (date ? ' — ' + date : '');
+    const header = dayLong[day] + (date ? ' - ' + date : '');
     const body = entries.map(function (e) {
       return '  ' + e.replace(/\n/g, '\n  ');
     }).join('\n');
@@ -674,14 +804,14 @@ function headerStyle_(level) {
 }
 
 /**
- * Inverse of deltaToRichText_ — best-effort reconstruction of a Quill Delta
+ * Inverse of deltaToRichText_ - best-effort reconstruction of a Quill Delta
  * from a Sheets RichTextValue. Used for legacy rows submitted before column K
  * (Task Delta JSON) existed.
  *
  * Lossy by design:
- *  - bold/italic/underline/strike/color → preserved per run
- *  - font-size {18,15,13} → header level {1,2,3} on the following newline
- *  - list bullet/number prefixes baked into the text stay as plain text
+ * - bold/italic/underline/strike/color → preserved per run
+ * - font-size {18,15,13} → header level {1,2,3} on the following newline
+ * - list bullet/number prefixes baked into the text stay as plain text
  *    (no way to detect them reliably without re-parsing line prefixes)
  *
  * Returns null on empty input or any unexpected failure (so the caller can

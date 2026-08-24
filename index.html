@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tech EW — Weekly Time Sheet</title>
+  <title>Tech EW - Weekly Time Sheet</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Inter+Tight:wght@600;700;800&family=Archivo+Narrow:wght@600;700&display=swap" rel="stylesheet" />
 
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="styles.css" rel="stylesheet" />
 </head>
-<!-- `app-shell` drives the desktop single-viewport lock — see the media query
+<!-- `app-shell` drives the desktop single-viewport lock - see the media query
      in styles.css (engages only when the screen is wide AND tall enough). -->
 <body class="app-shell min-h-screen bg-gradient-to-br from-slate-200 via-slate-100 to-orange-100/70">
   <div class="max-w-[100rem] w-full mx-auto px-3 sm:px-4 xl:px-6 py-3 sm:py-4 lg:h-full lg:flex lg:flex-col lg:gap-3 xl:gap-4">
@@ -22,12 +22,12 @@
       <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-orange-800 px-4 sm:px-6 xl:px-8 py-3 sm:py-4 text-white">
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div class="min-w-0">
-            <h1 class="text-base sm:text-lg lg:text-xl xl:text-2xl font-semibold tracking-tight">Tech EW &mdash; Weekly Time Sheet</h1>
+            <h1 class="text-base sm:text-lg lg:text-xl xl:text-2xl font-semibold tracking-tight">Tech EW - Weekly Time Sheet</h1>
             <p class="mt-0.5 text-slate-300 text-[11px] sm:text-xs">Log your weekly tasks &middot; submissions sync directly to the team sheet.</p>
           </div>
 
           <div class="flex flex-col sm:flex-row sm:items-stretch gap-2.5 sm:gap-3 w-full md:w-auto">
-            <!-- Owner-only weekly-summary export — revealed by app.js for the
+            <!-- Owner-only weekly-summary export - revealed by app.js for the
                  account owner (developer.ndma@gmail.com). sm:items-stretch on
                  the wrapper makes this match the user chip's height. -->
             <button id="exportSummaryBtn" type="button"
@@ -38,6 +38,17 @@
                 <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
               </svg>
               <span>Export weekly summary</span>
+            </button>
+
+            <!-- Owner-only analytics dashboard - same reveal rule as the
+                 export button above. -->
+            <button id="analyticsBtn" type="button"
+              class="hidden items-center justify-center gap-2 w-full sm:w-auto px-3.5 py-2 rounded-xl bg-white/95 backdrop-blur text-slate-800 text-xs sm:text-sm font-semibold shadow-sm hover:bg-white active:bg-slate-100 transition shrink-0 whitespace-nowrap">
+              <svg class="w-4 h-4 text-orange-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 3v18h18"/>
+                <path d="M7 15l4-5 3 3 5-7"/>
+              </svg>
+              <span>Analytics</span>
             </button>
 
             <div id="userChip" class="hidden items-center gap-2.5 sm:gap-3 bg-white/10 backdrop-blur rounded-xl px-3 py-1.5 text-sm shrink-0 w-full sm:w-auto">
@@ -117,7 +128,7 @@
                 <input type="hidden" id="weekInput" name="week" />
               </div>
               <!-- Three quick-pick buttons in an even grid so they never wrap
-                   awkwardly — consistent at every panel width. -->
+                   awkwardly - consistent at every panel width. -->
               <div class="grid grid-cols-3 gap-2">
                 <button id="lastWeekBtn" type="button"
                   class="text-xs sm:text-sm px-2 py-2 rounded-lg border border-slate-300 bg-white text-slate-900 font-semibold hover:bg-slate-50 hover:border-slate-400 transition text-center">
@@ -149,7 +160,7 @@
               <!-- Submitting as: name tinted orange to stand out; email muted. -->
               <div class="min-w-0">
                 <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Submitting as</div>
-                <div id="submittingAsName" class="mt-1 font-semibold text-orange-700 text-sm break-words leading-snug">&mdash;</div>
+                <div id="submittingAsName" class="mt-1 font-semibold text-orange-700 text-sm break-words leading-snug">-</div>
                 <div id="submittingAsEmail" class="text-xs text-slate-500 break-all"></div>
               </div>
 
@@ -157,7 +168,7 @@
                    not editable. Server enforces this anyway. -->
               <div class="min-w-0">
                 <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Designation</div>
-                <div id="designationDisplay" class="mt-1 font-semibold text-slate-900 text-sm leading-snug">&mdash;</div>
+                <div id="designationDisplay" class="mt-1 font-semibold text-slate-900 text-sm leading-snug">-</div>
               </div>
 
               <!-- Domain -->
@@ -170,7 +181,7 @@
                    not editable. Server enforces this anyway. -->
               <div class="min-w-0">
                 <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Reported to</div>
-                <div id="reportedToDisplay" class="mt-1 font-semibold text-slate-700 text-sm leading-snug">&mdash;</div>
+                <div id="reportedToDisplay" class="mt-1 font-semibold text-slate-700 text-sm leading-snug">-</div>
               </div>
             </div>
           </div>
@@ -253,7 +264,7 @@
           <p class="text-xs text-slate-500">Add rows for multiple tasks per day. Formatting applies to the focused cell.</p>
         </div>
 
-        <!-- Shared formatting toolbar — operates on the currently-focused cell. -->
+        <!-- Shared formatting toolbar - operates on the currently-focused cell. -->
         <div id="taskToolbar" class="flex flex-wrap items-center gap-0.5 px-2 py-1.5 rounded-t-lg border border-slate-300 border-b-0 bg-slate-50 shrink-0">
           <button type="button" data-cmd="bold"          class="tb-btn" title="Bold (Ctrl+B)"><b>B</b></button>
           <button type="button" data-cmd="italic"        class="tb-btn" title="Italic (Ctrl+I)"><i>I</i></button>
@@ -287,11 +298,11 @@
           <table id="taskTable" class="w-full table-fixed border-collapse">
             <thead>
               <tr>
-                <th data-day="Mon" class="tb-th"><div class="tb-day">Mon</div><div class="tb-date">&mdash;</div></th>
-                <th data-day="Tue" class="tb-th"><div class="tb-day">Tue</div><div class="tb-date">&mdash;</div></th>
-                <th data-day="Wed" class="tb-th"><div class="tb-day">Wed</div><div class="tb-date">&mdash;</div></th>
-                <th data-day="Thu" class="tb-th"><div class="tb-day">Thu</div><div class="tb-date">&mdash;</div></th>
-                <th data-day="Fri" class="tb-th"><div class="tb-day">Fri</div><div class="tb-date">&mdash;</div></th>
+                <th data-day="Mon" class="tb-th"><div class="tb-day">Mon</div><div class="tb-date">-</div></th>
+                <th data-day="Tue" class="tb-th"><div class="tb-day">Tue</div><div class="tb-date">-</div></th>
+                <th data-day="Wed" class="tb-th"><div class="tb-day">Wed</div><div class="tb-date">-</div></th>
+                <th data-day="Thu" class="tb-th"><div class="tb-day">Thu</div><div class="tb-date">-</div></th>
+                <th data-day="Fri" class="tb-th"><div class="tb-day">Fri</div><div class="tb-date">-</div></th>
                 <th class="tb-th-action" aria-label="Row actions"></th>
               </tr>
             </thead>
@@ -387,12 +398,167 @@
     </div>
   </div>
 
-  <!-- Export week dropdown panel — body-level (position:fixed) so the modal
+  <!-- Export week dropdown panel - body-level (position:fixed) so the modal
        card's overflow never clips it. Positioned under the trigger by app.js. -->
   <div id="exportWeekPanel" class="ew-panel" role="listbox" aria-label="Week to export"></div>
 
+  <!-- ============ ANALYTICS PANEL (owner only) ============
+       Full-screen overlay (not a small modal - there's too much to show).
+       All aggregation happens client-side in app.js from the raw per-day
+       item/char counts the "analytics" endpoint returns; charts are Chart.js,
+       lazy-loaded only when this panel is first opened. -->
+  <div id="analyticsBackdrop" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80]"></div>
+  <div id="analyticsPanel" class="an-panel hidden fixed inset-0 z-[90] overflow-y-auto bg-slate-50">
+    <div class="max-w-[100rem] w-full mx-auto px-4 sm:px-6 xl:px-8 py-4 sm:py-6">
+
+      <div class="flex items-start justify-between gap-3 mb-4 sm:mb-5">
+        <div class="min-w-0">
+          <h2 class="text-xl sm:text-2xl font-bold text-slate-800">Analytics &amp; User Performance</h2>
+          <p class="text-xs sm:text-sm text-slate-500 mt-1">
+            Activity trends derived from logged submissions - a volume/consistency proxy, not a quality score.
+          </p>
+        </div>
+        <button type="button" id="analyticsCloseBtn"
+          class="shrink-0 text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition p-2 rounded-lg" aria-label="Close analytics">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4 sm:mb-5">
+        <div id="analyticsRangeBar" class="flex flex-wrap gap-2" role="tablist" aria-label="Time range">
+          <button type="button" class="an-range-btn" data-range="8w">Last 8 weeks</button>
+          <button type="button" class="an-range-btn" data-range="3m">Last 3 months</button>
+          <button type="button" class="an-range-btn" data-range="6m">Last 6 months</button>
+          <button type="button" class="an-range-btn" data-range="1y">This year</button>
+          <button type="button" class="an-range-btn" data-range="all">All time</button>
+          <button type="button" id="analyticsCustomTrigger" class="an-range-btn inline-flex items-center gap-1.5" aria-haspopup="true" aria-expanded="false">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/>
+              <path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>
+            </svg>
+            <span id="analyticsCustomLabel">Custom</span>
+            <svg class="an-custom-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 9l6 6 6-6"/>
+            </svg>
+          </button>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" id="analyticsExportTrigger" class="an-range-btn inline-flex items-center gap-1.5" aria-haspopup="true" aria-expanded="false">
+            <span id="analyticsExportBtnIcon" class="an-btn-icon-slot">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+              </svg>
+            </span>
+            <span id="analyticsExportBtnLabel">Export report</span>
+            <svg id="analyticsExportBtnChevron" class="an-custom-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 9l6 6 6-6"/>
+            </svg>
+          </button>
+          <button type="button" id="analyticsRefreshBtn" class="an-range-btn inline-flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
+              <path d="M21 4v5h-5"/>
+            </svg>
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <div id="analyticsExportStatus" class="hidden"></div>
+      <div id="analyticsStatus" class="hidden"></div>
+
+      <div id="analyticsContent" class="hidden space-y-4 sm:space-y-5 pb-6">
+        <div id="analyticsKpis" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3"></div>
+
+        <div id="analyticsHighlights" class="grid gap-2.5 sm:grid-cols-2"></div>
+
+        <div class="an-card">
+          <div class="an-card-head">Team activity trend</div>
+          <div class="an-chart-wrap"><canvas id="teamTrendChart"></canvas></div>
+        </div>
+
+        <div class="an-card">
+          <div class="an-card-head">
+            Per-developer trend
+            <span class="an-card-hint">Click a name in the legend to isolate it</span>
+          </div>
+          <div class="an-chart-wrap an-chart-wrap-tall"><canvas id="devTrendChart"></canvas></div>
+        </div>
+
+        <div class="grid lg:grid-cols-2 gap-4">
+          <div class="an-card">
+            <div class="an-card-head">Leaderboard <span class="an-card-hint">Avg tasks logged per week</span></div>
+            <div class="an-chart-wrap"><canvas id="leaderboardChart"></canvas></div>
+          </div>
+          <div class="an-card">
+            <div class="an-card-head">Day-of-week distribution</div>
+            <div class="an-chart-wrap"><canvas id="dowChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="an-card">
+          <div class="an-card-head">
+            Submission heatmap
+            <span class="an-card-hint">Click a cell for that developer's detail</span>
+          </div>
+          <div id="analyticsHeatmap" class="an-heatmap-scroll"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Developer drill-down drawer - opens above the analytics panel. -->
+  <div id="devDetailBackdrop" class="drawer-backdrop fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[95]"></div>
+  <aside id="devDetailPanel" class="drawer-panel fixed top-0 right-0 h-full w-full sm:w-[30rem] max-w-full bg-white shadow-2xl ring-1 ring-slate-200 z-[100] flex flex-col">
+    <header class="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-slate-200 flex items-start justify-between gap-3 shrink-0 bg-gradient-to-r from-slate-50 to-orange-50/60">
+      <div class="min-w-0">
+        <h2 id="devDetailName" class="text-base font-semibold text-slate-800 truncate">-</h2>
+        <p id="devDetailMeta" class="text-xs text-slate-500 mt-0.5"></p>
+      </div>
+      <button type="button" id="devDetailCloseBtn"
+        class="text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition p-1.5 rounded-md shrink-0" aria-label="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </header>
+    <div id="devDetailBody" class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4"></div>
+  </aside>
+
+  <!-- Export week dropdown panel - body-level (position:fixed) so the modal
+       card's overflow never clips it. Positioned under the trigger by app.js. -->
+  <div id="exportWeekPanel" class="ew-panel" role="listbox" aria-label="Week to export"></div>
+
+  <!-- Analytics custom date filter dropdown - body-level (position:fixed),
+       positioned under its trigger by app.js. Week/Month/Year tabs; the list
+       below repopulates per tab. -->
+  <div id="analyticsCustomPanel" class="an-custom-panel">
+    <div id="analyticsCustomTabs" class="an-tab-row" role="tablist" aria-label="Filter by">
+      <button type="button" class="an-tab-btn is-active" data-tab="week">Week</button>
+      <button type="button" class="an-tab-btn" data-tab="month">Month</button>
+      <button type="button" class="an-tab-btn" data-tab="year">Year</button>
+    </div>
+    <div id="analyticsCustomList" class="an-custom-list"></div>
+  </div>
+
+  <!-- "Export report" developer picker - same fixed/body-level dropdown
+       pattern, just a flat ranked list instead of tabs. Picking a name builds
+       and downloads that developer's PDF directly, no drill-down required. -->
+  <div id="analyticsExportPanel" class="an-custom-panel an-export-panel">
+    <div class="an-custom-list-head">Export a developer's report</div>
+    <div class="an-custom-search-wrap">
+      <svg class="an-custom-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
+      </svg>
+      <input type="text" id="analyticsExportSearch" class="an-custom-search" placeholder="Search by name or role…" autocomplete="off" />
+    </div>
+    <div id="analyticsExportList" class="an-custom-list"></div>
+  </div>
+
   <!-- ?v= is a cache-buster: bump it whenever app.js changes so browsers
        fetch the new file instead of serving a stale cached copy. -->
-  <script type="module" src="app.js?v=20260520"></script>
+  <script type="module" src="app.js?v=20260824n"></script>
 </body>
 </html>

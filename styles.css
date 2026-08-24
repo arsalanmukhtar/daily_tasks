@@ -139,7 +139,7 @@ textarea {
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), 0 0 0 2px #fdba74;
 }
 
-/* Column headers — duo-tone: slate-100 surface, slate-800 day name, slate-500 date */
+/* Column headers - duo-tone: slate-100 surface, slate-800 day name, slate-500 date */
 .tb-th {
   padding: 0.55rem 0.75rem;
   text-align: left;
@@ -176,7 +176,7 @@ textarea {
   font-weight: 500;
   line-height: 1.2;
 }
-/* Today's column header — orange accent + top bar so the current day pops. */
+/* Today's column header - orange accent + top bar so the current day pops. */
 .tb-th.is-today {
   background: #fff7ed;
   box-shadow: inset 0 3px 0 #ea580c;
@@ -196,7 +196,7 @@ textarea {
 }
 .task-cell:nth-last-child(2) { border-right: 0; }
 
-/* Cell editor — contenteditable div with placeholder, focus accent, soft
+/* Cell editor - contenteditable div with placeholder, focus accent, soft
    scrolling. Font, padding and min-height scale fluidly with viewport width
    so the editor reads well from phones up to large desktops. */
 .cell-editor {
@@ -222,7 +222,7 @@ textarea {
   box-shadow: inset 0 0 0 1.5px #fdba74;
 }
 
-/* Future-day lock — weekday columns that haven't happened yet (e.g. this
+/* Future-day lock - weekday columns that haven't happened yet (e.g. this
    week's Thu/Fri when today is Wed) can't be edited; the header and the
    matching "Week days" row are faded to signal it. */
 .cell-editor.cell-locked {
@@ -233,7 +233,7 @@ textarea {
 .tb-th.is-future { opacity: 0.5; }
 .weekday-row.is-future { opacity: 0.4; }
 /* Tailwind's preflight resets ul/ol to list-style: none, so we restore
-   the markers explicitly for cells — otherwise B/I/U works but the bullet
+   the markers explicitly for cells - otherwise B/I/U works but the bullet
    and number buttons look like they do nothing. */
 .cell-editor ul {
   list-style: disc;
@@ -407,7 +407,7 @@ textarea {
 }
 .week-cal-grid-head span:first-child { color: #cbd5e1; }
 
-/* ---- Week rows — a whole week is the click target ----
+/* ---- Week rows - a whole week is the click target ----
    Prominence ladder (strongest -> faintest):
      selected week -> filled slate, lifted with a soft shadow
      current week  -> slate-tinted block (no ring)
@@ -445,7 +445,7 @@ textarea {
   border-radius: 0.4rem;
 }
 
-/* Current-day chip — the standout marker in its row. */
+/* Current-day chip - the standout marker in its row. */
 .cal-today-chip {
   display: inline-flex;
   align-items: center;
@@ -472,7 +472,7 @@ textarea {
   color: #334155;
 }
 
-/* Current week — prominent slate-tinted block (no ring). */
+/* Current week - prominent slate-tinted block (no ring). */
 .week-cal-row.is-current:not(.is-selected) {
   background: #eef1f5;
 }
@@ -486,7 +486,7 @@ textarea {
 }
 .week-cal-row.is-current:not(.is-selected):hover { background: #e2e8f0; }
 
-/* Selected week — the strongest state: filled slate, lifted. */
+/* Selected week - the strongest state: filled slate, lifted. */
 .week-cal-row.is-selected {
   background: #334155;
   box-shadow: 0 3px 10px -2px rgba(15, 23, 42, 0.4);
@@ -503,14 +503,14 @@ textarea {
   background: rgba(255, 255, 255, 0.2);
   color: #ffffff;
 }
-/* Today inside the selected row → white chip, dark slate text — maximum pop. */
+/* Today inside the selected row → white chip, dark slate text - maximum pop. */
 .week-cal-row.is-selected .cal-today-chip {
   background: #ffffff;
   color: #1e293b;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
-/* Future weeks — disabled. */
+/* Future weeks - disabled. */
 .week-cal-row.is-disabled .week-cal-cell { color: #d8dee8; }
 .week-cal-row.is-disabled .week-cal-wk { background: #fafbfc; color: #e7ebf0; }
 
@@ -585,7 +585,7 @@ textarea {
 }
 
 /* Match Quill's scrollbar tint inside the drawer list */
-#submissionsList::-webkit-scrollbar { width: 8px; }
+#submissionsList::-webkit-scrollbar { width: 5px; }
 #submissionsList::-webkit-scrollbar-track { background: transparent; }
 #submissionsList::-webkit-scrollbar-thumb {
   background-color: #cbd5e1;
@@ -692,7 +692,7 @@ textarea {
 .ew-trigger:focus-visible,
 .ew-trigger.is-open {
   outline: none;
-  border-color: #fb923c;                       /* orange-400 — modal accent */
+  border-color: #fb923c;                       /* orange-400 - modal accent */
   box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.25);
 }
 .ew-trigger-icon { width: 16px; height: 16px; flex-shrink: 0; color: #ea580c; }
@@ -763,7 +763,7 @@ textarea {
 }
 .ew-option.is-selected .ew-option-check { opacity: 1; }
 
-.ew-panel::-webkit-scrollbar { width: 9px; }
+.ew-panel::-webkit-scrollbar { width: 5px; }
 .ew-panel::-webkit-scrollbar-track { background: transparent; }
 .ew-panel::-webkit-scrollbar-thumb {
   background-color: #cbd5e1;
@@ -773,7 +773,7 @@ textarea {
 .ew-panel::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
 
 /* ---------- Export modal: in-progress status ----------
-   While an export runs, the status area is a centred column — a line of text
+   While an export runs, the status area is a centred column - a line of text
    above a full-width striped progress bar. Recoloured to the orange theme so
    it's visible on the white modal (the source snippet's fill was white). */
 .ew-status-loading {
@@ -789,7 +789,7 @@ textarea {
   color: #64748b;
   text-align: center;
 }
-/* Six equaliser bars — real child elements so each can be fully pill-rounded.
+/* Six equaliser bars - real child elements so each can be fully pill-rounded.
    Colour is the calendar's selected-row slate (#334155); the staggered delay
    gives the rolling-wave motion. */
 .ew-progress {
@@ -818,7 +818,7 @@ textarea {
 
 /* ---------- Submit status icons ----------
    Dual dotted-ring spinner (scaled to ~2/3 of the original 48px). Sits
-   inline next to the tick — no dark pill wrapper. The outer ring uses
+   inline next to the tick - no dark pill wrapper. The outer ring uses
    #FFF as in the source snippet (invisible on white surfaces); the orange
    inner ring carries the visible spin. */
 .loader {
@@ -867,15 +867,15 @@ textarea {
   animation: status-tick-fade 5s ease-out forwards;
 }
 
-/* Error message — left-bar callout: a red accent bar over a faint wash.
+/* Error message - left-bar callout: a red accent bar over a faint wash.
    Used for form/submit errors, the auth-gate error, and drawer load errors. */
 .error-callout {
   display: inline-block;
   max-width: 100%;
   text-align: left;
-  border-left: 3px solid #dc2626;   /* red-600 — accent bar */
-  background: #fef2f2;               /* red-50  — faint wash */
-  color: #b91c1c;                    /* red-700 — text */
+  border-left: 3px solid #dc2626;   /* red-600 - accent bar */
+  background: #fef2f2;               /* red-50 - faint wash */
+  color: #b91c1c;                    /* red-700 - text */
   font-size: 0.8125rem;
   font-weight: 400;
   line-height: 1.45;
@@ -892,14 +892,403 @@ textarea {
   animation: error-callout-fade 5s ease-out forwards;
 }
 
+/* ---------- Analytics panel (owner only) ----------
+   Full-screen overlay. Uses the same hidden/backdrop pattern as the export
+   modal, plus an opacity fade via `.open` (JS removes `.hidden` first, then
+   adds `.open` next frame so the transition actually runs). */
+.an-panel {
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+.an-panel.open { opacity: 1; }
+
+.an-range-btn {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: background 120ms, color 120ms, border-color 120ms, box-shadow 120ms;
+}
+.an-range-btn:hover { border-color: #cbd5e1; background: #f8fafc; }
+.an-range-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px #fdba74; }
+.an-range-btn.is-active {
+  background: #334155;
+  border-color: #334155;
+  color: #ffffff;
+}
+.an-range-btn:disabled { cursor: not-allowed; }
+
+/* In-button loading/success states (Export report + drawer export button) */
+.an-btn-icon-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.btn-spinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  opacity: 0.85;
+  animation: btn-spinner-spin 0.65s linear infinite;
+}
+@keyframes btn-spinner-spin { to { transform: rotate(360deg); } }
+
+/* Existing .an-range-btn transition (background/color/border-color 120ms)
+   already covers this state change - no extra rule needed. */
+.an-range-btn.is-btn-success {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #ffffff;
+}
+
+/* Custom date filter (week/month/year) trigger + dropdown */
+.an-custom-chevron {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  transition: transform 160ms ease;
+}
+.an-range-btn.is-open .an-custom-chevron { transform: rotate(180deg); }
+
+/* Panel reuses the export modal's .ew-panel/.ew-option look (fixed,
+   body-level, positioned by JS) so a new visual language isn't invented
+   for what's functionally the same kind of dropdown. */
+.an-custom-panel {
+  position: fixed;
+  z-index: 95;
+  display: none;
+  width: 17rem;
+  max-width: calc(100vw - 16px);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  box-shadow: 0 16px 36px -12px rgba(15, 23, 42, 0.35);
+  overflow: hidden;
+}
+.an-custom-panel.open { display: block; }
+
+.an-tab-row {
+  display: flex;
+  gap: 2px;
+  padding: 0.5rem 0.5rem 0.45rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+.an-tab-btn {
+  flex: 1 1 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.4rem 0;
+  text-align: center;
+  border: 0;
+  border-radius: 0.45rem 0.45rem 0 0;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: background 100ms, color 100ms;
+}
+.an-tab-btn:hover { background: #f8fafc; color: #334155; }
+.an-tab-btn.is-active {
+  background: #fff7ed;
+  color: #9a3412;
+  box-shadow: inset 0 -2px 0 #ea580c;
+}
+
+.an-custom-list-head {
+  padding: 0.6rem 0.75rem 0.5rem;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+}
+
+/* Export-report picker is wider than the date-filter dropdown: it has to
+   fit "Name" + "Designation · avg N/week" without truncating or forcing a
+   horizontal scrollbar. */
+.an-export-panel { width: 20.5rem; }
+
+.an-custom-search-wrap {
+  position: relative;
+  padding: 0 0.6rem 0.5rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+.an-custom-search-icon {
+  position: absolute;
+  left: 1.1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+.an-custom-search {
+  width: 100%;
+  padding: 0.45rem 0.6rem 0.45rem 2rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  color: #1e293b;
+  background: #f8fafc;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+.an-custom-search::placeholder { color: #94a3b8; }
+.an-custom-search:focus {
+  outline: none;
+  background: #ffffff;
+  border-color: #fb923c;
+  box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.18);
+}
+
+/* Ranked developer option: a small colour dot (rank-coloured, same palette
+   as the leaderboard chart) + name on one line, designation/avg wrapping
+   onto its own line instead of overflowing. */
+.an-export-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  white-space: normal;
+}
+.an-export-option-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  margin-top: 5px;
+}
+.an-export-option-text { min-width: 0; }
+.an-export-option-name {
+  font-weight: 600;
+  color: #1e293b;
+  overflow-wrap: anywhere;
+}
+.an-custom-option-sub {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: #94a3b8;
+  margin-top: 1px;
+  white-space: normal;
+}
+.an-custom-empty-search {
+  padding: 1.1rem 0.7rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.an-custom-list {
+  max-height: 15rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.55rem 0.4rem 0.4rem;
+}
+.an-custom-list::-webkit-scrollbar { width: 5px; }
+.an-custom-list::-webkit-scrollbar-track { background: transparent; }
+.an-custom-list::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 999px; }
+.an-custom-list::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+/* Firefox */
+.an-custom-list { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+
+.an-custom-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 0.35rem 0.2rem;
+}
+.an-custom-empty {
+  padding: 0.9rem 0.6rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* KPI strip cards - animated count-up number is handled in JS. Six cards now
+   fit the strip (added "Least active"), so padding/type is a size down from
+   the original 5-card layout to keep every card comfortable, not cramped. */
+.an-kpi {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  padding: 0.7rem 0.85rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  cursor: default;
+}
+/* Inter Tight - the same family as the rest of the app, but a narrower cut,
+   so KPI cards fit more (a long name, "12 tasks/week") before truncating. */
+.an-kpi-label {
+  font-family: 'Inter Tight', 'Inter', system-ui, sans-serif;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+}
+.an-kpi-value {
+  /* Archivo Narrow only ships up to weight 700 (no 800/900 cut), so the
+     weight below is set to match what's actually loaded - a heavier number
+     here would just fall back to synthesized/faux bold. */
+  font-family: 'Archivo Narrow', 'Inter Tight', 'Inter', system-ui, sans-serif;
+  margin-top: 0.25rem;
+  font-size: clamp(0.92rem, 0.7vw + 0.62rem, 1.1rem);
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  color: #1e293b;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.an-kpi-sub {
+  margin-top: 0.15rem;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.an-kpi-sub.is-up   { color: #15803d; }
+.an-kpi-sub.is-down { color: #b91c1c; }
+.an-kpi-sub.is-flat { color: #94a3b8; }
+
+/* Highlight callouts - left-accent bar, tone set via data-tone. */
+.an-highlight {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  border-left: 3px solid #94a3b8;
+  background: #f8fafc;
+  border-radius: 0 0.65rem 0.65rem 0;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.8125rem;
+  color: #334155;
+  line-height: 1.45;
+}
+.an-highlight strong { font-weight: 700; color: #1e293b; }
+.an-highlight[data-tone="peak"]  { border-left-color: #ea580c; background: #fff7ed; }
+.an-highlight[data-tone="good"]  { border-left-color: #15803d; background: #f0fdf4; }
+.an-highlight[data-tone="warn"]  { border-left-color: #dc2626; background: #fef2f2; }
+.an-highlight-body { display: flex; flex-direction: column; gap: 0.45rem; min-width: 0; }
+.an-highlight-title { font-weight: 700; color: #1e293b; }
+.an-chip-row { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.an-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.an-highlight-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+}
+
+/* Chart cards */
+.an-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1rem 1.1rem 1.1rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.an-card-head {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 0.6rem;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.an-card-hint {
+  font-size: 11px;
+  font-weight: 500;
+  color: #94a3b8;
+}
+.an-chart-wrap { position: relative; height: 240px; }
+.an-chart-wrap-tall { height: 320px; }
+
+/* Submission heatmap - a CSS grid built entirely in JS (row-label column +
+   one column per week). Cell background colour is set inline per-value. */
+.an-heatmap-scroll { overflow-x: auto; padding-bottom: 4px; }
+.an-heatmap-grid { display: grid; gap: 3px; width: max-content; }
+.an-heatmap-row-label {
+  display: flex;
+  align-items: center;
+  width: 11.5rem;
+  padding-right: 0.75rem;
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  position: sticky;
+  left: 0;
+  background: #ffffff;
+  z-index: 2;
+}
+.an-heatmap-col-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-align: center;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  padding-bottom: 2px;
+  white-space: nowrap;
+}
+.an-heatmap-cell {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 100ms, box-shadow 100ms;
+}
+.an-heatmap-cell:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 2px #334155;
+  position: relative;
+  z-index: 1;
+}
+
+/* Developer-detail mini stat rows inside the drill-down drawer */
+.an-detail-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.7rem;
+  background: #f8fafc;
+  border-radius: 0.55rem;
+  font-size: 0.8125rem;
+}
+.an-detail-stat-label { color: #64748b; font-weight: 500; }
+.an-detail-stat-value { color: #1e293b; font-weight: 700; font-variant-numeric: tabular-nums; }
+
 /* =========================================================
    Responsive behaviour
    =========================================================
    The app has three layout modes:
-     • Phone   (< 640px)  — single column, page scrolls, task table
+     • Phone   (< 640px) - single column, page scrolls, task table
                             scrolls horizontally inside its wrapper.
-     • Tablet  (640–1023) — single column, page scrolls, table fits.
-     • Desktop (≥ 1024px) — two-column dashboard. Locked to one viewport
+     • Tablet  (640–1023) - single column, page scrolls, table fits.
+     • Desktop (≥ 1024px) - two-column dashboard. Locked to one viewport
                             (no page scroll) ONLY when the screen is also
                             tall enough; shorter screens scroll instead.
    ========================================================= */
