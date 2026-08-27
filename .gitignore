@@ -25,3 +25,7 @@ keystore_password*.txt
 *.apk
 *.aab
 Leave Approvals*.zip
+
+# Local Android signing workspace (keystore, signing tool, build output) -
+# not project source, stays local only
+/android_signing/
