@@ -8,7 +8,9 @@
 const FIREBASE_CONFIG = {
   apiKey:     'AIzaSyA1exz20sN1WqLQdNkP986JX5wHuICYolg',
   authDomain: 'devteam-daily-tasks.firebaseapp.com',
-  projectId:  'devteam-daily-tasks'
+  projectId:  'devteam-daily-tasks',
+  messagingSenderId: '690432267181',
+  appId:      '1:690432267181:web:1a80dfa3bfcd6d0b160724'
 };
 
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz6njgCzwRK1i1aXzW9dmlZzlYfexxx72snoSB46L20u4ecitTTTYrLUnrHY_T_rkUmDQ/exec';
@@ -27,7 +29,8 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import {
   getAuth,
   GoogleAuthProvider,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   onAuthStateChanged
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import {
@@ -35,7 +38,12 @@ import {
   getToken
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging.js';
 
-const firebaseApp = initializeApp(FIREBASE_CONFIG);
+// Named app instance ('managerApp'), not the default one - this page shares
+// an origin (and Firebase project) with index.html, and the default app's
+// persisted session is broadcast across every tab on that origin. Without a
+// distinct name, a session refresh here would flash a transient "signed
+// out" state that index.html's tab would pick up too.
+const firebaseApp = initializeApp(FIREBASE_CONFIG, 'managerApp');
 const auth = getAuth(firebaseApp);
 
 // ---------- DOM refs ----------
@@ -97,14 +105,23 @@ function showToast_(message, tone) {
 }
 
 // ---------- Sign-in ----------
+// signInWithRedirect, not signInWithPopup - an installed iOS home-screen app
+// has no real popup window to open, so signInWithPopup fails there with
+// "auth/cancelled-popup-request". Redirect works in both an installed app
+// and a normal browser tab.
 signInBtn.addEventListener('click', async () => {
   signInError.classList.add('hidden');
   try {
-    await signInWithPopup(auth, new GoogleAuthProvider());
+    await signInWithRedirect(auth, new GoogleAuthProvider());
   } catch (err) {
     signInError.textContent = 'Sign-in failed: ' + err.message;
     signInError.classList.remove('hidden');
   }
+});
+
+getRedirectResult(auth).catch((err) => {
+  signInError.textContent = 'Sign-in failed: ' + err.message;
+  signInError.classList.remove('hidden');
 });
 
 onAuthStateChanged(auth, (user) => {
@@ -148,14 +165,27 @@ function setupPushIfEligible_() {
 
 async function registerForPush_() {
   try {
-    if (!('serviceWorker' in navigator) || !('Notification' in window)) return;
+    if (!('serviceWorker' in navigator) || !('Notification' in window)) {
+      showToast_('Push not supported in this browser.', 'error');
+      return;
+    }
     const registration = await navigator.serviceWorker.register('firebase-messaging-sw.js');
     const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return;
+    if (permission !== 'granted') {
+      showToast_('Notification permission was not granted.', 'error');
+      return;
+    }
 
-    const messaging = getMessaging();
+    // getMessaging(firebaseApp) - not the no-arg form, which looks up the
+    // default app. This page only initializes the named 'managerApp'
+    // instance (see the comment where firebaseApp is created above), so the
+    // no-arg form would throw "No Firebase App '[DEFAULT]' has been created".
+    const messaging = getMessaging(firebaseApp);
     const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration });
-    if (!token) return;
+    if (!token) {
+      showToast_('Could not get a push token.', 'error');
+      return;
+    }
 
     const idToken = await currentUser.getIdToken(false);
     const platform = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios' : (/android/i.test(navigator.userAgent) ? 'android' : 'web');
@@ -163,9 +193,12 @@ async function registerForPush_() {
     const formBody = new URLSearchParams();
     formBody.append('payload', JSON.stringify(payload));
     await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: formBody, redirect: 'follow' });
+    showToast_('Push notifications enabled.');
   } catch (err) {
-    // Push is a convenience layer - never block the approvals list on it.
-    console.warn('Push setup failed:', err);
+    // Push is a convenience layer - never block the approvals list on it -
+    // but still surface the failure, since a silent console.warn here is
+    // invisible on a phone with no way to open devtools.
+    showToast_('Push setup failed: ' + err.message, 'error');
   }
 }
 

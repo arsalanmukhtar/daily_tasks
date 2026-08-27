@@ -9,7 +9,9 @@ importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-com
 firebase.initializeApp({
   apiKey:     'AIzaSyA1exz20sN1WqLQdNkP986JX5wHuICYolg',
   authDomain: 'devteam-daily-tasks.firebaseapp.com',
-  projectId:  'devteam-daily-tasks'
+  projectId:  'devteam-daily-tasks',
+  messagingSenderId: '690432267181',
+  appId:      '1:690432267181:web:1a80dfa3bfcd6d0b160724'
 });
 
 const messaging = firebase.messaging();
