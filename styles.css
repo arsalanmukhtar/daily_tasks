@@ -1334,3 +1334,159 @@ textarea {
     opacity: 0.55;
   }
 }
+
+/* ---------- Apply for Leave ----------
+   Fixed width so the label swap (Apply for Leave / Requested for Approval /
+   Approved / Rejected) never reflows the header row it sits in. */
+.lv-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 11.75rem;
+  max-width: 100%;
+  padding: 0.5rem 0.5rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  text-align: center;
+}
+.lv-btn.is-idle {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #ffffff;
+  font-weight: 700;
+}
+.lv-btn.is-idle:hover { background: #15803d; border-color: #15803d; }
+.lv-btn.is-requested {
+  background: #fef3c7;
+  border-color: #fde68a;
+  color: #92400e;
+  cursor: default;
+}
+.lv-btn.is-approved {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #166534;
+  cursor: default;
+}
+.lv-btn.is-rejected {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #b91c1c;
+  cursor: default;
+}
+
+.lv-type-btn {
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.6rem;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: center;
+  transition: background-color 150ms, border-color 150ms, color 150ms;
+}
+.lv-type-btn:hover:not(:disabled) { background: #f8fafc; border-color: #94a3b8; }
+.lv-type-btn.is-selected { background: #fff7ed; border-color: #fb923c; color: #c2410c; }
+.lv-type-btn.is-disabled,
+.lv-type-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f8fafc;
+}
+
+.lv-file-drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 0.65rem;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 150ms, border-color 150ms;
+}
+.lv-file-drop:hover { background: #f1f5f9; border-color: #94a3b8; }
+.lv-attachment-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #fdba74;
+  border-radius: 0.65rem;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.lv-attachment-chip button {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  line-height: 1;
+  border-radius: 999px;
+  color: #c2410c;
+  font-size: 1rem;
+}
+.lv-attachment-chip button:hover { background: #fed7aa; }
+
+.lv-reason-editor { min-height: 8rem; }
+/* Neutral focus ring - the amber tint used for task-table cells reads as an
+   error/warning state here, so the reason box gets its own quieter one. */
+.lv-reason-editor:focus {
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1.5px #94a3b8;
+}
+
+.lv-chart-wrap { height: 11rem; }
+
+.lv-metrics-filter { display: flex; gap: 0.4rem; margin-bottom: 0.65rem; }
+.lv-filter-btn {
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.7rem;
+  font-weight: 600;
+  transition: background-color 150ms, border-color 150ms, color 150ms;
+}
+.lv-filter-btn:hover { background: #f8fafc; border-color: #94a3b8; }
+.lv-filter-btn.is-selected { background: #1e293b; border-color: #1e293b; color: #ffffff; }
+
+/* ---------- Toast notifications ---------- */
+.toast-container {
+  position: fixed;
+  left: 50%;
+  bottom: 1.75rem;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  border-radius: 0.75rem;
+  background: #1e293b;
+  color: #f8fafc;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  box-shadow: 0 10px 30px -8px rgba(15, 23, 42, 0.45);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 250ms ease, transform 250ms ease;
+}
+.toast.is-visible { opacity: 1; transform: translateY(0); }
+.toast.is-success { background: #166534; }
+.toast-icon { width: 1rem; height: 1rem; flex-shrink: 0; }

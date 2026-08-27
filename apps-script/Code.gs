@@ -26,10 +26,20 @@
 
 // Bump this on EVERY redeploy. doGet() echoes it back, so opening the /exec
 // URL and checking the "version" field confirms the new code actually went live.
-const BACKEND_VERSION = 'v18-jsonp-fallback-fix';
+const BACKEND_VERSION = 'v21-fcm-leave-approvals';
 
 const FIREBASE_API_KEY = 'AIzaSyA1exz20sN1WqLQdNkP986JX5wHuICYolg';
 const FIREBASE_PROJECT_ID = 'devteam-daily-tasks';
+
+// ---- Push notifications (leave-request approvals) ----
+// The manager approves/rejects leave requests from a small installable PWA
+// (manager.html) rather than a chat bot - Telegram is banned in the user's
+// region, Discord's bot API is Cloudflare-blocked from Apps Script's shared
+// IP pool (403 "internal network error", code 40333), and Google Chat apps
+// require a paid Workspace account. FCM push credentials live in Script
+// Properties (Project Settings -> Script Properties -> FCM_SERVICE_ACCOUNT_JSON),
+// never in source, so they never end up committed to a file - see
+// getFcmAccessToken_ below.
 
 // Must mirror the ALLOWLIST in app.js. Emails MUST be lowercase here.
 // Each entry is { name, designation, reportedTo } - the server treats all
@@ -74,12 +84,44 @@ const HEADERS = [
   'Task Delta JSON'
 ];
 
+const LEAVE_SHEET_NAME = 'Leave Requests';
+const LEAVE_FULL_COOLDOWN_DAYS = 7;
+const LEAVE_HEADERS = [
+  'Request ID',
+  'Timestamp',
+  'Email',
+  'Name',
+  'Week Label',
+  'Type',
+  'Reason HTML',
+  'Status',
+  'Resolved At',
+  'Resolved By',
+  'Attachment Name',
+  'Attachment URL',
+  'Dismissed'
+];
+
+const PUSH_TOKEN_SHEET_NAME = 'Push Tokens';
+const PUSH_TOKEN_HEADERS = ['Email', 'Token', 'Platform', 'Registered At'];
+
 // =====================================================
 
 function doPost(e) {
   debugLog_('1. doPost invoked',
     'parameter keys=' + (e && e.parameter ? Object.keys(e.parameter).join(',') : 'none') +
     ' / postData=' + (e && e.postData ? 'present' : 'absent'));
+
+  const bodyString = (e && e.parameter && e.parameter.payload) ||
+    (e && e.postData && e.postData.contents) || null;
+  if (bodyString) {
+    let action = null;
+    try { action = JSON.parse(bodyString).action; } catch (_e) { /* not JSON with an action - a normal submission */ }
+    if (action === 'applyLeave') return applyLeave_(bodyString);
+    if (action === 'dismissLeave') return dismissLeave_(bodyString);
+    if (action === 'registerPushToken') return registerPushToken_(bodyString);
+    if (action === 'decideLeave') return decideLeave_(bodyString);
+  }
   return processSubmission_(e);
 }
 
@@ -247,9 +289,24 @@ function doGet(e) {
     if (e.parameter.action === 'analytics') {
       return analyticsData_(e);
     }
+    if (e.parameter.action === 'leaveStatus') {
+      return leaveStatus_(e);
+    }
+    if (e.parameter.action === 'leaveAnalytics') {
+      return leaveAnalytics_(e);
+    }
+    if (e.parameter.action === 'listLeaveRequests') {
+      return listLeaveRequests_(e);
+    }
     // If a payload arrives as a GET parameter, treat it as a submission
     // (some browsers downgrade POST→GET on Apps Script's 302 redirect).
     if (e.parameter.payload) {
+      let action = null;
+      try { action = JSON.parse(e.parameter.payload).action; } catch (_e) { /* not JSON with an action */ }
+      if (action === 'applyLeave') return applyLeave_(e.parameter.payload);
+      if (action === 'dismissLeave') return dismissLeave_(e.parameter.payload);
+      if (action === 'registerPushToken') return registerPushToken_(e.parameter.payload);
+      if (action === 'decideLeave') return decideLeave_(e.parameter.payload);
       debugLog_('doGet with payload (forwarding to submission)', 'len=' + e.parameter.payload.length);
       return processSubmission_(e);
     }
@@ -533,6 +590,514 @@ function countDayItems_(html) {
   const liCount = (String(html).match(/<li[^>]*>/gi) || []).length;
   if (liCount > 0) return liCount;
   return stripHtml_(html).trim() ? 1 : 0;
+}
+
+// =====================================================
+// Leave requests (approved via manager.html)
+// =====================================================
+
+function getOrCreateLeaveSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(LEAVE_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(LEAVE_SHEET_NAME);
+    sheet.getRange(1, 1, 1, LEAVE_HEADERS.length).setValues([LEAVE_HEADERS])
+      .setFontWeight('bold')
+      .setBackground('#eef2ff')
+      .setFontColor('#1e293b');
+    sheet.setFrozenRows(1);
+    sheet.setColumnWidth(7, 400); // Reason HTML
+  }
+  return sheet;
+}
+
+/**
+ * Saves a leave request to the Leave Requests sheet, uploads any attachment
+ * to Drive, and pushes a notification to the manager's registered devices.
+ * The manager approves/rejects from manager.html, which calls decideLeave_
+ * directly - there's no polling involved.
+ *
+ * A failed Drive upload or push send does NOT fail the request - the row is
+ * saved either way, so nothing is lost if push isn't set up yet or a send
+ * briefly fails.
+ *
+ * POST body: { action: 'applyLeave', idToken, weekLabel, type, reasonHtml,
+ *              attachmentName?, attachmentMimeType?, attachmentBase64? }
+ */
+function applyLeave_(bodyString) {
+  try {
+    const body = JSON.parse(bodyString);
+    if (!body.idToken) return jsonResponse_({ status: 'error', message: 'Missing auth token.' });
+
+    let verified;
+    try {
+      verified = verifyIdToken_(body.idToken);
+    } catch (err) {
+      return jsonResponse_({ status: 'error', message: 'Unauthorized: ' + err.message });
+    }
+    const email = (verified.email || '').toLowerCase();
+    const entry = ALLOWLIST[email];
+    if (!entry) return jsonResponse_({ status: 'error', message: 'Email ' + email + ' is not authorized.' });
+
+    const weekLabel = String(body.weekLabel || '');
+    if (!weekLabel) return jsonResponse_({ status: 'error', message: 'Missing week.' });
+    const type = body.type === 'full' ? 'full' : 'short';
+    const reasonHtml = String(body.reasonHtml || '');
+    const reasonPlain = stripHtml_(reasonHtml) || '(no reason provided)';
+
+    let attachmentUrl = '';
+    if (body.attachmentBase64 && body.attachmentName) {
+      try {
+        attachmentUrl = saveLeaveAttachment_(body.attachmentName, body.attachmentMimeType, body.attachmentBase64);
+      } catch (err) {
+        debugLog_('applyLeave_: attachment save failed', String(err && err.message || err));
+      }
+    }
+
+    const sheet = getOrCreateLeaveSheet_();
+    const requestId = Utilities.getUuid();
+    sheet.appendRow([
+      requestId,
+      new Date(),
+      email,
+      entry.name,
+      weekLabel,
+      type,
+      reasonHtml,
+      'requested',
+      '',   // Resolved At
+      '',   // Resolved By
+      body.attachmentName || '',
+      attachmentUrl,
+      false // Dismissed
+    ]);
+
+    try {
+      const typeLabel = type === 'full' ? 'Full Leave' : 'Short Leave';
+      sendPushToOwner_('New leave request', entry.name + ' - ' + typeLabel + ' for ' + weekLabel, { requestId: requestId });
+    } catch (err) {
+      debugLog_('applyLeave_: push send failed', String(err && err.message || err));
+    }
+
+    return jsonResponse_({ status: 'ok', requestId: requestId });
+  } catch (err) {
+    return jsonResponse_({ status: 'error', message: String(err && err.message || err) });
+  }
+}
+
+/**
+ * Lets a user clear an Approved/Rejected request off their own button once
+ * they've seen it (the portal's "Ok" link) - marks Dismissed instead of
+ * deleting the row, so the record stays in the sheet for history.
+ *
+ * POST body: { action: 'dismissLeave', idToken, requestId }
+ */
+function dismissLeave_(bodyString) {
+  try {
+    const body = JSON.parse(bodyString);
+    if (!body.idToken) return jsonResponse_({ status: 'error', message: 'Missing auth token.' });
+
+    let verified;
+    try {
+      verified = verifyIdToken_(body.idToken);
+    } catch (err) {
+      return jsonResponse_({ status: 'error', message: 'Unauthorized: ' + err.message });
+    }
+    const email = (verified.email || '').toLowerCase();
+
+    const sheet = getOrCreateLeaveSheet_();
+    const row = findLeaveRequestRow_(sheet, body.requestId);
+    if (row < 0) return jsonResponse_({ status: 'error', message: 'Request not found.' });
+    const rowEmail = String(sheet.getRange(row, 3).getValue() || '').toLowerCase();
+    if (rowEmail !== email) return jsonResponse_({ status: 'error', message: 'Not your request.' });
+
+    sheet.getRange(row, 13).setValue(true);
+    return jsonResponse_({ status: 'ok' });
+  } catch (err) {
+    return jsonResponse_({ status: 'error', message: String(err && err.message || err) });
+  }
+}
+
+/**
+ * Returns every leave request the calling user has ever submitted (their
+ * own rows only, excluding dismissed ones), plus a full-leave cooldown
+ * computed from their most recent Full Leave request. The client picks out
+ * "this week's" record from the list and reuses the same list, with its own
+ * date-range filter, to drive the per-user leave-metrics chart.
+ *
+ * GET ?action=leaveStatus&idToken=...&callback=...
+ */
+function leaveStatus_(e) {
+  try {
+    const idToken = e && e.parameter && e.parameter.idToken;
+    if (!idToken) return jsonOrJsonp_(e, { status: 'error', message: 'Missing auth token.' });
+
+    let verified;
+    try {
+      verified = verifyIdToken_(idToken);
+    } catch (err) {
+      return jsonOrJsonp_(e, { status: 'error', message: 'Unauthorized: ' + err.message });
+    }
+    const email = (verified.email || '').toLowerCase();
+    if (!ALLOWLIST[email]) return jsonOrJsonp_(e, { status: 'error', message: 'Email ' + email + ' is not authorized.' });
+
+    const sheet = getOrCreateLeaveSheet_();
+    const last = sheet.getLastRow();
+    const records = [];
+    let lastFullAt = null;
+
+    if (last >= 2) {
+      const values = sheet.getRange(2, 1, last - 1, LEAVE_HEADERS.length).getValues();
+      for (let i = 0; i < values.length; i++) {
+        const r = values[i];
+        if (String(r[2] || '').toLowerCase() !== email) continue;
+        const ts = r[1] instanceof Date ? r[1] : new Date(r[1]);
+        if (r[5] === 'full' && (!lastFullAt || ts > lastFullAt)) lastFullAt = ts;
+        if (r[12] === true) continue; // dismissed - hide from the client entirely
+        records.push({
+          requestId: r[0],
+          requestedAt: (ts instanceof Date && !isNaN(ts.getTime())) ? ts.toISOString() : String(r[1] || ''),
+          weekLabel: r[4] || '',
+          type: r[5] || 'short',
+          status: r[7] || 'requested',
+          resolvedAt: r[8] instanceof Date ? r[8].toISOString() : String(r[8] || '')
+        });
+      }
+    }
+
+    const cooldownUntil = lastFullAt ? new Date(lastFullAt.getTime() + LEAVE_FULL_COOLDOWN_DAYS * 86400000) : null;
+    return jsonOrJsonp_(e, {
+      status: 'ok',
+      records: records,
+      fullLeaveCooldownUntil: cooldownUntil ? cooldownUntil.toISOString() : null
+    });
+  } catch (err) {
+    return jsonOrJsonp_(e, { status: 'error', message: String(err && err.message || err) });
+  }
+}
+
+/**
+ * Owner-only: aggregate leave-request counts across the whole team, for the
+ * Analytics panel's "Leave activity" KPIs.
+ *
+ * GET ?action=leaveAnalytics&idToken=...&callback=...
+ */
+function leaveAnalytics_(e) {
+  try {
+    const idToken = e && e.parameter && e.parameter.idToken;
+    if (!idToken) return jsonOrJsonp_(e, { status: 'error', message: 'Missing auth token.' });
+
+    let verified;
+    try {
+      verified = verifyIdToken_(idToken);
+    } catch (err) {
+      return jsonOrJsonp_(e, { status: 'error', message: 'Unauthorized: ' + err.message });
+    }
+    const email = (verified.email || '').toLowerCase();
+    if (email !== OWNER_EMAIL) return jsonOrJsonp_(e, { status: 'error', message: 'Only the account owner can view leave analytics.' });
+
+    const sheet = getOrCreateLeaveSheet_();
+    const last = sheet.getLastRow();
+    const counts = { shortTaken: 0, fullTaken: 0, approved: 0, rejected: 0 };
+    if (last >= 2) {
+      const values = sheet.getRange(2, 1, last - 1, LEAVE_HEADERS.length).getValues();
+      values.forEach(function (r) {
+        if (r[5] === 'short') counts.shortTaken++;
+        else if (r[5] === 'full') counts.fullTaken++;
+        if (r[7] === 'approved') counts.approved++;
+        else if (r[7] === 'rejected') counts.rejected++;
+      });
+    }
+    return jsonOrJsonp_(e, { status: 'ok', counts: counts });
+  } catch (err) {
+    return jsonOrJsonp_(e, { status: 'error', message: String(err && err.message || err) });
+  }
+}
+
+/**
+ * Returns 1-based sheet row index of the leave request with this Request ID,
+ * or -1 if none exists.
+ */
+function findLeaveRequestRow_(sheet, requestId) {
+  const last = sheet.getLastRow();
+  if (last < 2 || !requestId) return -1;
+  const ids = sheet.getRange(2, 1, last - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === String(requestId)) return i + 2;
+  }
+  return -1;
+}
+
+// ---------- Leave attachments (Drive) ----------
+
+const LEAVE_ATTACHMENT_FOLDER_NAME = 'Tech EW Leave Attachments';
+
+function getOrCreateAttachmentFolder_() {
+  const folders = DriveApp.getFoldersByName(LEAVE_ATTACHMENT_FOLDER_NAME);
+  if (folders.hasNext()) return folders.next();
+  return DriveApp.createFolder(LEAVE_ATTACHMENT_FOLDER_NAME);
+}
+
+/**
+ * Saves a base64-encoded attachment to Drive and returns a shareable view
+ * URL. Anyone with the link can view it - acceptable for this small
+ * internal tool, matching the low-friction sharing already used elsewhere.
+ */
+function saveLeaveAttachment_(name, mimeType, base64) {
+  const folder = getOrCreateAttachmentFolder_();
+  const blob = Utilities.newBlob(Utilities.base64Decode(base64), mimeType || 'application/octet-stream', name);
+  const file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return file.getUrl();
+}
+
+// ---------- Push tokens ----------
+
+function getOrCreatePushTokenSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(PUSH_TOKEN_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(PUSH_TOKEN_SHEET_NAME);
+    sheet.getRange(1, 1, 1, PUSH_TOKEN_HEADERS.length).setValues([PUSH_TOKEN_HEADERS])
+      .setFontWeight('bold')
+      .setBackground('#eef2ff')
+      .setFontColor('#1e293b');
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+/**
+ * Owner-only: upserts an FCM registration token for one of the manager's
+ * devices (they may have a phone and a desktop registered at once).
+ *
+ * POST body: { action: 'registerPushToken', idToken, token, platform }
+ */
+function registerPushToken_(bodyString) {
+  try {
+    const body = JSON.parse(bodyString);
+    if (!body.idToken) return jsonResponse_({ status: 'error', message: 'Missing auth token.' });
+    if (!body.token) return jsonResponse_({ status: 'error', message: 'Missing push token.' });
+
+    let verified;
+    try {
+      verified = verifyIdToken_(body.idToken);
+    } catch (err) {
+      return jsonResponse_({ status: 'error', message: 'Unauthorized: ' + err.message });
+    }
+    const email = (verified.email || '').toLowerCase();
+    if (email !== OWNER_EMAIL) return jsonResponse_({ status: 'error', message: 'Only the account owner can register for push notifications.' });
+
+    const sheet = getOrCreatePushTokenSheet_();
+    const last = sheet.getLastRow();
+    if (last >= 2) {
+      const tokens = sheet.getRange(2, 2, last - 1, 1).getValues();
+      for (let i = 0; i < tokens.length; i++) {
+        if (tokens[i][0] === body.token) {
+          sheet.getRange(i + 2, 4).setValue(new Date()); // already registered - just refresh the timestamp
+          return jsonResponse_({ status: 'ok' });
+        }
+      }
+    }
+    sheet.appendRow([email, body.token, body.platform || '', new Date()]);
+    return jsonResponse_({ status: 'ok' });
+  } catch (err) {
+    return jsonResponse_({ status: 'error', message: String(err && err.message || err) });
+  }
+}
+
+// ---------- Manager approval endpoints ----------
+
+/**
+ * Owner-only: returns the most recent leave requests (newest first) with
+ * everything manager.html needs to render a card and decide on it.
+ *
+ * GET ?action=listLeaveRequests&idToken=...&callback=...
+ */
+function listLeaveRequests_(e) {
+  try {
+    const idToken = e && e.parameter && e.parameter.idToken;
+    if (!idToken) return jsonOrJsonp_(e, { status: 'error', message: 'Missing auth token.' });
+
+    let verified;
+    try {
+      verified = verifyIdToken_(idToken);
+    } catch (err) {
+      return jsonOrJsonp_(e, { status: 'error', message: 'Unauthorized: ' + err.message });
+    }
+    const email = (verified.email || '').toLowerCase();
+    if (email !== OWNER_EMAIL) return jsonOrJsonp_(e, { status: 'error', message: 'Only the account owner can view leave requests.' });
+
+    const sheet = getOrCreateLeaveSheet_();
+    const last = sheet.getLastRow();
+    const records = [];
+    if (last >= 2) {
+      const values = sheet.getRange(2, 1, last - 1, LEAVE_HEADERS.length).getValues();
+      for (let i = 0; i < values.length; i++) {
+        const r = values[i];
+        const ts = r[1] instanceof Date ? r[1] : new Date(r[1]);
+        const resolvedAt = r[8] instanceof Date ? r[8] : (r[8] ? new Date(r[8]) : null);
+        records.push({
+          requestId: r[0],
+          requestedAt: (ts instanceof Date && !isNaN(ts.getTime())) ? ts.toISOString() : String(r[1] || ''),
+          email: r[2] || '',
+          name: r[3] || '',
+          weekLabel: r[4] || '',
+          type: r[5] || 'short',
+          reasonHtml: r[6] || '',
+          status: r[7] || 'requested',
+          resolvedAt: (resolvedAt && !isNaN(resolvedAt.getTime())) ? resolvedAt.toISOString() : '',
+          resolvedBy: r[9] || '',
+          attachmentName: r[10] || '',
+          attachmentUrl: r[11] || ''
+        });
+      }
+    }
+    records.reverse(); // newest first
+    return jsonOrJsonp_(e, { status: 'ok', records: records.slice(0, 50) });
+  } catch (err) {
+    return jsonOrJsonp_(e, { status: 'error', message: String(err && err.message || err) });
+  }
+}
+
+/**
+ * Owner-only: approves or rejects a leave request (called from
+ * manager.html's Approve/Reject buttons).
+ *
+ * POST body: { action: 'decideLeave', idToken, requestId, decision }
+ * where decision is 'approved' or 'rejected'.
+ */
+function decideLeave_(bodyString) {
+  try {
+    const body = JSON.parse(bodyString);
+    if (!body.idToken) return jsonResponse_({ status: 'error', message: 'Missing auth token.' });
+    const decision = body.decision === 'rejected' ? 'rejected' : (body.decision === 'approved' ? 'approved' : null);
+    if (!decision) return jsonResponse_({ status: 'error', message: 'Invalid decision.' });
+
+    let verified;
+    try {
+      verified = verifyIdToken_(body.idToken);
+    } catch (err) {
+      return jsonResponse_({ status: 'error', message: 'Unauthorized: ' + err.message });
+    }
+    const email = (verified.email || '').toLowerCase();
+    if (email !== OWNER_EMAIL) return jsonResponse_({ status: 'error', message: 'Only the account owner can decide leave requests.' });
+
+    const sheet = getOrCreateLeaveSheet_();
+    const row = findLeaveRequestRow_(sheet, body.requestId);
+    if (row < 0) return jsonResponse_({ status: 'error', message: 'Request not found.' });
+    if (String(sheet.getRange(row, 8).getValue()) !== 'requested') {
+      return jsonResponse_({ status: 'error', message: 'This request has already been resolved.' });
+    }
+
+    sheet.getRange(row, 8, 1, 2).setValues([[decision, new Date()]]); // Status, Resolved At
+    sheet.getRange(row, 10).setValue(verified.name || email); // Resolved By
+    return jsonResponse_({ status: 'ok' });
+  } catch (err) {
+    return jsonResponse_({ status: 'error', message: String(err && err.message || err) });
+  }
+}
+
+// ---------- Push notifications (FCM) ----------
+
+/**
+ * Exchanges the FCM service-account credentials (Script Properties ->
+ * FCM_SERVICE_ACCOUNT_JSON, the full JSON file downloaded from Firebase
+ * Console -> Project Settings -> Service Accounts) for a short-lived OAuth2
+ * access token, by hand-signing a JWT - Apps Script has no Firebase Admin
+ * SDK, so this is the standard way to call a Google Cloud REST API (FCM v1)
+ * from a service account inside Apps Script.
+ */
+function getFcmAccessToken_() {
+  const json = PropertiesService.getScriptProperties().getProperty('FCM_SERVICE_ACCOUNT_JSON');
+  if (!json) throw new Error('FCM_SERVICE_ACCOUNT_JSON script property is not set.');
+  const creds = JSON.parse(json);
+
+  const now = Math.floor(new Date().getTime() / 1000);
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const claimSet = {
+    iss: creds.client_email,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    aud: 'https://oauth2.googleapis.com/token',
+    exp: now + 3600,
+    iat: now
+  };
+  const base64url = function (obj) {
+    return Utilities.base64EncodeWebSafe(JSON.stringify(obj)).replace(/=+$/, '');
+  };
+  const toSign = base64url(header) + '.' + base64url(claimSet);
+  const signatureBytes = Utilities.computeRsaSha256Signature(toSign, creds.private_key);
+  const jwt = toSign + '.' + Utilities.base64EncodeWebSafe(signatureBytes).replace(/=+$/, '');
+
+  const resp = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+    method: 'post',
+    contentType: 'application/x-www-form-urlencoded',
+    muteHttpExceptions: true,
+    payload: {
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt
+    }
+  });
+  if (resp.getResponseCode() !== 200) {
+    throw new Error('FCM token exchange failed: ' + resp.getContentText());
+  }
+  return JSON.parse(resp.getContentText()).access_token;
+}
+
+/**
+ * Sends a push notification to every device the manager has registered.
+ * Best-effort: never throws - a missing/broken FCM setup should never break
+ * saving the underlying leave request. Auto-prunes any token FCM reports as
+ * unregistered/invalid so the Push Tokens sheet doesn't accumulate dead rows.
+ */
+function sendPushToOwner_(title, body, data) {
+  const sheet = getOrCreatePushTokenSheet_();
+  const last = sheet.getLastRow();
+  if (last < 2) {
+    debugLog_('sendPushToOwner_: no registered push tokens yet', '');
+    return;
+  }
+
+  let accessToken;
+  try {
+    accessToken = getFcmAccessToken_();
+  } catch (err) {
+    debugLog_('sendPushToOwner_: could not get FCM access token', String(err && err.message || err));
+    return;
+  }
+
+  const dataStr = {};
+  Object.keys(data || {}).forEach(function (k) { dataStr[k] = String(data[k]); });
+
+  const rows = sheet.getRange(2, 1, last - 1, PUSH_TOKEN_HEADERS.length).getValues();
+  const url = 'https://fcm.googleapis.com/v1/projects/' + FIREBASE_PROJECT_ID + '/messages:send';
+  // Bottom-up, so deleting a stale token's row doesn't shift the index of
+  // rows still to be processed.
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const token = rows[i][1];
+    if (!token) continue;
+    const resp = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + accessToken },
+      muteHttpExceptions: true,
+      payload: JSON.stringify({
+        message: {
+          token: token,
+          notification: { title: title, body: body },
+          webpush: { fcm_options: { link: 'manager.html' } },
+          data: dataStr
+        }
+      })
+    });
+    const code = resp.getResponseCode();
+    if (code >= 200 && code < 300) continue;
+    const text = resp.getContentText();
+    debugLog_('sendPushToOwner_: send failed for a token', code + ': ' + text);
+    if (text.indexOf('UNREGISTERED') >= 0 || text.indexOf('INVALID_ARGUMENT') >= 0) {
+      sheet.deleteRow(i + 2);
+    }
+  }
 }
 
 /**

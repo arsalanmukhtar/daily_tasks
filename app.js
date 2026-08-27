@@ -96,6 +96,31 @@ const submissionsBackdrop = document.getElementById('submissionsBackdrop');
 const submissionsDrawer  = document.getElementById('submissionsDrawer');
 const closeDrawerBtn     = document.getElementById('closeDrawerBtn');
 const submissionsList    = document.getElementById('submissionsList');
+const applyLeaveBtn      = document.getElementById('applyLeaveBtn');
+const applyLeaveBtnLabel = document.getElementById('applyLeaveBtnLabel');
+const leaveDismissBtn    = document.getElementById('leaveDismissBtn');
+const leaveBackdrop      = document.getElementById('leaveBackdrop');
+const leaveDrawer        = document.getElementById('leaveDrawer');
+const leaveDrawerWeekLabel = document.getElementById('leaveDrawerWeekLabel');
+const closeLeaveDrawerBtn = document.getElementById('closeLeaveDrawerBtn');
+const leaveMetricsBtn    = document.getElementById('leaveMetricsBtn');
+const leaveMetricsSection = document.getElementById('leaveMetricsSection');
+const leaveMetricsFilter = document.getElementById('leaveMetricsFilter');
+const leaveTypeShortBtn  = document.getElementById('leaveTypeShortBtn');
+const leaveTypeFullBtn   = document.getElementById('leaveTypeFullBtn');
+const leaveFullCooldownNote = document.getElementById('leaveFullCooldownNote');
+const leaveToolbar       = document.getElementById('leaveToolbar');
+const leaveReasonEditor  = document.getElementById('leaveReasonEditor');
+const leaveCancelBtn     = document.getElementById('leaveCancelBtn');
+const leaveSendBtn       = document.getElementById('leaveSendBtn');
+const leaveAttachmentInput  = document.getElementById('leaveAttachmentInput');
+const leaveAttachmentDrop   = document.getElementById('leaveAttachmentDrop');
+const leaveAttachmentChip   = document.getElementById('leaveAttachmentChip');
+const leaveAttachmentName   = document.getElementById('leaveAttachmentName');
+const leaveAttachmentRemove = document.getElementById('leaveAttachmentRemove');
+const leaveAttachmentError  = document.getElementById('leaveAttachmentError');
+const toastContainer     = document.getElementById('toastContainer');
+const analyticsLeaveKpis = document.getElementById('analyticsLeaveKpis');
 const exportSummaryBtn   = document.getElementById('exportSummaryBtn');
 const exportBackdrop     = document.getElementById('exportBackdrop');
 const exportModal        = document.getElementById('exportModal');
@@ -108,6 +133,7 @@ const exportWeekLabel    = document.getElementById('exportWeekLabel');
 const exportWeekPanel    = document.getElementById('exportWeekPanel');
 const exportStatus       = document.getElementById('exportStatus');
 
+const leaveApprovalsLink  = document.getElementById('leaveApprovalsLink');
 const analyticsBtn        = document.getElementById('analyticsBtn');
 const analyticsBackdrop   = document.getElementById('analyticsBackdrop');
 const analyticsPanel      = document.getElementById('analyticsPanel');
@@ -148,6 +174,11 @@ const TASK_DAY_LONG = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'T
 const TASK_FORMAT_VERSION = 'rows-v1';
 
 let activeCell = null;
+// Whichever formatting toolbar (taskToolbar, or the leave-reason toolbar)
+// belongs to the currently focused editor - execCommand always targets
+// activeCell, but toolbar button state (bold/list active, etc.) needs to
+// know which toolbar's buttons to refresh.
+let activeToolbarEl = null;
 
 // Weekday column keys (Mon..Fri) that fall after today for the selected week.
 // Cells in these columns are locked - you can't log time for a day that hasn't
@@ -174,7 +205,7 @@ function createTaskRow(rowData) {
     cell.classList.toggle('cell-locked', locked);
     cell.dataset.placeholder = locked ? 'Upcoming' : (day + ' tasks…');
     if (rowData && rowData[day]) cell.innerHTML = rowData[day];
-    cell.addEventListener('focus', () => { activeCell = cell; });
+    cell.addEventListener('focus', () => { activeCell = cell; activeToolbarEl = taskToolbar; });
     td.appendChild(cell);
     tr.appendChild(td);
   });
@@ -283,24 +314,29 @@ function escapeHtmlPreservingBreaks(s) {
 }
 
 // Toolbar: mousedown preventDefault keeps the cell focused so execCommand
-// has a valid Selection to operate on.
-Array.from(taskToolbar.querySelectorAll('[data-cmd]')).forEach((btn) => {
-  btn.addEventListener('mousedown', (e) => e.preventDefault());
-  btn.addEventListener('click', () => {
-    if (!activeCell) return;
-    activeCell.focus();
-    try { document.execCommand(btn.dataset.cmd, false, null); } catch (_e) {}
-    // Wait one frame so the DOM (and the selection's ancestry) reflects the
-    // execCommand change before we read state from it.
-    requestAnimationFrame(refreshToolbarState);
+// has a valid Selection to operate on. Wires any toolbar sharing the same
+// [data-cmd]/[data-color-action] markup (the task table's and the leave
+// reason editor's) against the shared activeCell/activeToolbarEl pair.
+function wireFormatToolbar_(toolbarEl) {
+  Array.from(toolbarEl.querySelectorAll('[data-cmd]')).forEach((btn) => {
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', () => {
+      if (!activeCell) return;
+      activeCell.focus();
+      try { document.execCommand(btn.dataset.cmd, false, null); } catch (_e) {}
+      // Wait one frame so the DOM (and the selection's ancestry) reflects the
+      // execCommand change before we read state from it.
+      requestAnimationFrame(() => refreshToolbarState_(toolbarEl));
+    });
   });
-});
+}
 
-function refreshToolbarState() {
+function refreshToolbarState_(toolbarEl) {
+  if (!toolbarEl) return;
   // Inline marks: queryCommandState is reliable for these.
   const inline = ['bold', 'italic', 'underline', 'strikethrough'];
   inline.forEach((cmd) => {
-    const btn = taskToolbar.querySelector('[data-cmd="' + cmd + '"]');
+    const btn = toolbarEl.querySelector('[data-cmd="' + cmd + '"]');
     if (!btn) return;
     let on = false;
     try { on = document.queryCommandState(cmd); } catch (_e) {}
@@ -309,8 +345,8 @@ function refreshToolbarState() {
   // List state: queryCommandState('insertUnorderedList') is unreliable
   // (returns false even when the caret is inside a <ul>). Walk the selection's
   // ancestry instead.
-  const ulBtn = taskToolbar.querySelector('[data-cmd="insertUnorderedList"]');
-  const olBtn = taskToolbar.querySelector('[data-cmd="insertOrderedList"]');
+  const ulBtn = toolbarEl.querySelector('[data-cmd="insertUnorderedList"]');
+  const olBtn = toolbarEl.querySelector('[data-cmd="insertOrderedList"]');
   if (ulBtn) ulBtn.classList.toggle('active', selectionIsInside_('UL'));
   if (olBtn) olBtn.classList.toggle('active', selectionIsInside_('OL'));
 }
@@ -326,8 +362,10 @@ function selectionIsInside_(tagName) {
 }
 
 document.addEventListener('selectionchange', () => {
-  if (activeCell && document.activeElement === activeCell) refreshToolbarState();
+  if (activeCell && document.activeElement === activeCell) refreshToolbarState_(activeToolbarEl);
 });
+
+wireFormatToolbar_(taskToolbar);
 
 // ---------- Markdown-style list autoformat ----------
 // Typing "1. " at the start of a line turns it into a numbered list; "- " or
@@ -375,7 +413,7 @@ function handleListAutoformat(e) {
     document.execCommand('delete', false, null);
     document.execCommand(cmd, false, null);
   } catch (_e) {}
-  requestAnimationFrame(refreshToolbarState);
+  requestAnimationFrame(() => refreshToolbarState_(activeToolbarEl));
 }
 
 taskTbody.addEventListener('beforeinput', handleListAutoformat);
@@ -500,17 +538,20 @@ function applyColor(action, color) {
   } catch (_e) {}
 }
 
-taskToolbar.querySelectorAll('[data-color-action]').forEach((btn) => {
-  btn.addEventListener('mousedown', (e) => e.preventDefault());
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (colorPalette.classList.contains('open') && activeColorBtn === btn) {
-      closeColorPalette();
-    } else {
-      openColorPalette(btn);
-    }
+function wireColorButtons_(toolbarEl) {
+  toolbarEl.querySelectorAll('[data-color-action]').forEach((btn) => {
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (colorPalette.classList.contains('open') && activeColorBtn === btn) {
+        closeColorPalette();
+      } else {
+        openColorPalette(btn);
+      }
+    });
   });
-});
+}
+wireColorButtons_(taskToolbar);
 
 document.addEventListener('click', (e) => {
   if (!colorPalette.contains(e.target) && !e.target.closest('[data-color-action]')) {
@@ -519,6 +560,12 @@ document.addEventListener('click', (e) => {
 });
 window.addEventListener('scroll', closeColorPalette, true);
 window.addEventListener('resize', closeColorPalette);
+
+// ---------- Leave reason editor: shares the task-table's toolbar wiring ----------
+wireFormatToolbar_(leaveToolbar);
+wireColorButtons_(leaveToolbar);
+leaveReasonEditor.addEventListener('focus', () => { activeCell = leaveReasonEditor; activeToolbarEl = leaveToolbar; });
+leaveReasonEditor.addEventListener('beforeinput', handleListAutoformat);
 
 // Seed with a single empty row on startup.
 addTaskRow();
@@ -611,6 +658,7 @@ function refreshWeekSummary() {
     renderWeekDaysList(null);
     updateColumnHeaderDates(null);
     applyFutureDayLocks(null);
+    refreshApplyLeaveButton();
     return null;
   }
   weekSummary.textContent =
@@ -619,8 +667,343 @@ function refreshWeekSummary() {
   renderWeekDaysList(info);
   updateColumnHeaderDates(info);
   applyFutureDayLocks(info);
+  refreshApplyLeaveButton();
   return info;
 }
+
+// ---------- Apply for Leave ----------
+// Backed by a real endpoint now (Code.gs: applyLeave_/dismissLeave_/
+// leaveStatus_/leaveAnalytics_, plus a Telegram bot that pushes the request
+// to the manager with Accept/Reject buttons). The button/panel only ever
+// reflects what the sheet says - no local state to fall out of sync.
+const LEAVE_FULL_COOLDOWN_DAYS = 7;
+const LEAVE_ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024;
+const LEAVE_ATTACHMENT_EXTS = ['.pdf', '.txt', '.doc', '.docx'];
+let selectedLeaveType = 'short';
+let leaveAttachmentFile = null;
+let leaveMetricsRange = 'all';
+let leaveMetricsChartInstance = null;
+// Last successful leaveStatus_ fetch - reused by the cooldown check, the
+// "Ok" dismiss (needs the current week's requestId), and the metrics chart,
+// so opening the drawer doesn't need three separate round-trips.
+let latestLeaveStatusData = null;
+
+function currentUserEmail_() {
+  return currentUserContext ? (currentUserContext.user.email || '').toLowerCase() : '';
+}
+
+function currentWeekLabel_() {
+  const info = weekdaysFor(weekInput.value);
+  return info ? `Week ${info.week}, ${info.year}` : '';
+}
+
+async function fetchLeaveStatus_() {
+  if (!currentUserContext) return null;
+  try {
+    const idToken = await currentUserContext.user.getIdToken(false);
+    const data = await jsonpFetch(APPS_SCRIPT_URL, { action: 'leaveStatus', idToken: idToken });
+    if (data && data.status === 'ok') return data;
+  } catch (_e) { /* offline or backend error - caller keeps the button's prior state */ }
+  return null;
+}
+
+function leaveMetricsRangeBounds_(range) {
+  const now = Date.now();
+  if (range === 'year') return { start: new Date(new Date().getFullYear(), 0, 1).getTime(), end: now };
+  if (range === '90d') return { start: now - 90 * 86400000, end: now };
+  return { start: -Infinity, end: Infinity };
+}
+
+function computeOwnLeaveMetrics_(records, range) {
+  const counts = { shortTaken: 0, fullTaken: 0, approved: 0, rejected: 0 };
+  const bounds = leaveMetricsRangeBounds_(range || 'all');
+  (records || []).forEach(function (rec) {
+    const ts = rec.requestedAt ? new Date(rec.requestedAt).getTime() : NaN;
+    if (!isNaN(ts) && (ts < bounds.start || ts > bounds.end)) return;
+    if (rec.type === 'short') counts.shortTaken++;
+    else if (rec.type === 'full') counts.fullTaken++;
+    if (rec.status === 'approved') counts.approved++;
+    else if (rec.status === 'rejected') counts.rejected++;
+  });
+  return counts;
+}
+
+// Fixed-width state button: Apply for Leave (idle) -> Requested for Approval
+// (after Send) -> Approved / Rejected (once the manager taps a button in
+// Telegram) -> dismissed via the "Ok" link back to idle.
+async function refreshApplyLeaveButton() {
+  const weekKey = weekInput.value;
+  if (!currentUserContext || !weekKey) {
+    applyLeaveBtn.classList.add('hidden');
+    leaveDismissBtn.classList.add('hidden');
+    return;
+  }
+  applyLeaveBtn.classList.remove('hidden');
+
+  const data = await fetchLeaveStatus_();
+  if (!data) return; // network hiccup - leave the button showing whatever it last showed
+  latestLeaveStatusData = data;
+
+  const weekLabel = currentWeekLabel_();
+  const rec = data.records.find(function (r) { return r.weekLabel === weekLabel; }) || null;
+
+  applyLeaveBtn.classList.remove('is-idle', 'is-requested', 'is-approved', 'is-rejected');
+  leaveDismissBtn.classList.add('hidden');
+  if (!rec) {
+    applyLeaveBtn.classList.add('is-idle');
+    applyLeaveBtn.disabled = false;
+    applyLeaveBtnLabel.textContent = 'Apply for Leave';
+  } else if (rec.status === 'approved') {
+    applyLeaveBtn.classList.add('is-approved');
+    applyLeaveBtn.disabled = true;
+    applyLeaveBtnLabel.textContent = 'Approved';
+    leaveDismissBtn.classList.remove('hidden');
+  } else if (rec.status === 'rejected') {
+    applyLeaveBtn.classList.add('is-rejected');
+    applyLeaveBtn.disabled = true;
+    applyLeaveBtnLabel.textContent = 'Rejected';
+    leaveDismissBtn.classList.remove('hidden');
+  } else {
+    applyLeaveBtn.classList.add('is-requested');
+    applyLeaveBtn.disabled = true;
+    applyLeaveBtnLabel.textContent = 'Requested for Approval';
+  }
+}
+
+let leaveStatusPollTimer = null;
+function startLeaveStatusPolling_() {
+  stopLeaveStatusPolling_();
+  leaveStatusPollTimer = setInterval(function () { refreshApplyLeaveButton(); }, 60000);
+}
+function stopLeaveStatusPolling_() {
+  if (leaveStatusPollTimer) { clearInterval(leaveStatusPollTimer); leaveStatusPollTimer = null; }
+}
+
+function selectLeaveType_(type) {
+  if (leaveTypeFullBtn.disabled && type === 'full') return;
+  selectedLeaveType = type;
+  leaveTypeShortBtn.classList.toggle('is-selected', type === 'short');
+  leaveTypeFullBtn.classList.toggle('is-selected', type === 'full');
+}
+
+function updateFullLeaveCooldownUI_() {
+  const untilStr = latestLeaveStatusData && latestLeaveStatusData.fullLeaveCooldownUntil;
+  const until = untilStr ? new Date(untilStr) : null;
+  const active = until && !isNaN(until.getTime()) && until.getTime() > Date.now();
+  leaveTypeFullBtn.disabled = !!active;
+  leaveTypeFullBtn.classList.toggle('is-disabled', !!active);
+  if (active) {
+    leaveFullCooldownNote.textContent = 'Full Leave is unavailable until ' + fmtFull(until) + ' (once every ' + LEAVE_FULL_COOLDOWN_DAYS + ' days).';
+    leaveFullCooldownNote.classList.remove('hidden');
+    if (selectedLeaveType === 'full') selectLeaveType_('short');
+  } else {
+    leaveFullCooldownNote.classList.add('hidden');
+  }
+}
+
+function resetLeaveAttachment_() {
+  leaveAttachmentFile = null;
+  leaveAttachmentInput.value = '';
+  leaveAttachmentChip.classList.add('hidden');
+  leaveAttachmentDrop.classList.remove('hidden');
+  leaveAttachmentError.classList.add('hidden');
+}
+
+function fileToBase64_(file) {
+  return new Promise(function (resolve, reject) {
+    const reader = new FileReader();
+    reader.onload = function () {
+      const result = String(reader.result || '');
+      const idx = result.indexOf(',');
+      resolve(idx >= 0 ? result.slice(idx + 1) : result);
+    };
+    reader.onerror = function () { reject(reader.error || new Error('Could not read file.')); };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function openLeaveDrawer() {
+  if (!currentUserContext || !weekInput.value) return;
+  leaveDrawerWeekLabel.textContent = weekSummary.textContent || '-';
+  leaveReasonEditor.innerHTML = '';
+  resetLeaveAttachment_();
+  leaveMetricsSection.classList.add('hidden');
+  leaveMetricsRange = 'all';
+  leaveMetricsFilter.querySelectorAll('.lv-filter-btn').forEach((b) => b.classList.toggle('is-selected', b.dataset.range === 'all'));
+  selectLeaveType_('short');
+  leaveDrawer.classList.add('open');
+  leaveBackdrop.classList.add('open');
+  // Focus immediately so activeCell/activeToolbarEl point at this editor
+  // before the user can touch the toolbar - otherwise a stale activeCell
+  // from the task table would silently take the formatting instead.
+  leaveReasonEditor.focus();
+  // Cooldown check should reflect the very latest state, not whatever the
+  // last periodic poll happened to catch.
+  await refreshApplyLeaveButton();
+  updateFullLeaveCooldownUI_();
+}
+
+function closeLeaveDrawer() {
+  leaveDrawer.classList.remove('open');
+  leaveBackdrop.classList.remove('open');
+  if (activeCell === leaveReasonEditor) activeCell = null;
+}
+
+async function renderLeaveMetricsChart_() {
+  const data = latestLeaveStatusData || await fetchLeaveStatus_();
+  const counts = computeOwnLeaveMetrics_(data ? data.records : [], leaveMetricsRange);
+  try {
+    const Chart = await loadChartJS();
+    if (leaveMetricsChartInstance) { leaveMetricsChartInstance.destroy(); leaveMetricsChartInstance = null; }
+    leaveMetricsChartInstance = new Chart(document.getElementById('leaveMetricsChart'), {
+      type: 'bar',
+      data: {
+        labels: ['Short taken', 'Full taken', 'Approved', 'Rejected'],
+        datasets: [{
+          data: [counts.shortTaken, counts.fullTaken, counts.approved, counts.rejected],
+          backgroundColor: ['#fb923c', '#f97316', '#22c55e', '#ef4444'],
+          borderRadius: 6, maxBarThickness: 44
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { precision: 0, font: { size: 12, weight: 'bold' } } },
+          x: { ticks: { font: { size: 11, weight: 'bold' } } }
+        }
+      }
+    });
+  } catch (_e) { /* chart library unavailable - metrics section just stays empty */ }
+}
+
+function showToast_(message, tone) {
+  const el = document.createElement('div');
+  el.className = 'toast' + (tone ? ' is-' + tone : '');
+  el.innerHTML =
+    (tone === 'success'
+      ? '<svg class="toast-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'
+      : '') +
+    '<span>' + escapeHtml(message) + '</span>';
+  toastContainer.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('is-visible'));
+  setTimeout(() => {
+    el.classList.remove('is-visible');
+    setTimeout(() => el.remove(), 250);
+  }, 3000);
+}
+
+applyLeaveBtn.addEventListener('click', openLeaveDrawer);
+leaveDismissBtn.addEventListener('click', async () => {
+  if (!currentUserContext || !latestLeaveStatusData) return;
+  const weekLabel = currentWeekLabel_();
+  const rec = latestLeaveStatusData.records.find(function (r) { return r.weekLabel === weekLabel; });
+  if (!rec) return;
+  try {
+    const idToken = await currentUserContext.user.getIdToken(false);
+    const formBody = new URLSearchParams();
+    formBody.append('payload', JSON.stringify({ action: 'dismissLeave', idToken: idToken, requestId: rec.requestId }));
+    await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: formBody, redirect: 'follow' });
+  } catch (_e) { /* best-effort */ }
+  refreshApplyLeaveButton();
+});
+closeLeaveDrawerBtn.addEventListener('click', closeLeaveDrawer);
+leaveBackdrop.addEventListener('click', closeLeaveDrawer);
+leaveCancelBtn.addEventListener('click', closeLeaveDrawer);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && leaveDrawer.classList.contains('open')) closeLeaveDrawer();
+});
+
+leaveTypeShortBtn.addEventListener('click', () => selectLeaveType_('short'));
+leaveTypeFullBtn.addEventListener('click', () => selectLeaveType_('full'));
+
+leaveMetricsBtn.addEventListener('click', () => {
+  const willShow = leaveMetricsSection.classList.contains('hidden');
+  leaveMetricsSection.classList.toggle('hidden', !willShow);
+  if (willShow) renderLeaveMetricsChart_();
+});
+
+leaveMetricsFilter.querySelectorAll('.lv-filter-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    leaveMetricsRange = btn.dataset.range;
+    leaveMetricsFilter.querySelectorAll('.lv-filter-btn').forEach((b) => b.classList.toggle('is-selected', b === btn));
+    renderLeaveMetricsChart_();
+  });
+});
+
+leaveAttachmentInput.addEventListener('change', () => {
+  const file = leaveAttachmentInput.files && leaveAttachmentInput.files[0];
+  leaveAttachmentError.classList.add('hidden');
+  if (!file) return;
+  const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+  if (LEAVE_ATTACHMENT_EXTS.indexOf(ext) === -1) {
+    leaveAttachmentError.textContent = 'Unsupported file type - use PDF, DOC, DOCX, or TXT.';
+    leaveAttachmentError.classList.remove('hidden');
+    leaveAttachmentInput.value = '';
+    return;
+  }
+  if (file.size > LEAVE_ATTACHMENT_MAX_BYTES) {
+    leaveAttachmentError.textContent = 'File is too large - max 8MB.';
+    leaveAttachmentError.classList.remove('hidden');
+    leaveAttachmentInput.value = '';
+    return;
+  }
+  leaveAttachmentFile = file;
+  leaveAttachmentName.textContent = file.name;
+  leaveAttachmentChip.classList.remove('hidden');
+  leaveAttachmentDrop.classList.add('hidden');
+});
+leaveAttachmentRemove.addEventListener('click', () => resetLeaveAttachment_());
+
+leaveSendBtn.addEventListener('click', async () => {
+  if (!currentUserContext) return;
+  const weekLabel = currentWeekLabel_();
+  if (!weekLabel) return;
+
+  let idToken;
+  try {
+    idToken = await currentUserContext.user.getIdToken(false);
+  } catch (err) {
+    showToast_('Could not get auth token.', 'error');
+    return;
+  }
+
+  const reasonHtml = (leaveReasonEditor.innerHTML || '').trim();
+  const payload = {
+    action: 'applyLeave',
+    idToken: idToken,
+    weekLabel: weekLabel,
+    type: selectedLeaveType,
+    reasonHtml: reasonHtml === '<br>' ? '' : reasonHtml
+  };
+
+  leaveSendBtn.disabled = true;
+  leaveCancelBtn.disabled = true;
+  const originalLabel = leaveSendBtn.textContent;
+  leaveSendBtn.textContent = 'Sending...';
+
+  try {
+    if (leaveAttachmentFile) {
+      payload.attachmentName = leaveAttachmentFile.name;
+      payload.attachmentMimeType = leaveAttachmentFile.type || 'application/octet-stream';
+      payload.attachmentBase64 = await fileToBase64_(leaveAttachmentFile);
+    }
+
+    const formBody = new URLSearchParams();
+    formBody.append('payload', JSON.stringify(payload));
+    await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: formBody, redirect: 'follow' });
+
+    closeLeaveDrawer();
+    showToast_('Leave Request Sent', 'success');
+    refreshApplyLeaveButton();
+  } catch (err) {
+    showToast_('Could not send leave request: ' + err.message, 'error');
+  } finally {
+    leaveSendBtn.disabled = false;
+    leaveCancelBtn.disabled = false;
+    leaveSendBtn.textContent = originalLabel;
+  }
+});
 
 // True when `date` (a UTC calendar date) is the user's current local day.
 function isTodayDate(date) {
@@ -960,6 +1343,8 @@ function showLoading()  {
   closeExportModal();
   closeAnalyticsPanel();
   submissionsDrawer.classList.remove('open'); submissionsBackdrop.classList.remove('open');
+  leaveDrawer.classList.remove('open'); leaveBackdrop.classList.remove('open');
+  applyLeaveBtn.classList.add('hidden'); leaveDismissBtn.classList.add('hidden');
 }
 function showAuthGate(errMsg) {
   loadingState.classList.add('hidden');
@@ -972,6 +1357,8 @@ function showAuthGate(errMsg) {
   closeExportModal();
   closeAnalyticsPanel();
   submissionsDrawer.classList.remove('open'); submissionsBackdrop.classList.remove('open');
+  leaveDrawer.classList.remove('open'); leaveBackdrop.classList.remove('open');
+  applyLeaveBtn.classList.add('hidden'); leaveDismissBtn.classList.add('hidden');
   if (errMsg) { authError.textContent = errMsg; authError.classList.remove('hidden'); }
   else { authError.classList.add('hidden'); authError.textContent = ''; }
 }
@@ -988,6 +1375,8 @@ function showForm(user, displayName, designation, reportedTo) {
   exportSummaryBtn.classList.toggle('flex', isOwner);
   analyticsBtn.classList.toggle('hidden', !isOwner);
   analyticsBtn.classList.toggle('flex', isOwner);
+  leaveApprovalsLink.classList.toggle('hidden', !isOwner);
+  leaveApprovalsLink.classList.toggle('flex', isOwner);
 
   const FALLBACK_AVATAR = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22white%22%3E%3Cpath d=%22M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z%22/%3E%3C/svg%3E';
   userPhoto.onerror = () => { userPhoto.onerror = null; userPhoto.src = FALLBACK_AVATAR; };
@@ -1069,6 +1458,7 @@ function onIdleCheck() {
   const remaining = effectiveLastActivity() + INACTIVITY_LIMIT_MS - Date.now();
   if (remaining > 0) { scheduleIdleCheck(); return; }
   stopInactivityTracking();
+  stopLeaveStatusPolling_();
   signOut(auth).finally(() => {
     showAuthGate('Signed out after 8 hours of inactivity. Please sign in again.');
   });
@@ -1093,6 +1483,7 @@ onAuthStateChanged(auth, (user) => {
   if (!user) {
     currentUserContext = null;
     stopInactivityTracking();
+    stopLeaveStatusPolling_();
     clearStoredActivity();
     showAuthGate();
     return;
@@ -1101,6 +1492,7 @@ onAuthStateChanged(auth, (user) => {
   const entry = ALLOWLIST[email];
   if (!entry) {
     stopInactivityTracking();
+    stopLeaveStatusPolling_();
     signOut(auth).finally(() => {
       showAuthGate(`The account ${user.email} isn't authorized. Contact your manager.`);
     });
@@ -1110,6 +1502,7 @@ onAuthStateChanged(auth, (user) => {
   // the 8-hour limit is signed out before the form is ever shown.
   if (isSessionIdleExpired()) {
     stopInactivityTracking();
+    stopLeaveStatusPolling_();
     clearStoredActivity();
     signOut(auth).finally(() => {
       showAuthGate('Signed out after 8 hours of inactivity. Please sign in again.');
@@ -1125,6 +1518,7 @@ onAuthStateChanged(auth, (user) => {
   };
   showForm(user, entry.name, entry.designation, entry.reportedTo);
   startInactivityTracking();
+  startLeaveStatusPolling_();
   // Pre-load this user's submissions, then reflect the current week's saved
   // content in the table - but only if they haven't already started typing.
   fetchUserSubmissions_()
@@ -2549,10 +2943,40 @@ function renderHeatmap_(model) {
   });
 }
 
+// Owner-only leave metrics. There's no backend for leave requests yet, so
+// this aggregates whatever leaveRequest:* entries exist in THIS browser's
+// localStorage - it won't reflect other developers' requests made on their
+// own devices until the feature is wired to a real endpoint.
+async function renderLeaveKpis_() {
+  analyticsLeaveKpis.innerHTML = '<div class="text-xs text-slate-400 col-span-2 sm:col-span-4">Loading...</div>';
+  try {
+    if (!currentUserContext) throw new Error('Not signed in.');
+    const idToken = await currentUserContext.user.getIdToken(false);
+    const data = await jsonpFetch(APPS_SCRIPT_URL, { action: 'leaveAnalytics', idToken: idToken });
+    if (!data || data.status !== 'ok') throw new Error((data && data.message) || 'Could not load leave activity.');
+    const counts = data.counts;
+    const cards = [
+      { label: 'Short leaves taken', value: counts.shortTaken },
+      { label: 'Full leaves taken', value: counts.fullTaken },
+      { label: 'Leaves approved', value: counts.approved },
+      { label: 'Leaves rejected', value: counts.rejected }
+    ];
+    analyticsLeaveKpis.innerHTML = cards.map(function (c) {
+      return '<div class="an-kpi">' +
+        '<div class="an-kpi-label">' + escapeHtml(c.label) + '</div>' +
+        '<div class="an-kpi-value">' + c.value + '</div>' +
+        '</div>';
+    }).join('');
+  } catch (err) {
+    analyticsLeaveKpis.innerHTML = '<div class="text-xs text-red-500 col-span-2 sm:col-span-4">' + escapeHtml(err.message || 'Could not load leave activity.') + '</div>';
+  }
+}
+
 async function renderAnalytics_() {
   const model = buildAnalyticsModel_(analyticsFilter);
   renderKpis_(model);
   renderHighlights_(model);
+  renderLeaveKpis_();
   renderHeatmap_(model);
   try {
     const Chart = await loadChartJS();
