@@ -56,8 +56,20 @@ const refreshBtn     = document.getElementById('refreshBtn');
 const emptyState     = document.getElementById('emptyState');
 const requestList    = document.getElementById('requestList');
 const toastContainer = document.getElementById('toastContainer');
+const debugLog       = document.getElementById('debugLog');
 
 let currentUser = null;
+
+// On-screen debug log - iOS gives no easy console access, so this lets the
+// user screenshot what actually happened instead of guessing blind.
+function logDebug_(msg) {
+  if (!debugLog) return;
+  const line = new Date().toLocaleTimeString() + '  ' + msg;
+  debugLog.textContent = (debugLog.textContent ? debugLog.textContent + '\n' : '') + line;
+}
+window.addEventListener('error', (e) => logDebug_('window error: ' + e.message));
+window.addEventListener('unhandledrejection', (e) => logDebug_('unhandled rejection: ' + (e.reason && e.reason.message || e.reason)));
+logDebug_('manager.js loaded');
 
 // ---------- JSONP GET helper (same pattern as app.js's jsonpFetch) ----------
 function jsonpFetch(url, params, timeoutMs) {
@@ -118,15 +130,19 @@ function showToast_(message, tone) {
 // persisted session without needing a fresh interactive sign-in.
 signInBtn.addEventListener('click', async () => {
   signInError.classList.add('hidden');
+  logDebug_('sign-in button clicked');
   try {
-    await signInWithPopup(auth, new GoogleAuthProvider());
+    const result = await signInWithPopup(auth, new GoogleAuthProvider());
+    logDebug_('signInWithPopup resolved: ' + (result.user && result.user.email));
   } catch (err) {
+    logDebug_('signInWithPopup threw: ' + err.code + ' - ' + err.message);
     signInError.textContent = 'Sign-in failed: ' + err.message;
     signInError.classList.remove('hidden');
   }
 });
 
 onAuthStateChanged(auth, (user) => {
+  logDebug_('onAuthStateChanged: ' + (user ? user.email : 'null'));
   signInGate.classList.add('hidden');
   restrictedGate.classList.add('hidden');
   appEl.classList.add('hidden');
@@ -154,6 +170,7 @@ async function initOwnerSession_() {
 function setupPushIfEligible_() {
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  logDebug_('setupPushIfEligible_: isIOS=' + isIOS + ' isStandalone=' + isStandalone);
 
   if (isIOS && !isStandalone) {
     // iOS only supports web push once the PWA is installed to the home
@@ -168,11 +185,14 @@ function setupPushIfEligible_() {
 async function registerForPush_() {
   try {
     if (!('serviceWorker' in navigator) || !('Notification' in window)) {
+      logDebug_('registerForPush_: serviceWorker or Notification API missing');
       showToast_('Push not supported in this browser.', 'error');
       return;
     }
     const registration = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+    logDebug_('service worker registered');
     const permission = await Notification.requestPermission();
+    logDebug_('Notification.requestPermission -> ' + permission);
     if (permission !== 'granted') {
       showToast_('Notification permission was not granted.', 'error');
       return;
@@ -184,6 +204,7 @@ async function registerForPush_() {
     // no-arg form would throw "No Firebase App '[DEFAULT]' has been created".
     const messaging = getMessaging(firebaseApp);
     const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration });
+    logDebug_('getToken -> ' + (token ? token.slice(0, 12) + '...' : 'null'));
     if (!token) {
       showToast_('Could not get a push token.', 'error');
       return;
@@ -195,11 +216,13 @@ async function registerForPush_() {
     const formBody = new URLSearchParams();
     formBody.append('payload', JSON.stringify(payload));
     await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: formBody, redirect: 'follow' });
+    logDebug_('registerPushToken POST sent');
     showToast_('Push notifications enabled.');
   } catch (err) {
     // Push is a convenience layer - never block the approvals list on it -
     // but still surface the failure, since a silent console.warn here is
     // invisible on a phone with no way to open devtools.
+    logDebug_('registerForPush_ threw: ' + (err.code || '') + ' ' + err.message);
     showToast_('Push setup failed: ' + err.message, 'error');
   }
 }
