@@ -16,3 +16,12 @@ theme-preview.html
 # One-time data-seed scripts (run once in Apps Script, not part of the app)
 apps-script/seed-mustafa-haider.gs
 apps-script/seed-arsalan-mukhtar.gs
+
+# Secrets and build artifacts - never commit these
+*firebase-adminsdk*.json
+*.jks
+*.keystore
+keystore_password*.txt
+*.apk
+*.aab
+Leave Approvals*.zip
