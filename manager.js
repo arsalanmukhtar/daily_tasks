@@ -29,8 +29,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import {
   getAuth,
   GoogleAuthProvider,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   onAuthStateChanged
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import {
@@ -105,23 +104,26 @@ function showToast_(message, tone) {
 }
 
 // ---------- Sign-in ----------
-// signInWithRedirect, not signInWithPopup - an installed iOS home-screen app
-// has no real popup window to open, so signInWithPopup fails there with
-// "auth/cancelled-popup-request". Redirect works in both an installed app
-// and a normal browser tab.
+// signInWithPopup, matching app.js (index.html's main app already uses this
+// successfully on this exact project). signInWithRedirect was tried first,
+// but Safari's cross-site tracking prevention wipes the pending-login
+// marker during the redirect round trip through firebaseapp.com and
+// accounts.google.com, so getRedirectResult came back empty on return -
+// popup avoids that redirect chain entirely.
+//
+// Sign-in must happen in a REGULAR browser tab, not the installed iOS home
+// screen app - Google blocks its own sign-in flow (popup or redirect) when
+// it detects a standalone/WebView context. Sign in here first, then Add to
+// Home Screen while already signed in; the installed app just resumes that
+// persisted session without needing a fresh interactive sign-in.
 signInBtn.addEventListener('click', async () => {
   signInError.classList.add('hidden');
   try {
-    await signInWithRedirect(auth, new GoogleAuthProvider());
+    await signInWithPopup(auth, new GoogleAuthProvider());
   } catch (err) {
     signInError.textContent = 'Sign-in failed: ' + err.message;
     signInError.classList.remove('hidden');
   }
-});
-
-getRedirectResult(auth).catch((err) => {
-  signInError.textContent = 'Sign-in failed: ' + err.message;
-  signInError.classList.remove('hidden');
 });
 
 onAuthStateChanged(auth, (user) => {
