@@ -98,14 +98,10 @@ const closeDrawerBtn     = document.getElementById('closeDrawerBtn');
 const submissionsList    = document.getElementById('submissionsList');
 const applyLeaveBtn      = document.getElementById('applyLeaveBtn');
 const applyLeaveBtnLabel = document.getElementById('applyLeaveBtnLabel');
-const leaveDismissBtn    = document.getElementById('leaveDismissBtn');
 const leaveBackdrop      = document.getElementById('leaveBackdrop');
 const leaveDrawer        = document.getElementById('leaveDrawer');
 const leaveDrawerWeekLabel = document.getElementById('leaveDrawerWeekLabel');
 const closeLeaveDrawerBtn = document.getElementById('closeLeaveDrawerBtn');
-const leaveMetricsBtn    = document.getElementById('leaveMetricsBtn');
-const leaveMetricsSection = document.getElementById('leaveMetricsSection');
-const leaveMetricsFilter = document.getElementById('leaveMetricsFilter');
 const leaveTypeShortBtn  = document.getElementById('leaveTypeShortBtn');
 const leaveTypeFullBtn   = document.getElementById('leaveTypeFullBtn');
 const leaveFullCooldownNote = document.getElementById('leaveFullCooldownNote');
@@ -119,6 +115,19 @@ const leaveAttachmentChip   = document.getElementById('leaveAttachmentChip');
 const leaveAttachmentName   = document.getElementById('leaveAttachmentName');
 const leaveAttachmentRemove = document.getElementById('leaveAttachmentRemove');
 const leaveAttachmentError  = document.getElementById('leaveAttachmentError');
+const viewMyLeavesBtn      = document.getElementById('viewMyLeavesBtn');
+const myLeavesBackdrop     = document.getElementById('myLeavesBackdrop');
+const myLeavesDrawer       = document.getElementById('myLeavesDrawer');
+const closeMyLeavesDrawerBtn = document.getElementById('closeMyLeavesDrawerBtn');
+const myLeavesApplyWeekLabel = document.getElementById('myLeavesApplyWeekLabel');
+const myLeavesNoWeekNote   = document.getElementById('myLeavesNoWeekNote');
+const myLeavesKpiTotal     = document.getElementById('myLeavesKpiTotal');
+const myLeavesKpiApproved  = document.getElementById('myLeavesKpiApproved');
+const myLeavesKpiRejected  = document.getElementById('myLeavesKpiRejected');
+const myLeavesKpiPending   = document.getElementById('myLeavesKpiPending');
+const myLeavesYearChips    = document.getElementById('myLeavesYearChips');
+const myLeavesQuarterTiles = document.getElementById('myLeavesQuarterTiles');
+const myLeavesList         = document.getElementById('myLeavesList');
 const toastContainer     = document.getElementById('toastContainer');
 const analyticsLeaveKpis = document.getElementById('analyticsLeaveKpis');
 const exportSummaryBtn   = document.getElementById('exportSummaryBtn');
@@ -681,11 +690,11 @@ const LEAVE_ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024;
 const LEAVE_ATTACHMENT_EXTS = ['.pdf', '.txt', '.doc', '.docx'];
 let selectedLeaveType = 'short';
 let leaveAttachmentFile = null;
-let leaveMetricsRange = 'all';
-let leaveMetricsChartInstance = null;
+let myLeavesSelectedYear = null;
+let myLeavesTrendChartInstance = null;
 // Last successful leaveStatus_ fetch - reused by the cooldown check, the
-// "Ok" dismiss (needs the current week's requestId), and the metrics chart,
-// so opening the drawer doesn't need three separate round-trips.
+// per-request "Ok, got it" dismiss, and the My Leaves stats/history, so
+// opening a drawer doesn't need several separate round-trips.
 let latestLeaveStatusData = null;
 
 function currentUserEmail_() {
@@ -707,38 +716,26 @@ async function fetchLeaveStatus_() {
   return null;
 }
 
-function leaveMetricsRangeBounds_(range) {
-  const now = Date.now();
-  if (range === 'year') return { start: new Date(new Date().getFullYear(), 0, 1).getTime(), end: now };
-  if (range === '90d') return { start: now - 90 * 86400000, end: now };
-  return { start: -Infinity, end: Infinity };
-}
-
-function computeOwnLeaveMetrics_(records, range) {
-  const counts = { shortTaken: 0, fullTaken: 0, approved: 0, rejected: 0 };
-  const bounds = leaveMetricsRangeBounds_(range || 'all');
-  (records || []).forEach(function (rec) {
-    const ts = rec.requestedAt ? new Date(rec.requestedAt).getTime() : NaN;
-    if (!isNaN(ts) && (ts < bounds.start || ts > bounds.end)) return;
-    if (rec.type === 'short') counts.shortTaken++;
-    else if (rec.type === 'full') counts.fullTaken++;
-    if (rec.status === 'approved') counts.approved++;
-    else if (rec.status === 'rejected') counts.rejected++;
-  });
-  return counts;
+function leaveRecordDate_(rec) {
+  const d = new Date(rec.requestedAt);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 // Fixed-width state button: Apply for Leave (idle) -> Requested for Approval
-// (after Send) -> Approved / Rejected (once the manager taps a button in
-// Telegram) -> dismissed via the "Ok" link back to idle.
+// (after Send) -> Approved / Rejected (once the manager decides) -> dismissed
+// via the matching history card's "Ok, got it" back to idle. Lives at the top
+// of the My Leaves drawer and always reflects the currently selected week.
 async function refreshApplyLeaveButton() {
   const weekKey = weekInput.value;
   if (!currentUserContext || !weekKey) {
     applyLeaveBtn.classList.add('hidden');
-    leaveDismissBtn.classList.add('hidden');
+    myLeavesNoWeekNote.classList.remove('hidden');
+    myLeavesApplyWeekLabel.textContent = 'No week selected';
     return;
   }
   applyLeaveBtn.classList.remove('hidden');
+  myLeavesNoWeekNote.classList.add('hidden');
+  myLeavesApplyWeekLabel.textContent = 'Leave for ' + (weekSummary.textContent || currentWeekLabel_());
 
   const data = await fetchLeaveStatus_();
   if (!data) return; // network hiccup - leave the button showing whatever it last showed
@@ -748,7 +745,6 @@ async function refreshApplyLeaveButton() {
   const rec = data.records.find(function (r) { return r.weekLabel === weekLabel; }) || null;
 
   applyLeaveBtn.classList.remove('is-idle', 'is-requested', 'is-approved', 'is-rejected');
-  leaveDismissBtn.classList.add('hidden');
   if (!rec) {
     applyLeaveBtn.classList.add('is-idle');
     applyLeaveBtn.disabled = false;
@@ -757,12 +753,10 @@ async function refreshApplyLeaveButton() {
     applyLeaveBtn.classList.add('is-approved');
     applyLeaveBtn.disabled = true;
     applyLeaveBtnLabel.textContent = 'Approved';
-    leaveDismissBtn.classList.remove('hidden');
   } else if (rec.status === 'rejected') {
     applyLeaveBtn.classList.add('is-rejected');
     applyLeaveBtn.disabled = true;
     applyLeaveBtnLabel.textContent = 'Rejected';
-    leaveDismissBtn.classList.remove('hidden');
   } else {
     applyLeaveBtn.classList.add('is-requested');
     applyLeaveBtn.disabled = true;
@@ -824,12 +818,10 @@ function fileToBase64_(file) {
 
 async function openLeaveDrawer() {
   if (!currentUserContext || !weekInput.value) return;
+  closeMyLeavesDrawer();
   leaveDrawerWeekLabel.textContent = weekSummary.textContent || '-';
   leaveReasonEditor.innerHTML = '';
   resetLeaveAttachment_();
-  leaveMetricsSection.classList.add('hidden');
-  leaveMetricsRange = 'all';
-  leaveMetricsFilter.querySelectorAll('.lv-filter-btn').forEach((b) => b.classList.toggle('is-selected', b.dataset.range === 'all'));
   selectLeaveType_('short');
   leaveDrawer.classList.add('open');
   leaveBackdrop.classList.add('open');
@@ -849,32 +841,186 @@ function closeLeaveDrawer() {
   if (activeCell === leaveReasonEditor) activeCell = null;
 }
 
-async function renderLeaveMetricsChart_() {
-  const data = latestLeaveStatusData || await fetchLeaveStatus_();
-  const counts = computeOwnLeaveMetrics_(data ? data.records : [], leaveMetricsRange);
+// ---------- My Leaves drawer: stats summary + full history ----------
+
+async function openMyLeavesDrawer() {
+  if (!currentUserContext) return;
+  myLeavesDrawer.classList.add('open');
+  myLeavesBackdrop.classList.add('open');
+  await refreshApplyLeaveButton();
+  await loadMyLeavesData_();
+}
+
+function closeMyLeavesDrawer() {
+  myLeavesDrawer.classList.remove('open');
+  myLeavesBackdrop.classList.remove('open');
+}
+
+async function loadMyLeavesData_() {
+  const data = await fetchLeaveStatus_();
+  if (data) latestLeaveStatusData = data;
+  const records = (latestLeaveStatusData && latestLeaveStatusData.records) || [];
+  renderMyLeavesKpis_(records);
+  renderMyLeavesYearChips_(records);
+  renderMyLeavesQuarterTiles_(records);
+  renderMyLeavesTrendChart_(records);
+  renderMyLeavesList_(records);
+}
+
+function renderMyLeavesKpis_(records) {
+  myLeavesKpiTotal.textContent = String(records.length);
+  myLeavesKpiApproved.textContent = String(records.filter((r) => r.status === 'approved').length);
+  myLeavesKpiRejected.textContent = String(records.filter((r) => r.status === 'rejected').length);
+  myLeavesKpiPending.textContent = String(records.filter((r) => r.status === 'requested').length);
+}
+
+function renderMyLeavesYearChips_(records) {
+  const years = new Set([new Date().getFullYear()]);
+  records.forEach((r) => { const d = leaveRecordDate_(r); if (d) years.add(d.getFullYear()); });
+  const sorted = Array.from(years).sort((a, b) => b - a);
+  if (!myLeavesSelectedYear || sorted.indexOf(myLeavesSelectedYear) === -1) {
+    myLeavesSelectedYear = sorted[0];
+  }
+  myLeavesYearChips.innerHTML = '';
+  sorted.forEach((year) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'lv-filter-btn' + (year === myLeavesSelectedYear ? ' is-selected' : '');
+    btn.textContent = String(year);
+    btn.addEventListener('click', () => {
+      myLeavesSelectedYear = year;
+      const recs = (latestLeaveStatusData && latestLeaveStatusData.records) || [];
+      renderMyLeavesYearChips_(recs);
+      renderMyLeavesQuarterTiles_(recs);
+      renderMyLeavesTrendChart_(recs);
+    });
+    myLeavesYearChips.appendChild(btn);
+  });
+}
+
+function renderMyLeavesQuarterTiles_(records) {
+  const year = myLeavesSelectedYear;
+  const quarters = [1, 2, 3, 4].map((q) => ({ q: q, total: 0, approved: 0, rejected: 0 }));
+  records.forEach((r) => {
+    const d = leaveRecordDate_(r);
+    if (!d || d.getFullYear() !== year) return;
+    const q = quarters[Math.floor(d.getMonth() / 3)];
+    q.total++;
+    if (r.status === 'approved') q.approved++;
+    else if (r.status === 'rejected') q.rejected++;
+  });
+  myLeavesQuarterTiles.innerHTML = quarters.map((q) =>
+    '<div class="rounded-lg border border-slate-200 bg-slate-50 p-2 text-center">' +
+      '<div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Q' + q.q + '</div>' +
+      '<div class="text-sm font-bold text-slate-800 mt-0.5">' + q.total + '</div>' +
+      '<div class="text-[10px] text-slate-400 mt-0.5">' + q.approved + 'A &middot; ' + q.rejected + 'R</div>' +
+    '</div>'
+  ).join('');
+}
+
+async function renderMyLeavesTrendChart_(records) {
+  const year = myLeavesSelectedYear;
+  const approved = new Array(12).fill(0);
+  const rejected = new Array(12).fill(0);
+  const pending = new Array(12).fill(0);
+  records.forEach((r) => {
+    const d = leaveRecordDate_(r);
+    if (!d || d.getFullYear() !== year) return;
+    const m = d.getMonth();
+    if (r.status === 'approved') approved[m]++;
+    else if (r.status === 'rejected') rejected[m]++;
+    else pending[m]++;
+  });
   try {
     const Chart = await loadChartJS();
-    if (leaveMetricsChartInstance) { leaveMetricsChartInstance.destroy(); leaveMetricsChartInstance = null; }
-    leaveMetricsChartInstance = new Chart(document.getElementById('leaveMetricsChart'), {
+    if (myLeavesTrendChartInstance) { myLeavesTrendChartInstance.destroy(); myLeavesTrendChartInstance = null; }
+    myLeavesTrendChartInstance = new Chart(document.getElementById('myLeavesTrendChart'), {
       type: 'bar',
       data: {
-        labels: ['Short taken', 'Full taken', 'Approved', 'Rejected'],
-        datasets: [{
-          data: [counts.shortTaken, counts.fullTaken, counts.approved, counts.rejected],
-          backgroundColor: ['#fb923c', '#f97316', '#22c55e', '#ef4444'],
-          borderRadius: 6, maxBarThickness: 44
-        }]
+        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+        datasets: [
+          { label: 'Approved', data: approved, backgroundColor: '#22c55e', stack: 's' },
+          { label: 'Rejected', data: rejected, backgroundColor: '#ef4444', stack: 's' },
+          { label: 'Pending', data: pending, backgroundColor: '#f59e0b', stack: 's' }
+        ]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
         scales: {
-          y: { beginAtZero: true, ticks: { precision: 0, font: { size: 12, weight: 'bold' } } },
-          x: { ticks: { font: { size: 11, weight: 'bold' } } }
+          x: { stacked: true, ticks: { font: { size: 10 } } },
+          y: { stacked: true, beginAtZero: true, ticks: { precision: 0, font: { size: 10 } } }
         }
       }
     });
-  } catch (_e) { /* chart library unavailable - metrics section just stays empty */ }
+  } catch (_e) { /* chart library unavailable - trend chart just stays empty */ }
+}
+
+function leaveStatusBadgeClasses_(status) {
+  if (status === 'approved') return 'bg-green-100 text-green-700';
+  if (status === 'rejected') return 'bg-red-100 text-red-700';
+  return 'bg-amber-100 text-amber-700';
+}
+
+function renderMyLeavesList_(records) {
+  if (!records.length) {
+    myLeavesList.innerHTML =
+      '<div class="text-center py-10 text-slate-500 text-sm">No leave requests yet.<br><span class="text-xs text-slate-400">Applied leaves will appear here.</span></div>';
+    return;
+  }
+  myLeavesList.innerHTML = '';
+  records.forEach((rec) => {
+    const card = document.createElement('div');
+    card.className = 'bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm';
+    const typeLabel = rec.type === 'full' ? 'Full Leave' : 'Short Leave';
+    const statusLabel = rec.status === 'approved' ? 'Approved' : rec.status === 'rejected' ? 'Rejected' : 'Requested';
+    const reasonHtml = rec.reasonHtml && rec.reasonHtml.trim() ? rec.reasonHtml : '<i class="text-slate-400">No reason provided.</i>';
+
+    let html =
+      '<div class="flex items-start justify-between gap-2">' +
+        '<div class="min-w-0">' +
+          '<div class="text-sm font-semibold text-slate-800 truncate">' + escapeHtml(rec.weekLabel) + '</div>' +
+          '<div class="text-xs text-slate-500 mt-0.5">' + escapeHtml(typeLabel) + ' &middot; ' + escapeHtml(formatTimestamp(rec.requestedAt)) + '</div>' +
+        '</div>' +
+        '<span class="shrink-0 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full ' + leaveStatusBadgeClasses_(rec.status) + '">' + statusLabel + '</span>' +
+      '</div>' +
+      '<div class="text-xs text-slate-600 leading-relaxed mt-2">' + reasonHtml + '</div>';
+
+    if (rec.attachmentUrl) {
+      html +=
+        '<a href="' + escapeHtml(rec.attachmentUrl) + '" target="_blank" rel="noopener" ' +
+          'class="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-orange-700 hover:text-orange-800 hover:underline">' +
+          '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>' +
+          escapeHtml(rec.attachmentName || 'View attachment') +
+        '</a>';
+    }
+
+    if (rec.status === 'approved' || rec.status === 'rejected') {
+      html +=
+        '<div class="mt-2.5 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">' +
+          '<span class="text-xs text-slate-500">' + statusLabel +
+            (rec.resolvedBy ? ' by ' + escapeHtml(rec.resolvedBy) : '') +
+            (rec.resolvedAt ? ' &middot; ' + escapeHtml(formatTimestamp(rec.resolvedAt)) : '') +
+          '</span>' +
+          '<button type="button" class="my-leave-dismiss-btn shrink-0 text-xs font-semibold text-slate-500 hover:text-slate-800 underline underline-offset-2" data-request-id="' + escapeHtml(rec.requestId) + '">Ok, got it</button>' +
+        '</div>';
+    }
+
+    card.innerHTML = html;
+    myLeavesList.appendChild(card);
+  });
+}
+
+async function dismissLeaveRequest_(requestId) {
+  if (!currentUserContext || !requestId) return;
+  try {
+    const idToken = await currentUserContext.user.getIdToken(false);
+    const formBody = new URLSearchParams();
+    formBody.append('payload', JSON.stringify({ action: 'dismissLeave', idToken: idToken, requestId: requestId }));
+    await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: formBody, redirect: 'follow' });
+  } catch (_e) { /* best-effort */ }
+  await refreshApplyLeaveButton();
+  await loadMyLeavesData_();
 }
 
 function showToast_(message, tone) {
@@ -894,41 +1040,23 @@ function showToast_(message, tone) {
 }
 
 applyLeaveBtn.addEventListener('click', openLeaveDrawer);
-leaveDismissBtn.addEventListener('click', async () => {
-  if (!currentUserContext || !latestLeaveStatusData) return;
-  const weekLabel = currentWeekLabel_();
-  const rec = latestLeaveStatusData.records.find(function (r) { return r.weekLabel === weekLabel; });
-  if (!rec) return;
-  try {
-    const idToken = await currentUserContext.user.getIdToken(false);
-    const formBody = new URLSearchParams();
-    formBody.append('payload', JSON.stringify({ action: 'dismissLeave', idToken: idToken, requestId: rec.requestId }));
-    await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: formBody, redirect: 'follow' });
-  } catch (_e) { /* best-effort */ }
-  refreshApplyLeaveButton();
-});
 closeLeaveDrawerBtn.addEventListener('click', closeLeaveDrawer);
 leaveBackdrop.addEventListener('click', closeLeaveDrawer);
 leaveCancelBtn.addEventListener('click', closeLeaveDrawer);
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && leaveDrawer.classList.contains('open')) closeLeaveDrawer();
+  if (e.key === 'Escape' && myLeavesDrawer.classList.contains('open')) closeMyLeavesDrawer();
 });
 
 leaveTypeShortBtn.addEventListener('click', () => selectLeaveType_('short'));
 leaveTypeFullBtn.addEventListener('click', () => selectLeaveType_('full'));
 
-leaveMetricsBtn.addEventListener('click', () => {
-  const willShow = leaveMetricsSection.classList.contains('hidden');
-  leaveMetricsSection.classList.toggle('hidden', !willShow);
-  if (willShow) renderLeaveMetricsChart_();
-});
-
-leaveMetricsFilter.querySelectorAll('.lv-filter-btn').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    leaveMetricsRange = btn.dataset.range;
-    leaveMetricsFilter.querySelectorAll('.lv-filter-btn').forEach((b) => b.classList.toggle('is-selected', b === btn));
-    renderLeaveMetricsChart_();
-  });
+viewMyLeavesBtn.addEventListener('click', openMyLeavesDrawer);
+closeMyLeavesDrawerBtn.addEventListener('click', closeMyLeavesDrawer);
+myLeavesBackdrop.addEventListener('click', closeMyLeavesDrawer);
+myLeavesList.addEventListener('click', (e) => {
+  const btn = e.target.closest('.my-leave-dismiss-btn');
+  if (btn) dismissLeaveRequest_(btn.dataset.requestId);
 });
 
 leaveAttachmentInput.addEventListener('change', () => {
@@ -1344,7 +1472,8 @@ function showLoading()  {
   closeAnalyticsPanel();
   submissionsDrawer.classList.remove('open'); submissionsBackdrop.classList.remove('open');
   leaveDrawer.classList.remove('open'); leaveBackdrop.classList.remove('open');
-  applyLeaveBtn.classList.add('hidden'); leaveDismissBtn.classList.add('hidden');
+  myLeavesDrawer.classList.remove('open'); myLeavesBackdrop.classList.remove('open');
+  applyLeaveBtn.classList.add('hidden');
 }
 function showAuthGate(errMsg) {
   loadingState.classList.add('hidden');
@@ -1358,7 +1487,8 @@ function showAuthGate(errMsg) {
   closeAnalyticsPanel();
   submissionsDrawer.classList.remove('open'); submissionsBackdrop.classList.remove('open');
   leaveDrawer.classList.remove('open'); leaveBackdrop.classList.remove('open');
-  applyLeaveBtn.classList.add('hidden'); leaveDismissBtn.classList.add('hidden');
+  myLeavesDrawer.classList.remove('open'); myLeavesBackdrop.classList.remove('open');
+  applyLeaveBtn.classList.add('hidden');
   if (errMsg) { authError.textContent = errMsg; authError.classList.remove('hidden'); }
   else { authError.classList.add('hidden'); authError.textContent = ''; }
 }

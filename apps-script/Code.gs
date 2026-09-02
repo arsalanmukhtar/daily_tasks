@@ -754,16 +754,22 @@ function leaveStatus_(e) {
         const ts = r[1] instanceof Date ? r[1] : new Date(r[1]);
         if (r[5] === 'full' && (!lastFullAt || ts > lastFullAt)) lastFullAt = ts;
         if (r[12] === true) continue; // dismissed - hide from the client entirely
+        const resolvedAt = r[8] instanceof Date ? r[8] : (r[8] ? new Date(r[8]) : null);
         records.push({
           requestId: r[0],
           requestedAt: (ts instanceof Date && !isNaN(ts.getTime())) ? ts.toISOString() : String(r[1] || ''),
           weekLabel: r[4] || '',
           type: r[5] || 'short',
+          reasonHtml: r[6] || '',
           status: r[7] || 'requested',
-          resolvedAt: r[8] instanceof Date ? r[8].toISOString() : String(r[8] || '')
+          resolvedAt: (resolvedAt && !isNaN(resolvedAt.getTime())) ? resolvedAt.toISOString() : '',
+          resolvedBy: r[9] || '',
+          attachmentName: r[10] || '',
+          attachmentUrl: r[11] || ''
         });
       }
     }
+    records.reverse(); // newest first
 
     const cooldownUntil = lastFullAt ? new Date(lastFullAt.getTime() + LEAVE_FULL_COOLDOWN_DAYS * 86400000) : null;
     return jsonOrJsonp_(e, {
