@@ -1,5 +1,6 @@
 package com.techew.leaveapprovals.ui.requests
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.techew.leaveapprovals.data.LeaveApiClient
@@ -39,8 +40,10 @@ class RequestListViewModel(
         runCatching {
             apiClient.listLeaveRequests()
         }.onSuccess {
+            Log.i("RequestListViewModel", "doRefresh got ${it.size} docs, top=${it.firstOrNull()?.requestId} reason=${it.firstOrNull()?.reasonHtml}")
             _records.value = it
         }.onFailure {
+            Log.e("RequestListViewModel", "doRefresh failed", it)
             _errorMessage.value = it.message ?: "Could not load requests."
         }
         _isLoading.value = false

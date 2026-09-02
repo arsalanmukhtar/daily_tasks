@@ -6,6 +6,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.Source
 import kotlinx.coroutines.tasks.await
 
 class ApiException(message: String) : Exception(message)
@@ -21,11 +22,16 @@ class LeaveApiClient(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
 ) {
 
+    // Source.SERVER, not the default - a plain .get() can be satisfied from
+    // the SDK's local cache without a real round trip once a query has been
+    // run before, so a manual refresh could silently keep showing stale data
+    // even though a fresh app launch (no cache yet for that query) picks up
+    // the latest documents fine.
     suspend fun listLeaveRequests(limit: Int = 50): List<LeaveRequest> {
         val snapshot = db.collection("leaveRequests")
             .orderBy("requestedAt", Query.Direction.DESCENDING)
             .limit(limit.toLong())
-            .get()
+            .get(Source.SERVER)
             .await()
         return snapshot.documents.map { it.toLeaveRequest() }
     }
