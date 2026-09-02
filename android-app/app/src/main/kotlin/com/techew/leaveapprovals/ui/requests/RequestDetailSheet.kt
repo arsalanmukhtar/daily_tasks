@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -23,10 +24,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -47,11 +44,11 @@ import com.techew.leaveapprovals.ui.theme.StatusRejected
 fun RequestDetailSheet(
     request: LeaveRequest,
     sheetState: SheetState,
+    isDeciding: Boolean,
     onDismiss: () -> Unit,
     onDecide: (decision: String) -> Unit
 ) {
     val context = LocalContext.current
-    var isSubmitting by remember(request.requestId) { mutableStateOf(false) }
     val (statusColor, statusBg) = statusColors(request.status)
     val typeLabel = if (request.type == "full") "Full Leave" else "Short Leave"
 
@@ -121,20 +118,25 @@ fun RequestDetailSheet(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            } else if (isDeciding) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 22.dp),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.padding(vertical = 6.dp))
+                }
             } else {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 22.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Button(
-                        onClick = { isSubmitting = true; onDecide("approved") },
-                        enabled = !isSubmitting,
+                        onClick = { onDecide("approved") },
                         colors = ButtonDefaults.buttonColors(containerColor = StatusApproved),
                         modifier = Modifier.weight(1f)
                     ) { Text("Approve") }
                     Button(
-                        onClick = { isSubmitting = true; onDecide("rejected") },
-                        enabled = !isSubmitting,
+                        onClick = { onDecide("rejected") },
                         colors = ButtonDefaults.buttonColors(containerColor = StatusRejected),
                         modifier = Modifier.weight(1f)
                     ) { Text("Reject") }

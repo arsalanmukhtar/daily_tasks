@@ -20,27 +20,37 @@ class RequestListViewModel(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    // True from the moment Approve/Reject is tapped until the refreshed list
+    // (with the new status) has actually loaded - lets the detail sheet show
+    // a spinner for the whole round trip instead of closing instantly with
+    // no feedback.
+    private val _isDeciding = MutableStateFlow(false)
+    val isDeciding: StateFlow<Boolean> = _isDeciding.asStateFlow()
+
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
     fun refresh() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            _errorMessage.value = null
-            runCatching {
-                val idToken = getIdToken()
-                apiClient.listLeaveRequests(idToken)
-            }.onSuccess {
-                _records.value = it
-            }.onFailure {
-                _errorMessage.value = it.message ?: "Could not load requests."
-            }
-            _isLoading.value = false
+        viewModelScope.launch { doRefresh() }
+    }
+
+    private suspend fun doRefresh() {
+        _isLoading.value = true
+        _errorMessage.value = null
+        runCatching {
+            val idToken = getIdToken()
+            apiClient.listLeaveRequests(idToken)
+        }.onSuccess {
+            _records.value = it
+        }.onFailure {
+            _errorMessage.value = it.message ?: "Could not load requests."
         }
+        _isLoading.value = false
     }
 
     fun decide(requestId: String, decision: String) {
         viewModelScope.launch {
+            _isDeciding.value = true
             _errorMessage.value = null
             runCatching {
                 val idToken = getIdToken()
@@ -48,7 +58,8 @@ class RequestListViewModel(
             }.onFailure {
                 _errorMessage.value = it.message ?: "Could not save decision."
             }
-            refresh()
+            doRefresh()
+            _isDeciding.value = false
         }
     }
 }

@@ -39,6 +39,7 @@ fun RequestListScreen(
 ) {
     val records by viewModel.records.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val isDeciding by viewModel.isDeciding.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -55,6 +56,15 @@ fun RequestListScreen(
     }
 
     LaunchedEffect(Unit) { viewModel.refresh() }
+
+    // Approve/Reject just sets isDeciding true and lets the sheet show a
+    // spinner for the round trip; once the refreshed list lands and
+    // isDeciding flips back to false, close the sheet automatically.
+    var wasDeciding by remember { mutableStateOf(false) }
+    LaunchedEffect(isDeciding) {
+        if (wasDeciding && !isDeciding) closeSheet()
+        wasDeciding = isDeciding
+    }
 
     // Notification tap: scroll to the request and open its details directly -
     // stronger and simpler than the old flash-then-fade card highlight, since
@@ -103,10 +113,10 @@ fun RequestListScreen(
         RequestDetailSheet(
             request = selectedRequest,
             sheetState = sheetState,
+            isDeciding = isDeciding,
             onDismiss = { closeSheet() },
             onDecide = { decision ->
                 viewModel.decide(selectedRequest.requestId, decision)
-                closeSheet()
             }
         )
     }
