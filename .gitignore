@@ -29,3 +29,6 @@ Leave Approvals*.zip
 # Local Android signing workspace (keystore, signing tool, build output) -
 # not project source, stays local only
 /android_signing/
+
+# Firebase config - contains real API keys, never committed
+google-services.json
