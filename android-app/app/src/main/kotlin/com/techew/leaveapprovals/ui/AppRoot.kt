@@ -25,10 +25,10 @@ import com.techew.leaveapprovals.auth.AuthRepository
 import com.techew.leaveapprovals.auth.AuthState
 import com.techew.leaveapprovals.data.LeaveApiClient
 import com.techew.leaveapprovals.push.NotificationHelper
-import com.techew.leaveapprovals.ui.requests.RequestListScreen
 import com.techew.leaveapprovals.ui.requests.RequestListViewModel
 import com.techew.leaveapprovals.ui.restricted.RestrictedScreen
 import com.techew.leaveapprovals.ui.signin.SignInScreen
+import com.techew.leaveapprovals.ui.summary.LeaveSummaryViewModel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -113,13 +113,19 @@ fun AppRoot(
             )
         }
         is AuthState.SignedInOwner -> {
-            val viewModel = remember(state.user.uid) {
+            val requestListViewModel = remember(state.user.uid) {
                 RequestListViewModel(apiClient) {
                     state.user.getIdToken(false).await().token ?: ""
                 }
             }
-            RequestListScreen(
-                viewModel = viewModel,
+            val summaryViewModel = remember(state.user.uid) {
+                LeaveSummaryViewModel(apiClient) {
+                    state.user.getIdToken(false).await().token ?: ""
+                }
+            }
+            ManagerHomeScreen(
+                requestListViewModel = requestListViewModel,
+                summaryViewModel = summaryViewModel,
                 highlightRequestId = highlightRequestId,
                 onHighlightHandled = onHighlightHandled
             )

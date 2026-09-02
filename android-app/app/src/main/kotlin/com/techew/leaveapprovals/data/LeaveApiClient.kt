@@ -30,10 +30,11 @@ class LeaveApiClient(private val baseUrl: String) {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    suspend fun listLeaveRequests(idToken: String): List<LeaveRequest> {
+    suspend fun listLeaveRequests(idToken: String, limit: Int = 50): List<LeaveRequest> {
         val url = baseUrl.toHttpUrl().newBuilder()
             .addQueryParameter("action", "listLeaveRequests")
             .addQueryParameter("idToken", idToken)
+            .addQueryParameter("limit", limit.toString())
             .build()
         val body = execute(url)
         val parsed = json.decodeFromString(ListResponse.serializer(), body)

@@ -916,9 +916,12 @@ function registerPushToken_(bodyString) {
 
 /**
  * Owner-only: returns the most recent leave requests (newest first) with
- * everything manager.html needs to render a card and decide on it.
+ * everything the manager app needs to render a card, decide on it, or
+ * aggregate it into the Summary tab's stats.
  *
- * GET ?action=listLeaveRequests&idToken=...&callback=...
+ * GET ?action=listLeaveRequests&idToken=...&limit=500&callback=...
+ * `limit` is optional (default 50, capped at 1000) - the Requests tab uses
+ * the default, the Summary tab asks for a much larger window for its trends.
  */
 function listLeaveRequests_(e) {
   try {
@@ -960,7 +963,10 @@ function listLeaveRequests_(e) {
       }
     }
     records.reverse(); // newest first
-    return jsonOrJsonp_(e, { status: 'ok', records: records.slice(0, 50) });
+    let limit = parseInt(e && e.parameter && e.parameter.limit, 10);
+    if (!limit || limit < 1) limit = 50;
+    if (limit > 1000) limit = 1000;
+    return jsonOrJsonp_(e, { status: 'ok', records: records.slice(0, limit) });
   } catch (err) {
     return jsonOrJsonp_(e, { status: 'error', message: String(err && err.message || err) });
   }
