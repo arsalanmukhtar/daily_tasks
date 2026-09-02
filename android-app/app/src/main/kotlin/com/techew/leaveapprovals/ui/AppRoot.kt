@@ -20,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import com.google.firebase.messaging.FirebaseMessaging
-import com.techew.leaveapprovals.AppConfig
 import com.techew.leaveapprovals.auth.AuthRepository
 import com.techew.leaveapprovals.auth.AuthState
 import com.techew.leaveapprovals.data.LeaveApiClient
@@ -40,7 +39,7 @@ fun AppRoot(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val authRepository = remember { AuthRepository() }
-    val apiClient = remember { LeaveApiClient(AppConfig.APPS_SCRIPT_URL) }
+    val apiClient = remember { LeaveApiClient() }
 
     var authState by remember { mutableStateOf<AuthState>(AuthState.Loading) }
     var isSigningIn by remember { mutableStateOf(false) }
@@ -57,7 +56,7 @@ fun AppRoot(
     // and register the FCM token - registration itself doesn't need the
     // permission, only *displaying* a notification does, so this always runs.
     LaunchedEffect(authState) {
-        val owner = authState as? AuthState.SignedInOwner ?: return@LaunchedEffect
+        if (authState !is AuthState.SignedInOwner) return@LaunchedEffect
         NotificationHelper.ensureChannel(context)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -66,8 +65,7 @@ fun AppRoot(
         }
         runCatching {
             val token = FirebaseMessaging.getInstance().token.await()
-            val idToken = owner.user.getIdToken(false).await().token ?: return@runCatching
-            apiClient.registerPushToken(idToken, token)
+            apiClient.registerPushToken(token)
         }
     }
 
@@ -113,16 +111,8 @@ fun AppRoot(
             )
         }
         is AuthState.SignedInOwner -> {
-            val requestListViewModel = remember(state.user.uid) {
-                RequestListViewModel(apiClient) {
-                    state.user.getIdToken(false).await().token ?: ""
-                }
-            }
-            val summaryViewModel = remember(state.user.uid) {
-                LeaveSummaryViewModel(apiClient) {
-                    state.user.getIdToken(false).await().token ?: ""
-                }
-            }
+            val requestListViewModel = remember(state.user.uid) { RequestListViewModel(apiClient) }
+            val summaryViewModel = remember(state.user.uid) { LeaveSummaryViewModel(apiClient) }
             ManagerHomeScreen(
                 requestListViewModel = requestListViewModel,
                 summaryViewModel = summaryViewModel,

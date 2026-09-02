@@ -10,8 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class RequestListViewModel(
-    private val apiClient: LeaveApiClient,
-    private val getIdToken: suspend () -> String
+    private val apiClient: LeaveApiClient
 ) : ViewModel() {
 
     private val _records = MutableStateFlow<List<LeaveRequest>>(emptyList())
@@ -38,8 +37,7 @@ class RequestListViewModel(
         _isLoading.value = true
         _errorMessage.value = null
         runCatching {
-            val idToken = getIdToken()
-            apiClient.listLeaveRequests(idToken)
+            apiClient.listLeaveRequests()
         }.onSuccess {
             _records.value = it
         }.onFailure {
@@ -53,8 +51,7 @@ class RequestListViewModel(
             _isDeciding.value = true
             _errorMessage.value = null
             runCatching {
-                val idToken = getIdToken()
-                apiClient.decideLeave(idToken, requestId, decision)
+                apiClient.decideLeave(requestId, decision)
             }.onFailure {
                 _errorMessage.value = it.message ?: "Could not save decision."
             }

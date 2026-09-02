@@ -10,6 +10,7 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.techew.leaveapprovals.AppConfig
+import com.techew.leaveapprovals.data.AllowlistRepository
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -19,11 +20,14 @@ import kotlinx.coroutines.tasks.await
  * blocks Google Sign-In inside an installed home-screen web app, but there
  * is no such restriction for a native Android account picker.
  *
- * The OWNER_EMAIL check here is UX only - apps-script/Code.gs independently
- * verifies the ID token and checks the email server-side on every request,
- * which is the real security boundary.
+ * The owner check here is UX only - firestore.rules independently checks
+ * the same `allowlist` doc on every read/write, which is the real security
+ * boundary.
  */
-class AuthRepository(private val auth: FirebaseAuth = FirebaseAuth.getInstance()) {
+class AuthRepository(
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
+    private val allowlistRepository: AllowlistRepository = AllowlistRepository()
+) {
 
     val currentUser get() = auth.currentUser
 
@@ -59,17 +63,21 @@ class AuthRepository(private val auth: FirebaseAuth = FirebaseAuth.getInstance()
         }
     }
 
-    fun stateForCurrentUser(): AuthState {
+    suspend fun stateForCurrentUser(): AuthState {
         val user = auth.currentUser ?: return AuthState.SignedOut
         return stateFor(user)
     }
 
-    private fun stateFor(user: com.google.firebase.auth.FirebaseUser): AuthState {
-        val email = user.email?.lowercase()
-        return if (email == AppConfig.OWNER_EMAIL) {
-            AuthState.SignedInOwner(user)
-        } else {
-            AuthState.SignedInNotOwner(email ?: "(no email)")
+    private suspend fun stateFor(user: com.google.firebase.auth.FirebaseUser): AuthState {
+        val email = user.email?.lowercase() ?: return AuthState.SignedInNotOwner("(no email)")
+        return try {
+            if (allowlistRepository.isOwner(email)) {
+                AuthState.SignedInOwner(user)
+            } else {
+                AuthState.SignedInNotOwner(email)
+            }
+        } catch (err: Exception) {
+            AuthState.Error(err.message ?: "Could not verify account access.")
         }
     }
 }

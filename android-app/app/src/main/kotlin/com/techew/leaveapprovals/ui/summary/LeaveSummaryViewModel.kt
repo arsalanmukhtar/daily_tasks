@@ -10,13 +10,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 // Well past what a small team accumulates even over a couple of years - large
-// enough that the Summary tab's trends aren't quietly missing older history,
-// small enough that Apps Script/Sheets still return it in one quick call.
+// enough that the Summary tab's trends aren't quietly missing older history.
 private const val SUMMARY_LIMIT = 500
 
 class LeaveSummaryViewModel(
-    private val apiClient: LeaveApiClient,
-    private val getIdToken: suspend () -> String
+    private val apiClient: LeaveApiClient
 ) : ViewModel() {
 
     private val _records = MutableStateFlow<List<LeaveRequest>>(emptyList())
@@ -41,8 +39,7 @@ class LeaveSummaryViewModel(
             _isLoading.value = true
             _errorMessage.value = null
             runCatching {
-                val idToken = getIdToken()
-                apiClient.listLeaveRequests(idToken, limit = SUMMARY_LIMIT)
+                apiClient.listLeaveRequests(limit = SUMMARY_LIMIT)
             }.onSuccess {
                 _records.value = it
                 loaded = true

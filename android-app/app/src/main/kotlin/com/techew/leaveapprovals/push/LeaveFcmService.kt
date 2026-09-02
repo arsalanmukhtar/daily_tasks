@@ -3,25 +3,24 @@ package com.techew.leaveapprovals.push
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
-import com.techew.leaveapprovals.AppConfig
+import com.techew.leaveapprovals.data.AllowlistRepository
 import com.techew.leaveapprovals.data.LeaveApiClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
 class LeaveFcmService : FirebaseMessagingService() {
 
-    private val apiClient = LeaveApiClient(AppConfig.APPS_SCRIPT_URL)
+    private val apiClient = LeaveApiClient()
+    private val allowlistRepository = AllowlistRepository()
     private val scope = CoroutineScope(Dispatchers.IO)
 
     override fun onNewToken(token: String) {
-        val user = FirebaseAuth.getInstance().currentUser ?: return
-        if (user.email?.lowercase() != AppConfig.OWNER_EMAIL) return
+        val email = FirebaseAuth.getInstance().currentUser?.email?.lowercase() ?: return
         scope.launch {
             runCatching {
-                val idToken = user.getIdToken(false).await().token ?: return@runCatching
-                apiClient.registerPushToken(idToken, token)
+                if (!allowlistRepository.isOwner(email)) return@runCatching
+                apiClient.registerPushToken(token)
             }
         }
     }

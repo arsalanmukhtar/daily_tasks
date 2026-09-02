@@ -1,8 +1,5 @@
 package com.techew.leaveapprovals.data
 
-import kotlinx.serialization.Serializable
-
-@Serializable
 data class LeaveRequest(
     val requestId: String,
     val requestedAt: String = "",
@@ -16,17 +13,4 @@ data class LeaveRequest(
     val resolvedBy: String = "",
     val attachmentName: String = "",
     val attachmentUrl: String = ""
-)
-
-@Serializable
-data class ListResponse(
-    val status: String,
-    val records: List<LeaveRequest> = emptyList(),
-    val message: String? = null
-)
-
-@Serializable
-data class OkResponse(
-    val status: String,
-    val message: String? = null
 )

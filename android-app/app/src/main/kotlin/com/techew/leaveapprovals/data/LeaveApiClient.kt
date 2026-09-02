@@ -1,70 +1,89 @@
 package com.techew.leaveapprovals.data
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import okhttp3.HttpUrl.Companion.toHttpUrl
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import java.util.concurrent.TimeUnit
+import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import kotlinx.coroutines.tasks.await
 
 class ApiException(message: String) : Exception(message)
 
 /**
- * Talks to the same apps-script/Code.gs backend the web app already uses,
- * unmodified. Native networking has no CORS restriction (unlike a browser),
- * so this uses plain HTTPS GET for every call - including "writes" - which
- * sidesteps an unrelated ambiguity where some HTTP clients downgrade a
- * redirected POST to GET inconsistently. Code.gs's doGet() already has a
- * `e.parameter.payload` JSON-blob fallback that every write action goes
- * through, so this needs zero backend changes.
+ * Talks to Firestore directly (client SDK, no backend) - authorization comes
+ * from firestore.rules, not from a request parameter. Only the signed-in
+ * owner ever constructs/uses this (see AppRoot's AuthState.SignedInOwner
+ * branch), matching the rules' `isOwner()` gate on reading every request.
  */
-class LeaveApiClient(private val baseUrl: String) {
+class LeaveApiClient(
+    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+) {
 
-    private val client = OkHttpClient.Builder()
-        .callTimeout(30, TimeUnit.SECONDS)
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .build()
-
-    private val json = Json { ignoreUnknownKeys = true }
-
-    suspend fun listLeaveRequests(idToken: String, limit: Int = 50): List<LeaveRequest> {
-        val url = baseUrl.toHttpUrl().newBuilder()
-            .addQueryParameter("action", "listLeaveRequests")
-            .addQueryParameter("idToken", idToken)
-            .addQueryParameter("limit", limit.toString())
-            .build()
-        val body = execute(url)
-        val parsed = json.decodeFromString(ListResponse.serializer(), body)
-        if (parsed.status != "ok") throw ApiException(parsed.message ?: "Unknown error")
-        return parsed.records
+    suspend fun listLeaveRequests(limit: Int = 50): List<LeaveRequest> {
+        val snapshot = db.collection("leaveRequests")
+            .orderBy("requestedAt", Query.Direction.DESCENDING)
+            .limit(limit.toLong())
+            .get()
+            .await()
+        return snapshot.documents.map { it.toLeaveRequest() }
     }
 
-    suspend fun registerPushToken(idToken: String, token: String) {
-        writeAction(mapOf("action" to "registerPushToken", "idToken" to idToken, "token" to token, "platform" to "android"))
+    suspend fun registerPushToken(token: String) {
+        val email = auth.currentUser?.email?.lowercase() ?: throw ApiException("Not signed in.")
+        db.collection("pushTokens").document(token).set(
+            mapOf(
+                "email" to email,
+                "platform" to "android",
+                "registeredAt" to FieldValue.serverTimestamp()
+            )
+        ).await()
     }
 
-    suspend fun decideLeave(idToken: String, requestId: String, decision: String) {
-        writeAction(mapOf("action" to "decideLeave", "idToken" to idToken, "requestId" to requestId, "decision" to decision))
-    }
-
-    private suspend fun writeAction(payload: Map<String, String>) {
-        val payloadJson = json.encodeToString(payload)
-        val url = baseUrl.toHttpUrl().newBuilder()
-            .addQueryParameter("payload", payloadJson)
-            .build()
-        val body = execute(url)
-        val parsed = json.decodeFromString(OkResponse.serializer(), body)
-        if (parsed.status != "ok") throw ApiException(parsed.message ?: "Unknown error")
-    }
-
-    private suspend fun execute(url: okhttp3.HttpUrl): String = withContext(Dispatchers.IO) {
-        val request = Request.Builder().url(url).get().build()
-        client.newCall(request).execute().use { resp ->
-            if (!resp.isSuccessful) throw ApiException("HTTP ${resp.code}")
-            resp.body?.string() ?: throw ApiException("Empty response")
+    // Apps Script's single-threaded execution used to make the "already
+    // resolved" guard safe for free; Firestore doesn't, so this reads the
+    // current status and writes the decision inside one transaction.
+    suspend fun decideLeave(requestId: String, decision: String) {
+        val status = if (decision == "approved") "approved" else "rejected"
+        val resolvedBy = auth.currentUser?.displayName ?: auth.currentUser?.email ?: "Unknown"
+        val ref = db.collection("leaveRequests").document(requestId)
+        try {
+            db.runTransaction { transaction ->
+                val snapshot = transaction.get(ref)
+                if (snapshot.getString("status") != "requested") {
+                    throw ApiException("This request has already been resolved.")
+                }
+                transaction.update(
+                    ref,
+                    mapOf(
+                        "status" to status,
+                        "resolvedAt" to FieldValue.serverTimestamp(),
+                        "resolvedBy" to resolvedBy
+                    )
+                )
+            }.await()
+        } catch (err: ApiException) {
+            throw err
+        } catch (err: Exception) {
+            throw ApiException(err.message ?: "Could not save decision.")
         }
     }
 }
+
+private fun DocumentSnapshot.toLeaveRequest(): LeaveRequest = LeaveRequest(
+    requestId = id,
+    requestedAt = getTimestamp("requestedAt").toIsoStringOrEmpty(),
+    email = getString("email") ?: "",
+    name = getString("name") ?: "",
+    weekLabel = getString("weekLabel") ?: "",
+    type = getString("type") ?: "short",
+    reasonHtml = getString("reasonHtml") ?: "",
+    status = getString("status") ?: "requested",
+    resolvedAt = getTimestamp("resolvedAt").toIsoStringOrEmpty(),
+    resolvedBy = getString("resolvedBy") ?: "",
+    attachmentName = getString("attachmentName") ?: "",
+    attachmentUrl = getString("attachmentUrl") ?: ""
+)
+
+private fun Timestamp?.toIsoStringOrEmpty(): String = this?.toDate()?.toInstant()?.toString() ?: ""
