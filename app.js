@@ -1183,6 +1183,21 @@ leaveSendBtn.addEventListener('click', async () => {
   leaveSendBtn.textContent = 'Sending...';
 
   try {
+    // Obtain the Drive access token BEFORE creating the request doc, while
+    // we're still as close as possible to the click's user-activation - if
+    // the session was restored from persistence rather than a fresh sign-in,
+    // this needs a reauth popup, and popups fired after an intervening
+    // network await (like addDoc) risk being silently blocked by the
+    // browser.
+    let driveTokenError = null;
+    if (leaveAttachmentFile) {
+      try {
+        await ensureDriveAccessToken_();
+      } catch (tokenErr) {
+        driveTokenError = tokenErr;
+      }
+    }
+
     const docRef = await addDoc(collection(db, 'leaveRequests'), {
       email: email,
       name: currentUserContext.displayName,
@@ -1201,6 +1216,7 @@ leaveSendBtn.addEventListener('click', async () => {
 
     if (leaveAttachmentFile) {
       try {
+        if (driveTokenError) throw driveTokenError;
         const uploaded = await uploadAttachmentToDrive_(leaveAttachmentFile);
         await updateDoc(docRef, {
           attachmentName: leaveAttachmentFile.name,
@@ -1210,7 +1226,9 @@ leaveSendBtn.addEventListener('click', async () => {
       } catch (attachErr) {
         // Best-effort, matching prior behavior - the leave request itself
         // still stands even if the attachment upload failed.
-        showToast_('Leave request sent, but the attachment could not be uploaded.', 'error');
+        console.error('Attachment upload failed:', attachErr);
+        const detail = attachErr && (attachErr.code || attachErr.message);
+        showToast_('Leave request sent, but the attachment could not be uploaded' + (detail ? ' (' + detail + ')' : '.'), 'error');
       }
     }
 
