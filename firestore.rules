@@ -62,9 +62,12 @@ service cloud.firestore {
         request.resource.data.status == 'requested' &&
         request.resource.data.dismissed == false;
 
-      // Two disjoint update shapes: the owner deciding (approve/reject), or
-      // the requester dismissing their own already-resolved request. Each
-      // may only touch its own specific fields - nothing else.
+      // Three disjoint update shapes, each touching only its own specific
+      // fields - nothing else: the owner deciding (approve/reject), the
+      // requester dismissing their own already-resolved request, or the
+      // requester attaching a file's Drive metadata right after create
+      // (the upload itself happens client-side, after the doc already
+      // exists - see uploadAttachmentToDrive_ in app.js).
       allow update: if
         (
           isOwner() &&
@@ -78,6 +81,12 @@ service cloud.firestore {
           request.resource.data.dismissed == true &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['dismissed'])
+        ) || (
+          isAllowlisted() &&
+          resource.data.email == emailLower() &&
+          resource.data.status == 'requested' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['attachmentName', 'attachmentUrl', 'attachmentFileId'])
         );
 
       allow delete: if false;
