@@ -1,42 +1,13 @@
 // =====================================================
-// CONFIG - fill in these three blocks before deploying.
+// CONFIG
 // =====================================================
 
-// 1. Firebase Web config - from Firebase console → Project settings → "Your apps" (Web)
+// Firebase Web config - from Firebase console → Project settings → "Your apps" (Web)
 const FIREBASE_CONFIG = {
   apiKey:     'AIzaSyA1exz20sN1WqLQdNkP986JX5wHuICYolg',
   authDomain: 'devteam-daily-tasks.firebaseapp.com',
   projectId:  'devteam-daily-tasks'
 };
-
-// 2. Deployed Apps Script web app URL (ends in /exec)
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz6njgCzwRK1i1aXzW9dmlZzlYfexxx72snoSB46L20u4ecitTTTYrLUnrHY_T_rkUmDQ/exec';
-
-// 3. Allowlist - email → { name, designation, reportedTo }. Emails must be
-//    lowercase. The SAME map must be pasted into apps-script/Code.gs (the
-//    server is the enforcer; this copy drives the UX). All fields are fixed
-//    per user - not editable in the UI; the server uses this map's values.
-const ALLOWLIST = {
-  'developer.ndma@gmail.com':     { name: 'Muhammad Arsalan Mukhtar', designation: 'Deputy Manager - I',     reportedTo: 'Junaid Aziz Khan' },
-  'as2040704@gmail.com':          { name: 'Abdul Sattar Sheikh',      designation: 'Assistant Manager - II', reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'mustafa.haider2011@gmail.com': { name: 'Syed Mustafa Haider',      designation: 'Assistant Manager - III',  reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'shehzadalikhan586@gmail.com':  { name: 'Shehzad Ali',              designation: 'Assistant Manager - I',  reportedTo: 'Kashif Iqbal' },
-  'seemalnaeem100@gmail.com':     { name: 'Seemal Naeem',             designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'muddasir.ndma25@gmail.com':    { name: 'Muddasir Shah',            designation: 'Assistant Manager - I',  reportedTo: 'Imtiaz Nabi' },
-  'ahad.khan.work01@gmail.com':   { name: 'Muhammad Ahad Khan',       designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'zainabali27feb2004@gmail.com': { name: 'Zainab Ali',               designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'ttalha063@gmail.com':          { name: 'Talha Rizwan',             designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'zeeshannasir2001@gmail.com':   { name: 'Zeeshan Nasir',            designation: 'Assistant Manager - I',  reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'ibrahimabdullahh84@gmail.com': { name: 'Ibrahim Abdullah',         designation: 'Assistant Manager - I',  reportedTo: 'Imtiaz Nabi' },
-  'usamabinumar199@gmail.com':    { name: 'Usama bin Umar',           designation: 'Intern',                 reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'osamakhan32156@gmail.com':     { name: 'Muhammad Osama Khan',      designation: 'Intern',                 reportedTo: 'Muhammad Arsalan Mukhtar' },
-  'muqeetahmad155@gmail.com':     { name: 'Muqeet Ahmad',             designation: 'Assistant Manager - I',  reportedTo: 'Imtiaz Nabi' }
-};
-
-// The account owner - the only user who sees the "Export weekly summary"
-// action. Must be lowercase and present in ALLOWLIST. The server enforces
-// this independently in apps-script/Code.gs (OWNER_EMAIL there).
-const OWNER_EMAIL = 'developer.ndma@gmail.com';
 
 // =====================================================
 
@@ -45,18 +16,56 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  reauthenticateWithPopup,
   signOut,
   onAuthStateChanged,
   setPersistence,
   browserLocalPersistence
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  addDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const firebaseApp = initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
 setPersistence(auth, browserLocalPersistence);
 
+// drive.file: only lets this app see/manage files IT creates (leave
+// attachments) - not the user's whole Drive. Needed since attachments are
+// uploaded client-side directly to Drive now (no backend, no Firebase
+// Storage - see the migration plan for why).
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: 'select_account' });
+provider.addScope('https://www.googleapis.com/auth/drive.file');
+
+// The Drive OAuth access token (distinct from the Firebase ID token) lives
+// only in memory - captured at sign-in, re-obtained via a near-silent
+// reauth right before an upload if it's more than ~50 minutes old (Google
+// access tokens last about an hour; Firebase doesn't auto-refresh this one
+// the way it does its own ID token).
+let driveAccessToken = null;
+let driveAccessTokenAt = 0;
+
+async function ensureDriveAccessToken_() {
+  const fresh = driveAccessToken && (Date.now() - driveAccessTokenAt) < 50 * 60 * 1000;
+  if (fresh) return driveAccessToken;
+  const result = await reauthenticateWithPopup(auth.currentUser, provider);
+  const credential = GoogleAuthProvider.credentialFromResult(result);
+  driveAccessToken = credential.accessToken;
+  driveAccessTokenAt = Date.now();
+  return driveAccessToken;
+}
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
@@ -681,10 +690,9 @@ function refreshWeekSummary() {
 }
 
 // ---------- Apply for Leave ----------
-// Backed by a real endpoint now (Code.gs: applyLeave_/dismissLeave_/
-// leaveStatus_/leaveAnalytics_, plus a Telegram bot that pushes the request
-// to the manager with Accept/Reject buttons). The button/panel only ever
-// reflects what the sheet says - no local state to fall out of sync.
+// Backed directly by Firestore's leaveRequests collection - the manager
+// approves/rejects from the native Android app. The button/panel only ever
+// reflects what Firestore says - no local state to fall out of sync.
 const LEAVE_FULL_COOLDOWN_DAYS = 7;
 const LEAVE_ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024;
 const LEAVE_ATTACHMENT_EXTS = ['.pdf', '.txt', '.doc', '.docx'];
@@ -701,6 +709,19 @@ function currentUserEmail_() {
   return currentUserContext ? (currentUserContext.user.email || '').toLowerCase() : '';
 }
 
+// Owner-only features (export, analytics) need the whole roster, which used
+// to be the hardcoded ALLOWLIST constant - now a Firestore read, cached for
+// this session since the roster rarely changes while someone's using the app.
+let allowlistMapCache = null;
+async function getAllowlistMap_() {
+  if (allowlistMapCache) return allowlistMapCache;
+  const snap = await getDocs(collection(db, 'allowlist'));
+  const map = {};
+  snap.docs.forEach(function (d) { map[d.id] = d.data(); });
+  allowlistMapCache = map;
+  return map;
+}
+
 function currentWeekLabel_() {
   const info = weekdaysFor(weekInput.value);
   return info ? `Week ${info.week}, ${info.year}` : '';
@@ -709,9 +730,40 @@ function currentWeekLabel_() {
 async function fetchLeaveStatus_() {
   if (!currentUserContext) return null;
   try {
-    const idToken = await currentUserContext.user.getIdToken(false);
-    const data = await jsonpFetch(APPS_SCRIPT_URL, { action: 'leaveStatus', idToken: idToken });
-    if (data && data.status === 'ok') return data;
+    const email = currentUserEmail_();
+    const snap = await getDocs(query(collection(db, 'leaveRequests'), where('email', '==', email)));
+    const allDocs = snap.docs.map(function (d) { return { id: d.id, data: d.data() }; });
+
+    // Cooldown scan includes dismissed rows (matches prior server behavior).
+    let lastFullAt = null;
+    allDocs.forEach(function (entry) {
+      if (entry.data.type === 'full' && entry.data.requestedAt) {
+        const ts = entry.data.requestedAt.toDate ? entry.data.requestedAt.toDate() : new Date(entry.data.requestedAt);
+        if (!lastFullAt || ts > lastFullAt) lastFullAt = ts;
+      }
+    });
+
+    const records = allDocs
+      .filter(function (entry) { return entry.data.dismissed !== true; })
+      .map(function (entry) {
+        const data = entry.data;
+        return {
+          requestId: entry.id,
+          requestedAt: data.requestedAt && data.requestedAt.toDate ? data.requestedAt.toDate().toISOString() : '',
+          weekLabel: data.weekLabel || '',
+          type: data.type || 'short',
+          reasonHtml: data.reasonHtml || '',
+          status: data.status || 'requested',
+          resolvedAt: data.resolvedAt && data.resolvedAt.toDate ? data.resolvedAt.toDate().toISOString() : '',
+          resolvedBy: data.resolvedBy || '',
+          attachmentName: data.attachmentName || '',
+          attachmentUrl: data.attachmentUrl || ''
+        };
+      })
+      .sort(function (a, b) { return new Date(b.requestedAt) - new Date(a.requestedAt); });
+
+    const cooldownUntil = lastFullAt ? new Date(lastFullAt.getTime() + LEAVE_FULL_COOLDOWN_DAYS * 86400000) : null;
+    return { status: 'ok', records: records, fullLeaveCooldownUntil: cooldownUntil ? cooldownUntil.toISOString() : null };
   } catch (_e) { /* offline or backend error - caller keeps the button's prior state */ }
   return null;
 }
@@ -801,19 +853,6 @@ function resetLeaveAttachment_() {
   leaveAttachmentChip.classList.add('hidden');
   leaveAttachmentDrop.classList.remove('hidden');
   leaveAttachmentError.classList.add('hidden');
-}
-
-function fileToBase64_(file) {
-  return new Promise(function (resolve, reject) {
-    const reader = new FileReader();
-    reader.onload = function () {
-      const result = String(reader.result || '');
-      const idx = result.indexOf(',');
-      resolve(idx >= 0 ? result.slice(idx + 1) : result);
-    };
-    reader.onerror = function () { reject(reader.error || new Error('Could not read file.')); };
-    reader.readAsDataURL(file);
-  });
 }
 
 async function openLeaveDrawer() {
@@ -1011,13 +1050,14 @@ function renderMyLeavesList_(records) {
   });
 }
 
-async function dismissLeaveRequest_(requestId) {
+async function dismissLeaveRequest_(requestId, buttonEl) {
   if (!currentUserContext || !requestId) return;
+  if (buttonEl) {
+    buttonEl.disabled = true;
+    buttonEl.innerHTML = '<span class="loader loader-sm" style="vertical-align: middle; margin-right: 4px;"></span>Working...';
+  }
   try {
-    const idToken = await currentUserContext.user.getIdToken(false);
-    const formBody = new URLSearchParams();
-    formBody.append('payload', JSON.stringify({ action: 'dismissLeave', idToken: idToken, requestId: requestId }));
-    await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: formBody, redirect: 'follow' });
+    await updateDoc(doc(db, 'leaveRequests', requestId), { dismissed: true });
   } catch (_e) { /* best-effort */ }
   await refreshApplyLeaveButton();
   await loadMyLeavesData_();
@@ -1056,7 +1096,7 @@ closeMyLeavesDrawerBtn.addEventListener('click', closeMyLeavesDrawer);
 myLeavesBackdrop.addEventListener('click', closeMyLeavesDrawer);
 myLeavesList.addEventListener('click', (e) => {
   const btn = e.target.closest('.my-leave-dismiss-btn');
-  if (btn) dismissLeaveRequest_(btn.dataset.requestId);
+  if (btn) dismissLeaveRequest_(btn.dataset.requestId, btn);
 });
 
 leaveAttachmentInput.addEventListener('change', () => {
@@ -1083,27 +1123,59 @@ leaveAttachmentInput.addEventListener('change', () => {
 });
 leaveAttachmentRemove.addEventListener('click', () => resetLeaveAttachment_());
 
+// Uploads directly to the signed-in user's own Google Drive using the
+// drive.file OAuth scope granted at sign-in (see ensureDriveAccessToken_),
+// then shares it "anyone with the link can view" - replicates the old
+// Apps Script DriveApp behavior exactly, just executed client-side under the
+// requester's own account instead of one fixed server identity.
+async function uploadAttachmentToDrive_(file) {
+  const accessToken = await ensureDriveAccessToken_();
+  const mimeType = file.type || 'application/octet-stream';
+  const boundary = 'techew-' + Date.now();
+  const base64Data = arrayBufferToBase64_(await file.arrayBuffer());
+
+  const multipartBody =
+    '--' + boundary + '\r\n' +
+    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+    JSON.stringify({ name: file.name, mimeType: mimeType }) + '\r\n' +
+    '--' + boundary + '\r\n' +
+    'Content-Type: ' + mimeType + '\r\n' +
+    'Content-Transfer-Encoding: base64\r\n\r\n' +
+    base64Data + '\r\n' +
+    '--' + boundary + '--';
+
+  const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + accessToken,
+      'Content-Type': 'multipart/related; boundary=' + boundary
+    },
+    body: multipartBody
+  });
+  if (!uploadRes.ok) throw new Error('Drive upload failed (' + uploadRes.status + ')');
+  const uploaded = await uploadRes.json();
+  const fileId = uploaded.id;
+
+  await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '/permissions', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role: 'reader', type: 'anyone' })
+  });
+
+  const metaRes = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?fields=webViewLink', {
+    headers: { Authorization: 'Bearer ' + accessToken }
+  });
+  const meta = await metaRes.json();
+  return { fileId: fileId, url: meta.webViewLink || ('https://drive.google.com/file/d/' + fileId + '/view') };
+}
+
 leaveSendBtn.addEventListener('click', async () => {
   if (!currentUserContext) return;
   const weekLabel = currentWeekLabel_();
   if (!weekLabel) return;
 
-  let idToken;
-  try {
-    idToken = await currentUserContext.user.getIdToken(false);
-  } catch (err) {
-    showToast_('Could not get auth token.', 'error');
-    return;
-  }
-
   const reasonHtml = (leaveReasonEditor.innerHTML || '').trim();
-  const payload = {
-    action: 'applyLeave',
-    idToken: idToken,
-    weekLabel: weekLabel,
-    type: selectedLeaveType,
-    reasonHtml: reasonHtml === '<br>' ? '' : reasonHtml
-  };
+  const email = currentUserEmail_();
 
   leaveSendBtn.disabled = true;
   leaveCancelBtn.disabled = true;
@@ -1111,15 +1183,36 @@ leaveSendBtn.addEventListener('click', async () => {
   leaveSendBtn.textContent = 'Sending...';
 
   try {
-    if (leaveAttachmentFile) {
-      payload.attachmentName = leaveAttachmentFile.name;
-      payload.attachmentMimeType = leaveAttachmentFile.type || 'application/octet-stream';
-      payload.attachmentBase64 = await fileToBase64_(leaveAttachmentFile);
-    }
+    const docRef = await addDoc(collection(db, 'leaveRequests'), {
+      email: email,
+      name: currentUserContext.displayName,
+      weekLabel: weekLabel,
+      type: selectedLeaveType,
+      reasonHtml: reasonHtml === '<br>' ? '' : reasonHtml,
+      status: 'requested',
+      requestedAt: serverTimestamp(),
+      resolvedAt: null,
+      resolvedBy: null,
+      attachmentName: null,
+      attachmentUrl: null,
+      attachmentFileId: null,
+      dismissed: false
+    });
 
-    const formBody = new URLSearchParams();
-    formBody.append('payload', JSON.stringify(payload));
-    await fetch(APPS_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: formBody, redirect: 'follow' });
+    if (leaveAttachmentFile) {
+      try {
+        const uploaded = await uploadAttachmentToDrive_(leaveAttachmentFile);
+        await updateDoc(docRef, {
+          attachmentName: leaveAttachmentFile.name,
+          attachmentUrl: uploaded.url,
+          attachmentFileId: uploaded.fileId
+        });
+      } catch (attachErr) {
+        // Best-effort, matching prior behavior - the leave request itself
+        // still stands even if the attachment upload failed.
+        showToast_('Leave request sent, but the attachment could not be uploaded.', 'error');
+      }
+    }
 
     closeLeaveDrawer();
     showToast_('Leave Request Sent', 'success');
@@ -1500,7 +1593,7 @@ function showForm(user, displayName, designation, reportedTo) {
   userChip.classList.add('flex');
 
   // Owner-only: reveal the weekly-summary export button in the header.
-  const isOwner = (user.email || '').toLowerCase() === OWNER_EMAIL;
+  const isOwner = !!(currentUserContext && currentUserContext.isOwner);
   exportSummaryBtn.classList.toggle('hidden', !isOwner);
   exportSummaryBtn.classList.toggle('flex', isOwner);
   analyticsBtn.classList.toggle('hidden', !isOwner);
@@ -1609,7 +1702,7 @@ function stopInactivityTracking() {
 
 let currentUserContext = null; // { user, displayName }
 
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
   if (!user) {
     currentUserContext = null;
     stopInactivityTracking();
@@ -1619,7 +1712,14 @@ onAuthStateChanged(auth, (user) => {
     return;
   }
   const email = (user.email || '').toLowerCase();
-  const entry = ALLOWLIST[email];
+  let entrySnap;
+  try {
+    entrySnap = await getDoc(doc(db, 'allowlist', email));
+  } catch (err) {
+    showAuthGate('Could not verify your account: ' + (err.message || err));
+    return;
+  }
+  const entry = entrySnap.exists() && entrySnap.data().active !== false ? entrySnap.data() : null;
   if (!entry) {
     stopInactivityTracking();
     stopLeaveStatusPolling_();
@@ -1644,7 +1744,9 @@ onAuthStateChanged(auth, (user) => {
     user,
     displayName: entry.name,
     designation: entry.designation,
-    reportedTo: entry.reportedTo || ''
+    reportedTo: entry.reportedTo || '',
+    domain: entry.domain || 'GIS Developer',
+    isOwner: entry.isOwner === true
   };
   showForm(user, entry.name, entry.designation, entry.reportedTo);
   startInactivityTracking();
@@ -1659,7 +1761,12 @@ onAuthStateChanged(auth, (user) => {
 signInBtn.addEventListener('click', async () => {
   authError.classList.add('hidden');
   try {
-    await signInWithPopup(auth, provider);
+    const result = await signInWithPopup(auth, provider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    if (credential && credential.accessToken) {
+      driveAccessToken = credential.accessToken;
+      driveAccessTokenAt = Date.now();
+    }
   } catch (err) {
     showAuthGate('Sign-in failed: ' + (err.message || err.code || err));
   }
@@ -1754,6 +1861,16 @@ cancelEditBtn.addEventListener('click', () => {
   resetFormToFresh();
 });
 
+// Matches tools/import-from-sheets.js's sanitizeWeekLabel() exactly - both
+// must produce the same doc ID for the same weekLabel string.
+function sanitizeWeekLabel_(weekLabel) {
+  return String(weekLabel || '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+function submissionDocId_(email, weekLabel) {
+  return `${email}_${sanitizeWeekLabel_(weekLabel)}`;
+}
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   setStatus('info', '');
@@ -1768,46 +1885,27 @@ form.addEventListener('submit', async (e) => {
   }
   if (isTaskTableEmpty()) return setStatus('error', 'Please enter your tasks.');
 
-  if (APPS_SCRIPT_URL === 'PASTE_YOUR_DEPLOYED_URL_HERE') {
-    return setStatus('error', 'APPS_SCRIPT_URL is not configured in app.js.');
-  }
-
-  let idToken;
-  try {
-    idToken = await currentUserContext.user.getIdToken(/* forceRefresh */ false);
-  } catch (err) {
-    return setStatus('error', 'Could not get auth token: ' + err.message);
-  }
-
-  const payload = {
-    idToken,
-    weekLabel: `Week ${info.week}, ${info.year}`,
-    weekRange: `${fmtISO(info.days[0].date)} to ${fmtISO(info.days[4].date)}`,
-    // Designation is server-enforced from ALLOWLIST - included here only as
-    // a hint; the server ignores it and uses its own value.
+  const email = currentUserEmail_();
+  const weekLabel = `Week ${info.week}, ${info.year}`;
+  const docData = {
+    email,
+    name: currentUserContext.displayName,
     designation: currentUserContext.designation,
+    reportedTo: currentUserContext.reportedTo,
+    domain: currentUserContext.domain,
+    weekLabel,
+    weekRange: `${fmtISO(info.days[0].date)} to ${fmtISO(info.days[4].date)}`,
     taskFormat: TASK_FORMAT_VERSION,
-    taskRows: serializeTaskTable()
+    taskRows: serializeTaskTable(),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
   };
 
   submitBtn.disabled = true;
   setStatus('submitting');
 
   try {
-    // URLSearchParams body → fetch sends Content-Type:
-    // application/x-www-form-urlencoded which is a "simple" CORS request
-    // (no preflight) AND Apps Script auto-parses it into e.parameter.
-    // fetch follows 302 redirects while preserving the POST method+body - 
-    // unlike HTML form submission which downgrades POST→GET on 302.
-    const formBody = new URLSearchParams();
-    formBody.append('payload', JSON.stringify(payload));
-
-    await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      body: formBody,
-      redirect: 'follow'
-    });
+    await setDoc(doc(db, 'submissions', submissionDocId_(email, weekLabel)), docData);
     setStatus('ok', '');
     exitEditMode();
     // Refresh the cache so a later week-switch reflects this submission.
@@ -1857,56 +1955,21 @@ function closeSubmissionsDrawer() {
   submissionsBackdrop.classList.remove('open');
 }
 
-/**
- * JSONP fetch - Apps Script `/exec` GET responses lack a reliable
- * Access-Control-Allow-Origin header (they 302 to googleusercontent.com),
- * so cross-origin `fetch` reads fail. Loading the response via <script>
- * tag bypasses CORS entirely; the server wraps the payload in `callback(...)`
- * which calls our locally-registered global.
- */
-function jsonpFetch(url, params, timeoutMs) {
-  return new Promise(function (resolve, reject) {
-    const cbName = '__jsonp_cb_' + Math.random().toString(36).slice(2) + '_' + Date.now();
-    const script = document.createElement('script');
-    let settled = false;
-
-    function cleanup() {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      try { delete window[cbName]; } catch (_e) { window[cbName] = undefined; }
-      if (script.parentNode) script.parentNode.removeChild(script);
-    }
-
-    const timer = setTimeout(function () {
-      cleanup();
-      reject(new Error('Request timed out.'));
-    }, timeoutMs || 30000);
-
-    window[cbName] = function (data) {
-      cleanup();
-      resolve(data);
-    };
-
-    const qs = new URLSearchParams(Object.assign({}, params, { callback: cbName }));
-    script.src = url + '?' + qs.toString();
-    script.onerror = function () {
-      cleanup();
-      reject(new Error('Could not reach the submissions endpoint.'));
-    };
-    document.head.appendChild(script);
-  });
-}
-
 // Fetches the signed-in user's submissions and refreshes the cache. Throws on
 // failure so callers can surface it however they need.
 async function fetchUserSubmissions_() {
-  const idToken = await currentUserContext.user.getIdToken(false);
-  const data = await jsonpFetch(APPS_SCRIPT_URL, { action: 'list', idToken: idToken });
-  if (!data || data.status !== 'ok') {
-    throw new Error((data && data.message) || 'Failed to load submissions.');
-  }
-  submissionsCache = data.submissions || [];
+  const email = currentUserEmail_();
+  const snap = await getDocs(query(collection(db, 'submissions'), where('email', '==', email)));
+  submissionsCache = snap.docs.map(function (d) {
+    const data = d.data();
+    return {
+      weekLabel: data.weekLabel,
+      weekRange: data.weekRange,
+      designation: data.designation,
+      taskRows: data.taskRows,
+      timestamp: data.updatedAt && data.updatedAt.toDate ? data.updatedAt.toDate().toISOString() : null
+    };
+  });
   return submissionsCache;
 }
 
@@ -2225,8 +2288,7 @@ function setExportStatus(kind, msg) {
 }
 
 function openExportModal() {
-  if (!currentUserContext ||
-      (currentUserContext.user.email || '').toLowerCase() !== OWNER_EMAIL) return;
+  if (!currentUserContext || !currentUserContext.isOwner) return;
   populateExportWeeks();
   setExportStatus('', '');
   exportRunBtn.disabled = false;
@@ -2264,9 +2326,9 @@ function loadExcelJS() {
   return exceljsPromise;
 }
 
-// Builds the workbook Blob: one worksheet per ALLOWLIST developer, with a
+// Builds the workbook Blob: one worksheet per allowlisted developer, with a
 // title block and a five-column day grid. Non-submitters get a marked sheet.
-async function buildExportWorkbook(ExcelJSlib, info, weekLabel, submissions) {
+async function buildExportWorkbook(ExcelJSlib, info, weekLabel, submissions, allowlistMap) {
   const wb = new ExcelJSlib.Workbook();
   wb.creator = 'Tech EW Weekly Time Sheet';
   wb.created = new Date();
@@ -2284,8 +2346,8 @@ async function buildExportWorkbook(ExcelJSlib, info, weekLabel, submissions) {
   };
   const usedNames = {};
 
-  Object.keys(ALLOWLIST).forEach(function (email) {
-    const entry = ALLOWLIST[email];
+  Object.keys(allowlistMap).forEach(function (email) {
+    const entry = allowlistMap[email];
     const sub   = byEmail[email.toLowerCase()];
 
     // Excel worksheet names: ≤31 chars, no \ / ? * [ ] :, and must be unique.
@@ -2420,14 +2482,11 @@ async function runExport() {
   try {
     const ExcelJSlib = await loadExcelJS();
     setExportStatus('loading', 'Fetching submissions…');
-    const idToken = await currentUserContext.user.getIdToken(false);
-    const data = await jsonpFetch(APPS_SCRIPT_URL,
-      { action: 'export', week: weekLabel, idToken: idToken }, 45000);
-    if (!data || data.status !== 'ok') {
-      throw new Error((data && data.message) || 'Export request failed.');
-    }
+    const snap = await getDocs(query(collection(db, 'submissions'), where('weekLabel', '==', weekLabel)));
+    const submissions = snap.docs.map(function (d) { return d.data(); });
+    const allowlistMap = await getAllowlistMap_();
     setExportStatus('loading', 'Building the workbook…');
-    const blob = await buildExportWorkbook(ExcelJSlib, info, weekLabel, data.submissions);
+    const blob = await buildExportWorkbook(ExcelJSlib, info, weekLabel, submissions, allowlistMap);
     const result = await saveExportBlob(blob, fileName, fileHandle);
     setExportStatus('ok', (result === 'saved' ? 'Saved ' : 'Downloaded ') + fileName);
   } catch (err) {
@@ -2579,13 +2638,70 @@ function loadJsPDF() {
   return jspdfPromise;
 }
 
+// Mirrors the item-count semantics the old server-side analytics used:
+// number of <li> tags, or 1 if there's plain content with no list markup,
+// or 0 if empty.
+function countDayItems_(html) {
+  if (!html) return 0;
+  const liCount = (String(html).match(/<li[^>]*>/gi) || []).length;
+  if (liCount > 0) return liCount;
+  return cellToText(html).trim() ? 1 : 0;
+}
+
 async function fetchAnalyticsData_() {
-  const idToken = await currentUserContext.user.getIdToken(false);
-  const data = await jsonpFetch(APPS_SCRIPT_URL, { action: 'analytics', idToken: idToken }, 45000);
-  if (!data || data.status !== 'ok') {
-    throw new Error((data && data.message) || 'Failed to load analytics.');
-  }
-  analyticsCache = { roster: data.roster || [], submissions: data.submissions || [] };
+  const allowlistMap = await getAllowlistMap_();
+  const snap = await getDocs(collection(db, 'submissions'));
+  const dayKeys = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  const submissions = [];
+
+  snap.docs.forEach(function (d) {
+    const data = d.data();
+    const subEmail = (data.email || '').toLowerCase();
+    const allowEntry = allowlistMap[subEmail];
+    if (!allowEntry) return; // orphaned row from a removed team member
+
+    const taskRows = Array.isArray(data.taskRows) ? data.taskRows : null;
+    const dayItemCounts = {};
+    const dayCharCounts = {};
+    let totalItems = 0;
+    let daysWithContent = 0;
+
+    dayKeys.forEach(function (dKey) { dayItemCounts[dKey] = 0; dayCharCounts[dKey] = 0; });
+    if (taskRows) {
+      dayKeys.forEach(function (dKey) {
+        let items = 0, chars = 0;
+        taskRows.forEach(function (row) {
+          const html = row && row[dKey];
+          if (!html) return;
+          items += countDayItems_(html);
+          chars += cellToText(html).length;
+        });
+        dayItemCounts[dKey] = items;
+        dayCharCounts[dKey] = chars;
+        totalItems += items;
+        if (items > 0) daysWithContent++;
+      });
+    }
+
+    submissions.push({
+      email: subEmail,
+      name: data.name || allowEntry.name,
+      designation: data.designation || allowEntry.designation,
+      weekLabel: data.weekLabel || '',
+      weekRange: data.weekRange || '',
+      timestamp: data.updatedAt && data.updatedAt.toDate ? data.updatedAt.toDate().toISOString() : '',
+      dayItemCounts: dayItemCounts,
+      dayCharCounts: dayCharCounts,
+      totalItems: totalItems,
+      daysWithContent: daysWithContent
+    });
+  });
+
+  const roster = Object.keys(allowlistMap).map(function (em) {
+    return { email: em, name: allowlistMap[em].name, designation: allowlistMap[em].designation };
+  });
+
+  analyticsCache = { roster: roster, submissions: submissions };
   return analyticsCache;
 }
 
@@ -3073,18 +3189,21 @@ function renderHeatmap_(model) {
   });
 }
 
-// Owner-only leave metrics. There's no backend for leave requests yet, so
-// this aggregates whatever leaveRequest:* entries exist in THIS browser's
-// localStorage - it won't reflect other developers' requests made on their
-// own devices until the feature is wired to a real endpoint.
+// Owner-only leave metrics: whole-collection tallies across every
+// developer's leave requests (dismissed included, matching prior behavior).
 async function renderLeaveKpis_() {
   analyticsLeaveKpis.innerHTML = '<div class="text-xs text-slate-400 col-span-2 sm:col-span-4">Loading...</div>';
   try {
     if (!currentUserContext) throw new Error('Not signed in.');
-    const idToken = await currentUserContext.user.getIdToken(false);
-    const data = await jsonpFetch(APPS_SCRIPT_URL, { action: 'leaveAnalytics', idToken: idToken });
-    if (!data || data.status !== 'ok') throw new Error((data && data.message) || 'Could not load leave activity.');
-    const counts = data.counts;
+    const snap = await getDocs(collection(db, 'leaveRequests'));
+    const counts = { shortTaken: 0, fullTaken: 0, approved: 0, rejected: 0 };
+    snap.docs.forEach(function (d) {
+      const data = d.data();
+      if (data.type === 'short') counts.shortTaken++;
+      else if (data.type === 'full') counts.fullTaken++;
+      if (data.status === 'approved') counts.approved++;
+      else if (data.status === 'rejected') counts.rejected++;
+    });
     const cards = [
       { label: 'Short leaves taken', value: counts.shortTaken },
       { label: 'Full leaves taken', value: counts.fullTaken },
@@ -3259,7 +3378,7 @@ function closeAnalyticsExportPanel_() {
 }
 
 async function openAnalyticsPanel() {
-  if (!currentUserContext || (currentUserContext.user.email || '').toLowerCase() !== OWNER_EMAIL) return;
+  if (!currentUserContext || !currentUserContext.isOwner) return;
   analyticsBackdrop.classList.remove('hidden');
   analyticsPanel.classList.remove('hidden');
   void analyticsPanel.offsetWidth; // force reflow so the opacity transition actually runs
@@ -3406,16 +3525,14 @@ function setDevDetailExportStatus_(kind, msg) {
 }
 
 // Fetches ONE developer's raw submission (with the actual taskRows HTML, not
-// just counts) for a specific week, by reusing the existing owner-only
-// `action=export` endpoint that already powers "Export weekly summary" - no
-// backend change needed. Returns null if they didn't submit that week (or
-// the request fails).
+// just counts) for a specific week - a direct doc read by the same
+// deterministic ID the submit handler writes to. Returns null if they didn't
+// submit that week (or the request fails - Security Rules let the owner read
+// any submission doc).
 async function fetchDevWeekSubmission_(email, weekLabel) {
   try {
-    const idToken = await currentUserContext.user.getIdToken(false);
-    const data = await jsonpFetch(APPS_SCRIPT_URL, { action: 'export', week: weekLabel, idToken: idToken }, 45000);
-    if (!data || data.status !== 'ok') return null;
-    return (data.submissions || []).find(function (s) { return (s.email || '').toLowerCase() === email; }) || null;
+    const snap = await getDoc(doc(db, 'submissions', submissionDocId_(email, weekLabel)));
+    return snap.exists() ? snap.data() : null;
   } catch (_e) {
     return null;
   }
@@ -3619,7 +3736,7 @@ function ensureSpace_(doc, y, neededMm, marginX, devName) {
  * Throws on failure - callers own their own loading/error UI.
  */
 async function buildDevPerformancePdf_(email) {
-  const dev = ALLOWLIST[email] || {};
+  const dev = (analyticsCache.roster || []).find(function (r) { return r.email === email; }) || {};
   const devName = dev.name || email;
   const accentColor = colorForEmail_(email, analyticsCache.roster);
 

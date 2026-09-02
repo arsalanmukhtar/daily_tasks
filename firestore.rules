@@ -1,0 +1,98 @@
+rules_version = '2';
+
+// Published by pasting into the Firebase Console's Firestore > Rules tab -
+// this file is the version-controlled source of truth for that paste, not
+// something deployed via the CLI. Replaces every server-side auth check that
+// used to live in apps-script/Code.gs (ALLOWLIST membership / OWNER_EMAIL).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function emailLower() {
+      return request.auth.token.email.lower();
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function allowlistDoc() {
+      return get(/databases/$(database)/documents/allowlist/$(emailLower()));
+    }
+
+    function isAllowlisted() {
+      return isSignedIn() && allowlistDoc().data.active == true;
+    }
+
+    function isOwner() {
+      return isAllowlisted() && allowlistDoc().data.isOwner == true;
+    }
+
+    // ---------- allowlist ----------
+    // Profile/authorization data for each developer. Edited by hand in the
+    // Console's Data tab, never from the app - write is denied entirely.
+    match /allowlist/{email} {
+      allow read: if isAllowlisted();
+      allow write: if false;
+    }
+
+    // ---------- submissions ----------
+    // One doc per (email, weekLabel), doc ID `{email}_{weekLabelSanitized}`.
+    match /submissions/{docId} {
+      allow read: if isAllowlisted() &&
+        (resource.data.email == emailLower() || isOwner());
+
+      allow create, update: if isAllowlisted() &&
+        request.resource.data.email == emailLower() &&
+        request.resource.data.name == allowlistDoc().data.name &&
+        request.resource.data.designation == allowlistDoc().data.designation &&
+        request.resource.data.reportedTo == allowlistDoc().data.reportedTo &&
+        request.resource.data.domain == allowlistDoc().data.domain;
+
+      allow delete: if false;
+    }
+
+    // ---------- leaveRequests ----------
+    match /leaveRequests/{requestId} {
+      allow read: if isAllowlisted() &&
+        (resource.data.email == emailLower() || isOwner());
+
+      allow create: if isAllowlisted() &&
+        request.resource.data.email == emailLower() &&
+        request.resource.data.name == allowlistDoc().data.name &&
+        request.resource.data.status == 'requested' &&
+        request.resource.data.dismissed == false;
+
+      // Two disjoint update shapes: the owner deciding (approve/reject), or
+      // the requester dismissing their own already-resolved request. Each
+      // may only touch its own specific fields - nothing else.
+      allow update: if
+        (
+          isOwner() &&
+          resource.data.status == 'requested' &&
+          request.resource.data.status in ['approved', 'rejected'] &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'resolvedAt', 'resolvedBy'])
+        ) || (
+          isAllowlisted() &&
+          resource.data.email == emailLower() &&
+          request.resource.data.dismissed == true &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['dismissed'])
+        );
+
+      allow delete: if false;
+    }
+
+    // ---------- pushTokens ----------
+    // Doc ID = the FCM token itself. Anyone allowlisted may register their
+    // own token (the VM daemon reads this collection via the Admin SDK,
+    // which bypasses these rules entirely).
+    match /pushTokens/{token} {
+      allow read: if isOwner();
+      allow create, update: if isAllowlisted() &&
+        request.resource.data.email == emailLower();
+      allow delete: if isAllowlisted() &&
+        resource.data.email == emailLower();
+    }
+  }
+}

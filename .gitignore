@@ -32,3 +32,10 @@ Leave Approvals*.zip
 
 # Firebase config - contains real API keys, never committed
 google-services.json
+
+# One-time/local admin scripts (Firestore seeding, Sheets import) - the
+# service-account key they need is never committed, and node_modules isn't
+# either. The scripts themselves ARE committed (tools/*.js).
+tools/node_modules/
+tools/*.json
+!tools/package.json

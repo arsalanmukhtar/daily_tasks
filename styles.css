@@ -858,6 +858,20 @@ textarea {
   100% { transform: rotate(-360deg); }
 }
 
+/* Small inline variant - for a spinner sitting next to text inside a
+   button/link (e.g. My Leaves' "Ok, got it" dismiss while it's in flight),
+   where the full 32px loader would be too large. */
+.loader-sm {
+  width: 14px;
+  height: 14px;
+  border-width: 1.5px;
+}
+.loader-sm::after {
+  width: 7px;
+  height: 7px;
+  border-width: 1.5px;
+}
+
 /* Tick stays solid for ~4s, then fades over the last second. */
 @keyframes status-tick-fade {
   0%, 80%  { opacity: 1; transform: scale(1); }
