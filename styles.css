@@ -860,16 +860,21 @@ textarea {
 
 /* Small inline variant - for a spinner sitting next to text inside a
    button/link (e.g. My Leaves' "Ok, got it" dismiss while it's in flight),
-   where the full 32px loader would be too large. */
+   where the full 32px loader would be too large. A single solid ring with
+   one darker arc, not the dual dotted-ring trick above - at 14px the dotted
+   borders don't distribute evenly, which made the two rings look
+   off-center from each other even though they were geometrically centered. */
 .loader-sm {
   width: 14px;
   height: 14px;
   border-width: 1.5px;
+  border-style: solid;
+  border-color: rgba(75, 85, 99, 0.25);
+  border-top-color: #4b5563;
+  animation: loader-rotate 0.8s linear infinite;
 }
 .loader-sm::after {
-  width: 7px;
-  height: 7px;
-  border-width: 1.5px;
+  content: none;
 }
 
 /* Tick stays solid for ~4s, then fades over the last second. */

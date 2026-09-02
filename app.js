@@ -1152,7 +1152,13 @@ async function uploadAttachmentToDrive_(file) {
     },
     body: multipartBody
   });
-  if (!uploadRes.ok) throw new Error('Drive upload failed (' + uploadRes.status + ')');
+  if (!uploadRes.ok) {
+    const errBody = await uploadRes.text().catch(() => '');
+    console.error('Drive upload error body:', errBody);
+    let reason = '';
+    try { reason = JSON.parse(errBody).error.message; } catch (_e) { /* not JSON, ignore */ }
+    throw new Error('Drive upload failed (' + uploadRes.status + ')' + (reason ? ': ' + reason : ''));
+  }
   const uploaded = await uploadRes.json();
   const fileId = uploaded.id;
 
