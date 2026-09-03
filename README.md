@@ -71,6 +71,5 @@ That's it - no code edit, no redeploy, no `git push`. The change takes effect on
 - [android-app/](android-app/) - native Android app for the manager ("Leave Approvals"): live Firestore listeners for the Requests/Summary tabs, Firestore transactions for approve/reject, FCM for push.
 - [push-daemon/](push-daemon/) - long-running Node.js service on our VM that watches Firestore for new leave requests and sends the FCM push (see its own README for deployment).
 - [tools/](tools/) - one-time/local-only admin scripts (allowlist seeding, the historical Sheets→Firestore import). Not deployed anywhere - see [tools/README.md](tools/README.md).
-- [apps-script/Code.gs](apps-script/Code.gs) - **archived**. This was the original Google Sheets-backed server; both apps have since moved to talking to Firestore directly. Kept only because `tools/import-from-sheets.js` reuses its legacy task-format conversion logic.
 - [assets/](assets/) - icons and logo used by the web app.
 - [.well-known/assetlinks.json](.well-known/assetlinks.json) - Digital Asset Links file verifying the Android app's link to this domain.

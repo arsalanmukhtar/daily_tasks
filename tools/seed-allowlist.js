@@ -1,5 +1,6 @@
 // One-time script: populates the `allowlist` Firestore collection from the
-// exact same 14 entries in apps-script/Code.gs's ALLOWLIST + OWNER_EMAIL.
+// same 14 entries that used to live in the old Apps Script backend's
+// ALLOWLIST + OWNER_EMAIL (that file has since been retired and removed).
 // Run once locally (`node seed-allowlist.js` from inside tools/), never
 // deployed anywhere. Safe to re-run - it overwrites each doc with the same
 // values (idempotent), it doesn't append/duplicate.

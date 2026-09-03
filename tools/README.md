@@ -16,9 +16,9 @@ your own machine and they're done.
 
 ## seed-allowlist.js
 
-Populates the `allowlist` Firestore collection from the same 14 entries
-currently in `apps-script/Code.gs`'s `ALLOWLIST`. Safe to re-run (overwrites
-each doc with the same values, no duplicates).
+Populates the `allowlist` Firestore collection from the same 14 entries that
+used to live in the old (now-retired) Apps Script backend's `ALLOWLIST`.
+Safe to re-run (overwrites each doc with the same values, no duplicates).
 
 ```
 node seed-allowlist.js
