@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material3.Button
@@ -59,55 +61,64 @@ fun RequestDetailSheet(
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 28.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+            // Scrollable on its own, capped by the weight below - a long
+            // reason can no longer push the Approve/Reject row (or the
+            // resolved-by line) off the bottom of the sheet, unreachable.
+            Column(
+                modifier = Modifier
+                    .weight(weight = 1f, fill = false)
+                    .verticalScroll(rememberScrollState())
             ) {
-                Column {
-                    Text(request.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(
-                        request.email,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                StatusBadge(label = request.status.uppercase(), color = statusColor, background = statusBg)
-            }
-
-            Row(
-                modifier = Modifier.padding(top = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                MetaChip(request.weekLabel)
-                MetaChip(typeLabel)
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(top = 16.dp, bottom = 14.dp))
-
-            Text(
-                "REASON",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            AndroidView(
-                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                factory = { ctx ->
-                    TextView(ctx).apply { movementMethod = LinkMovementMethod.getInstance() }
-                },
-                update = { textView ->
-                    val html = request.reasonHtml.ifBlank { "<i>No reason provided.</i>" }
-                    textView.text = HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_COMPACT)
-                }
-            )
-
-            if (request.attachmentUrl.isNotBlank()) {
-                OutlinedButton(
-                    onClick = { openAttachment(context, request.attachmentUrl) },
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Icon(Icons.Outlined.AttachFile, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                    Text(request.attachmentName.ifBlank { "Open attachment" })
+                    Column {
+                        Text(request.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(
+                            request.email,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    StatusBadge(label = request.status.uppercase(), color = statusColor, background = statusBg)
+                }
+
+                Row(
+                    modifier = Modifier.padding(top = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    MetaChip(request.weekLabel)
+                    MetaChip(typeLabel)
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(top = 16.dp, bottom = 14.dp))
+
+                Text(
+                    "REASON",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                AndroidView(
+                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                    factory = { ctx ->
+                        TextView(ctx).apply { movementMethod = LinkMovementMethod.getInstance() }
+                    },
+                    update = { textView ->
+                        val html = request.reasonHtml.ifBlank { "<i>No reason provided.</i>" }
+                        textView.text = HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_COMPACT)
+                    }
+                )
+
+                if (request.attachmentUrl.isNotBlank()) {
+                    OutlinedButton(
+                        onClick = { openAttachment(context, request.attachmentUrl) },
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+                    ) {
+                        Icon(Icons.Outlined.AttachFile, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                        Text(request.attachmentName.ifBlank { "Open attachment" })
+                    }
                 }
             }
 
