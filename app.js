@@ -122,10 +122,12 @@ const leaveTypeFullBtn   = document.getElementById('leaveTypeFullBtn');
 const leaveFullCooldownNote = document.getElementById('leaveFullCooldownNote');
 const leaveDateModeSingleBtn = document.getElementById('leaveDateModeSingleBtn');
 const leaveDateModeRangeBtn  = document.getElementById('leaveDateModeRangeBtn');
+const leaveDateModeCustomBtn = document.getElementById('leaveDateModeCustomBtn');
 const leaveDateRangeInput = document.getElementById('leaveDateRangeInput');
 const leaveDateRangeError = document.getElementById('leaveDateRangeError');
 const leaveToolbar       = document.getElementById('leaveToolbar');
 const leaveReasonEditor  = document.getElementById('leaveReasonEditor');
+const leaveBackBtn       = document.getElementById('leaveBackBtn');
 const leaveCancelBtn     = document.getElementById('leaveCancelBtn');
 const leaveSendBtn       = document.getElementById('leaveSendBtn');
 const leaveAttachmentInput  = document.getElementById('leaveAttachmentInput');
@@ -135,6 +137,8 @@ const leaveAttachmentError  = document.getElementById('leaveAttachmentError');
 const viewMyLeavesBtn      = document.getElementById('viewMyLeavesBtn');
 const myLeavesBackdrop     = document.getElementById('myLeavesBackdrop');
 const myLeavesDrawer       = document.getElementById('myLeavesDrawer');
+const myLeavesLoading      = document.getElementById('myLeavesLoading');
+const myLeavesContent      = document.getElementById('myLeavesContent');
 const closeMyLeavesDrawerBtn = document.getElementById('closeMyLeavesDrawerBtn');
 const myLeavesApplyWeekLabel = document.getElementById('myLeavesApplyWeekLabel');
 const myLeavesNoWeekNote   = document.getElementById('myLeavesNoWeekNote');
@@ -832,7 +836,7 @@ let leaveSelectedHalfDay = 'AM'; // 'AM' | 'PM' - only meaningful when selectedL
 let leaveAttachmentFiles = [];
 let leaveDateRangePicker = null;
 let leaveSelectedDates = []; // [start] or [start, end], plain JS Date objects
-let leaveDateMode = 'single'; // 'single' | 'range' - which Flatpickr mode is active
+let leaveDateMode = 'single'; // 'single' | 'range' | 'multiple' - which Flatpickr mode is active
 let myLeavesSelectedYear = null;
 let myLeavesSelectedQuarter = null; // 1-4, or null - clicking a quarter tile filters the history list to it
 let myLeavesHistoryFilter = 'all'; // 'all' | 'pending' | 'resolved' - the hfilter chips
@@ -1080,7 +1084,9 @@ function updateLeaveDrawerSummaryChips_() {
   if (leaveSelectedDates.length) {
     const start = leaveSelectedDates[0];
     const end = leaveSelectedDates[leaveSelectedDates.length - 1];
-    if (leaveDateMode === 'range' && leaveSelectedDates.length > 1) {
+    if (leaveDateMode === 'multiple' && leaveSelectedDates.length > 1) {
+      chips.push('<span class="mchip n">' + leaveSelectedDates.length + ' dates selected</span>');
+    } else if (leaveDateMode === 'range' && leaveSelectedDates.length > 1) {
       const days = Math.round((end - start) / 86400000) + 1;
       chips.push('<span class="mchip n">' + fmtDateLocal_(start) + ' – ' + fmtDateLocal_(end) + '</span>');
       chips.push('<span class="mchip n">' + days + (days === 1 ? ' day' : ' days') + '</span>');
@@ -1106,7 +1112,13 @@ function updateLeaveDatePickedSummary_() {
   leaveDatePicked.classList.remove('hidden');
   const start = leaveSelectedDates[0];
   const end = leaveSelectedDates[leaveSelectedDates.length - 1];
-  if (leaveDateMode === 'range' && leaveSelectedDates.length > 1) {
+  if (leaveDateMode === 'multiple' && leaveSelectedDates.length > 1) {
+    const MAX_LISTED = 4;
+    const listed = leaveSelectedDates.slice(0, MAX_LISTED).map(fmtDateLocal_).join(', ');
+    const extra = leaveSelectedDates.length - MAX_LISTED;
+    leaveDatePickedLabel.textContent = listed + (extra > 0 ? ' +' + extra + ' more' : '');
+    leaveDatePickedMeta.textContent = leaveSelectedDates.length + ' dates';
+  } else if (leaveDateMode === 'range' && leaveSelectedDates.length > 1) {
     const days = Math.round((end - start) / 86400000) + 1;
     leaveDatePickedLabel.textContent = fmtDateLocal_(start) + ' – ' + fmtDateLocal_(end);
     leaveDatePickedMeta.textContent = days + (days === 1 ? ' day' : ' days');
@@ -1175,9 +1187,18 @@ async function ensureLeaveDatePicker_() {
     mode: leaveDateMode,
     dateFormat: 'd M Y',
     minDate: 'today',
+    // A native <select> for the month name opens the browser's own listbox
+    // (blue-highlight OS chrome) when clicked, which CSS cannot restyle in
+    // any browser - 'static' renders the month as plain themeable text
+    // instead. Month navigation still works fine via the prev/next arrows.
+    monthSelectorType: 'static',
     inline: true,
     onChange: function (selectedDates) {
-      leaveSelectedDates = selectedDates;
+      // Sort defensively rather than trusting pick order - Range mode is
+      // always chronological already, but Custom (multiple) mode reflects
+      // click order, and start/end/day-count math downstream assumes [0]
+      // is the earliest date and [length-1] is the latest.
+      leaveSelectedDates = selectedDates.slice().sort(function (a, b) { return a - b; });
       leaveDateRangeError.classList.add('hidden');
       updateLeaveDatePickedSummary_();
       updateLeaveDrawerSummaryChips_();
@@ -1195,7 +1216,10 @@ function selectLeaveDateMode_(mode) {
   leaveDateMode = mode;
   leaveDateModeSingleBtn.classList.toggle('is-selected', mode === 'single');
   leaveDateModeRangeBtn.classList.toggle('is-selected', mode === 'range');
-  leaveDateRangeInput.placeholder = mode === 'range' ? 'Select start and end date' : 'Select a date';
+  leaveDateModeCustomBtn.classList.toggle('is-selected', mode === 'multiple');
+  leaveDateRangeInput.placeholder = mode === 'range'
+    ? 'Select start and end date'
+    : (mode === 'multiple' ? 'Select one or more dates' : 'Select a date');
   if (leaveDateRangePicker) {
     leaveDateRangePicker.clear();
     leaveDateRangePicker.set('mode', mode);
@@ -1242,8 +1266,19 @@ async function openMyLeavesDrawer() {
   // Start from a clean filter state each time the drawer is opened.
   myLeavesHistoryFilter = 'all';
   myLeavesSelectedQuarter = null;
-  await refreshApplyLeaveButton();
-  await loadMyLeavesData_();
+  // The very first fetch (unlike a later re-fetch from dismiss/withdraw,
+  // which just quietly refreshes what's already on screen) has nothing to
+  // show yet - a blank panel reads as broken, not busy, so swap in an
+  // explicit loading state for exactly this one await.
+  myLeavesLoading.classList.remove('hidden');
+  myLeavesContent.classList.add('hidden');
+  try {
+    await refreshApplyLeaveButton();
+    await loadMyLeavesData_();
+  } finally {
+    myLeavesLoading.classList.add('hidden');
+    myLeavesContent.classList.remove('hidden');
+  }
 }
 
 function closeMyLeavesDrawer() {
@@ -1374,6 +1409,9 @@ async function renderMyLeavesTrendChart_(records) {
   try {
     const Chart = await loadChartJS();
     if (myLeavesTrendChartInstance) { myLeavesTrendChartInstance.destroy(); myLeavesTrendChartInstance = null; }
+    const INTER_STACK = "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+    const AXIS_COLOR = '#94A3B8';   // --ink-400
+    const GRID_COLOR = 'rgba(15, 23, 42, 0.06)';
     myLeavesTrendChartInstance = new Chart(document.getElementById('myLeavesTrendChart'), {
       type: 'bar',
       data: {
@@ -1381,17 +1419,48 @@ async function renderMyLeavesTrendChart_(records) {
         datasets: [
           // Same hex values as the --ok-600/--no-600/--wait-600 tokens -
           // Chart.js needs a literal string, it can't read a CSS var().
-          { label: 'Approved', data: approved, backgroundColor: '#12996B', stack: 's' },
-          { label: 'Rejected', data: rejected, backgroundColor: '#D64545', stack: 's' },
-          { label: 'Pending', data: pending, backgroundColor: '#C77A08', stack: 's' }
-        ]
+          { label: 'Approved', data: approved, backgroundColor: '#12996B', hoverBackgroundColor: '#0F7D58', stack: 's' },
+          { label: 'Rejected', data: rejected, backgroundColor: '#D64545', hoverBackgroundColor: '#B93A3A', stack: 's' },
+          { label: 'Pending', data: pending, backgroundColor: '#C77A08', hoverBackgroundColor: '#A9670A', stack: 's' }
+        ].map(function (ds) {
+          return Object.assign(ds, {
+            borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 },
+            borderSkipped: false,
+            maxBarThickness: 26,
+            categoryPercentage: 0.62,
+            barPercentage: 0.9
+          });
+        })
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+        layout: { padding: { top: 10 } },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            display: true, position: 'bottom', align: 'center',
+            labels: {
+              usePointStyle: true, pointStyle: 'circle', boxWidth: 7, boxHeight: 7,
+              padding: 16, color: '#475569', font: { size: 11, family: INTER_STACK, weight: '600' }
+            }
+          },
+          tooltip: {
+            enabled: true, backgroundColor: '#0F172A', titleColor: '#F8FAFC', bodyColor: '#E2E8F0',
+            titleFont: { size: 12, family: INTER_STACK, weight: '700' }, bodyFont: { size: 12, family: INTER_STACK },
+            padding: 10, cornerRadius: 8, boxPadding: 4, displayColors: true, usePointStyle: true,
+            borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1
+          }
+        },
         scales: {
-          x: { stacked: true, ticks: { font: { size: 10 } } },
-          y: { stacked: true, beginAtZero: true, ticks: { precision: 0, font: { size: 10 } } }
+          x: {
+            stacked: true, grid: { display: false }, border: { display: false },
+            ticks: { font: { size: 10.5, family: INTER_STACK }, color: AXIS_COLOR }
+          },
+          y: {
+            stacked: true, beginAtZero: true, border: { display: false },
+            grid: { color: GRID_COLOR, drawTicks: false },
+            ticks: { precision: 0, font: { size: 10.5, family: INTER_STACK }, color: AXIS_COLOR, padding: 8 }
+          }
         }
       }
     });
@@ -1590,6 +1659,10 @@ applyLeaveBtn.addEventListener('click', openLeaveDrawer);
 closeLeaveDrawerBtn.addEventListener('click', closeLeaveDrawer);
 leaveBackdrop.addEventListener('click', closeLeaveDrawer);
 leaveCancelBtn.addEventListener('click', closeLeaveDrawer);
+leaveBackBtn.addEventListener('click', () => {
+  closeLeaveDrawer();
+  openMyLeavesDrawer();
+});
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && leaveDrawer.classList.contains('open')) closeLeaveDrawer();
   if (e.key === 'Escape' && myLeavesDrawer.classList.contains('open')) closeMyLeavesDrawer();
@@ -1603,6 +1676,7 @@ leaveTypeShortBtn.addEventListener('click', () => selectLeaveType_('casualShort'
 leaveTypeFullBtn.addEventListener('click', () => selectLeaveType_('casualFull'));
 leaveDateModeSingleBtn.addEventListener('click', () => selectLeaveDateMode_('single'));
 leaveDateModeRangeBtn.addEventListener('click', () => selectLeaveDateMode_('range'));
+leaveDateModeCustomBtn.addEventListener('click', () => selectLeaveDateMode_('multiple'));
 leaveHalfDayAmBtn.addEventListener('click', () => selectLeaveHalfDay_('AM'));
 leaveHalfDayPmBtn.addEventListener('click', () => selectLeaveHalfDay_('PM'));
 
@@ -1802,6 +1876,12 @@ leaveSendBtn.addEventListener('click', async () => {
       attachments: [],
       dismissed: false
     };
+    // Custom (non-contiguous) picks: startDate/endDate above still cover the
+    // full span for backward-compat with archive/overlap logic elsewhere,
+    // but the exact picked days are preserved here so nothing is lost.
+    if (leaveDateMode === 'multiple' && leaveSelectedDates.length > 1) {
+      leaveDocPayload.customDates = leaveSelectedDates.map(function (d) { return Timestamp.fromDate(d); });
+    }
     // Only Short Leave carries a half-day period - omit the field entirely
     // for Full Leave and every other leave type.
     if (selectedLeaveType === 'casualShort') {

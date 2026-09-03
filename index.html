@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Inter+Tight:wght@600;700;800&family=Archivo+Narrow:wght@600;700&display=swap" rel="stylesheet" />
 
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="styles.css?v=20260903a" rel="stylesheet" />
+  <link href="styles.css?v=20260903d" rel="stylesheet" />
 </head>
 <!-- `app-shell` drives the desktop single-viewport lock - see the media query
      in styles.css (engages only when the screen is wide AND tall enough). -->
@@ -441,6 +441,7 @@
             <div class="seg">
               <button type="button" id="leaveDateModeSingleBtn" data-mode="single">Single Date</button>
               <button type="button" id="leaveDateModeRangeBtn" data-mode="range">Date Range</button>
+              <button type="button" id="leaveDateModeCustomBtn" data-mode="multiple">Custom</button>
             </div>
             <div class="cal-host">
               <input type="text" id="leaveDateRangeInput" readonly placeholder="Select a date" />
@@ -453,7 +454,7 @@
           </div>
         </div>
 
-        <div class="dcol">
+        <div class="dcol dcol-r">
           <div class="blk">
             <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Attachments <span class="text-slate-400 normal-case font-medium">&middot; optional</span></div>
             <input type="file" id="leaveAttachmentInput" class="hidden" multiple
@@ -467,7 +468,7 @@
             <p id="leaveAttachmentError" class="hidden mt-1 text-xs text-red-600"></p>
           </div>
 
-          <div class="blk">
+          <div class="blk blk-fill">
             <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Reason</div>
             <div id="leaveToolbar" class="flex flex-wrap items-center gap-0.5 px-2 py-1.5 rounded-t-lg border border-slate-300 border-b-0 bg-slate-50">
               <button type="button" data-cmd="bold"          class="tb-btn" title="Bold (Ctrl+B)"><b>B</b></button>
@@ -502,6 +503,11 @@
 
     <footer class="px-4 sm:px-5 py-3 border-t border-slate-100 bg-slate-50/60 flex items-center gap-3 shrink-0">
       <div id="leaveSummaryChips" class="summary"></div>
+      <button type="button" id="leaveBackBtn"
+        class="shrink-0 px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-400 transition"
+        title="Back to My Leaves">
+        &larr; Back
+      </button>
       <button type="button" id="leaveCancelBtn"
         class="shrink-0 px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-400 transition">
         Cancel
@@ -534,7 +540,17 @@
       </button>
     </header>
 
-    <div class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5">
+    <div class="flex-1 overflow-y-auto p-4 sm:p-5">
+
+      <!-- Shown only while the initial fetch in openMyLeavesDrawer() is in
+           flight - without this, the stats/quarter/chart panel is briefly
+           just blank white space, which reads as broken rather than busy. -->
+      <div id="myLeavesLoading" class="my-leaves-loading hidden">
+        <span class="loader"></span>
+        <p>Loading your leave activity&hellip;</p>
+      </div>
+
+      <div id="myLeavesContent" class="hidden space-y-5">
 
       <!-- Apply for Leave - state-aware button, tied to the week picked on
            the main form (applyLeaveBtn/applyLeaveBtnLabel ids are read by
@@ -596,6 +612,8 @@
       <div>
         <div id="myLeavesHistoryFilters" class="hfilter mb-2.5"></div>
         <div id="myLeavesList"></div>
+      </div>
+
       </div>
     </div>
   </aside>
@@ -825,6 +843,6 @@
 
   <!-- ?v= is a cache-buster: bump it whenever app.js changes so browsers
        fetch the new file instead of serving a stale cached copy. -->
-  <script type="module" src="app.js?v=20260903c"></script>
+  <script type="module" src="app.js?v=20260903g"></script>
 </body>
 </html>

@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,8 +20,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.techew.leaveapprovals.data.AllowlistEntry
@@ -76,41 +77,83 @@ fun LeaveFilterBar(
     onEmailChange: (String?) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            item {
-                FilterChip(selected = statusFilter == null, onClick = { onStatusChange(null) }, label = { Text("All statuses") })
+        // Three compact pickers side by side (status / type / person) rather
+        // than two separately-scrolling rows of one-chip-per-value - matches
+        // the mockup's single-row .filterbar and actually fits a phone
+        // screen instead of clipping the last chip off both rows.
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            FilterDropdownButton(
+                label = statusFilter?.let { statusLabel(it) } ?: "All statuses",
+                modifier = Modifier.weight(1f)
+            ) { close ->
+                DropdownMenuItem(text = { Text("All statuses") }, onClick = { onStatusChange(null); close() })
+                STATUSES.forEach { status ->
+                    DropdownMenuItem(text = { Text(statusLabel(status)) }, onClick = { onStatusChange(status); close() })
+                }
             }
-            items(STATUSES) { status ->
-                FilterChip(selected = statusFilter == status, onClick = { onStatusChange(status) }, label = { Text(statusLabel(status)) })
+            FilterDropdownButton(
+                label = typeFilter?.let { LeaveType.label(it) } ?: "All types",
+                modifier = Modifier.weight(1f)
+            ) { close ->
+                DropdownMenuItem(text = { Text("All types") }, onClick = { onTypeChange(null); close() })
+                LeaveType.ALL.forEach { type ->
+                    DropdownMenuItem(text = { Text(LeaveType.label(type)) }, onClick = { onTypeChange(type); close() })
+                }
             }
-        }
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-            item {
-                FilterChip(selected = typeFilter == null, onClick = { onTypeChange(null) }, label = { Text("All types") })
-            }
-            items(LeaveType.ALL) { type ->
-                FilterChip(selected = typeFilter == type, onClick = { onTypeChange(type) }, label = { Text(LeaveType.label(type)) })
-            }
-        }
 
-        var sheetOpen by remember { mutableStateOf(false) }
-        val selectedName = roster.find { it.email == emailFilter }?.name ?: "All developers"
+            var sheetOpen by remember { mutableStateOf(false) }
+            val selectedName = roster.find { it.email == emailFilter }?.name ?: "Everyone"
+            OutlinedButton(
+                onClick = { sheetOpen = true },
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    selectedName, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f)
+                )
+                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
+
+            if (sheetOpen) {
+                PersonFilterSheet(
+                    roster = roster,
+                    allRecords = allRecords,
+                    emailFilter = emailFilter,
+                    onEmailChange = onEmailChange,
+                    onDismiss = { sheetOpen = false }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A single compact "Label ▾" pill that opens a plain DropdownMenu - used for
+ * the status/type pickers, which (unlike the person filter) are short,
+ * static, unsearched lists where a full bottom sheet would be overkill.
+ */
+@Composable
+private fun FilterDropdownButton(
+    label: String,
+    modifier: Modifier = Modifier,
+    items: @Composable (close: () -> Unit) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
         OutlinedButton(
-            onClick = { sheetOpen = true },
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            onClick = { expanded = true },
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text(selectedName, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Start)
-            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null)
-        }
-
-        if (sheetOpen) {
-            PersonFilterSheet(
-                roster = roster,
-                allRecords = allRecords,
-                emailFilter = emailFilter,
-                onEmailChange = onEmailChange,
-                onDismiss = { sheetOpen = false }
+            Text(
+                label, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f)
             )
+            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            items { expanded = false }
         }
     }
 }
