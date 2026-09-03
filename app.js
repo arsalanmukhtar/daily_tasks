@@ -808,28 +808,43 @@ async function fetchLeaveStatus_() {
       }
     });
 
+    function toRecord(entry) {
+      const data = entry.data;
+      return {
+        requestId: entry.id,
+        requestedAt: data.requestedAt && data.requestedAt.toDate ? data.requestedAt.toDate().toISOString() : '',
+        startDate: data.startDate && data.startDate.toDate ? data.startDate.toDate().toISOString() : '',
+        endDate: data.endDate && data.endDate.toDate ? data.endDate.toDate().toISOString() : '',
+        weekLabel: data.weekLabel || '',
+        type: normalizeLeaveType_(data.type),
+        reasonHtml: data.reasonHtml || '',
+        status: data.status || 'requested',
+        resolvedAt: data.resolvedAt && data.resolvedAt.toDate ? data.resolvedAt.toDate().toISOString() : '',
+        resolvedBy: data.resolvedBy || '',
+        attachments: normalizeLeaveAttachments_(data),
+        dismissed: data.dismissed === true
+      };
+    }
+    const byNewest = function (a, b) { return new Date(b.requestedAt) - new Date(a.requestedAt); };
+
+    // "records" (dismissed excluded) is only for the per-week Apply-for-Leave
+    // button state - dismissing a resolved request is what lets that button
+    // reset to idle for the same week/period. "allRecords" is the complete,
+    // permanent history (dismissed included) - dismissing only acknowledges
+    // a request, it never removes it from the employee's own tracking list.
     const records = allDocs
       .filter(function (entry) { return entry.data.dismissed !== true; })
-      .map(function (entry) {
-        const data = entry.data;
-        return {
-          requestId: entry.id,
-          requestedAt: data.requestedAt && data.requestedAt.toDate ? data.requestedAt.toDate().toISOString() : '',
-          startDate: data.startDate && data.startDate.toDate ? data.startDate.toDate().toISOString() : '',
-          endDate: data.endDate && data.endDate.toDate ? data.endDate.toDate().toISOString() : '',
-          weekLabel: data.weekLabel || '',
-          type: normalizeLeaveType_(data.type),
-          reasonHtml: data.reasonHtml || '',
-          status: data.status || 'requested',
-          resolvedAt: data.resolvedAt && data.resolvedAt.toDate ? data.resolvedAt.toDate().toISOString() : '',
-          resolvedBy: data.resolvedBy || '',
-          attachments: normalizeLeaveAttachments_(data)
-        };
-      })
-      .sort(function (a, b) { return new Date(b.requestedAt) - new Date(a.requestedAt); });
+      .map(toRecord)
+      .sort(byNewest);
+    const allRecords = allDocs.map(toRecord).sort(byNewest);
 
     const cooldownUntil = lastFullAt ? new Date(lastFullAt.getTime() + LEAVE_FULL_COOLDOWN_DAYS * 86400000) : null;
-    return { status: 'ok', records: records, fullLeaveCooldownUntil: cooldownUntil ? cooldownUntil.toISOString() : null };
+    return {
+      status: 'ok',
+      records: records,
+      allRecords: allRecords,
+      fullLeaveCooldownUntil: cooldownUntil ? cooldownUntil.toISOString() : null
+    };
   } catch (_e) { /* offline or backend error - caller keeps the button's prior state */ }
   return null;
 }
@@ -1062,7 +1077,10 @@ function closeMyLeavesDrawer() {
 async function loadMyLeavesData_() {
   const data = await fetchLeaveStatus_();
   if (data) latestLeaveStatusData = data;
-  const records = (latestLeaveStatusData && latestLeaveStatusData.records) || [];
+  // The full permanent history (dismissed included) - dismissing a request
+  // only acknowledges it (see fetchLeaveStatus_), it must stay visible here
+  // so an employee can always track everything they've ever applied for.
+  const records = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
   renderMyLeavesKpis_(records);
   renderMyLeavesYearChips_(records);
   renderMyLeavesQuarterTiles_(records);
@@ -1092,7 +1110,7 @@ function renderMyLeavesYearChips_(records) {
     btn.textContent = String(year);
     btn.addEventListener('click', () => {
       myLeavesSelectedYear = year;
-      const recs = (latestLeaveStatusData && latestLeaveStatusData.records) || [];
+      const recs = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
       renderMyLeavesYearChips_(recs);
       renderMyLeavesQuarterTiles_(recs);
       renderMyLeavesTrendChart_(recs);
@@ -1205,7 +1223,9 @@ function renderMyLeavesList_(records) {
             (rec.resolvedBy ? ' by <b class="font-semibold text-slate-700">' + escapeHtml(rec.resolvedBy) + '</b>' : '') +
             (rec.resolvedAt ? ' &middot; ' + escapeHtml(formatTimestamp(rec.resolvedAt)) : '') +
           '</span>' +
-          '<button type="button" class="my-leave-dismiss-btn shrink-0 text-xs font-semibold text-slate-500 hover:text-slate-800 underline underline-offset-2" data-request-id="' + escapeHtml(rec.requestId) + '">Ok, got it</button>' +
+          (rec.dismissed
+            ? ''
+            : '<button type="button" class="my-leave-dismiss-btn shrink-0 text-xs font-semibold text-slate-500 hover:text-slate-800 underline underline-offset-2" data-request-id="' + escapeHtml(rec.requestId) + '">Ok, got it</button>') +
         '</div>';
     }
 
