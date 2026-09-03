@@ -33,7 +33,8 @@ import {
   query,
   where,
   getDocs,
-  serverTimestamp
+  serverTimestamp,
+  Timestamp
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const firebaseApp = initializeApp(FIREBASE_CONFIG);
@@ -111,18 +112,23 @@ const leaveBackdrop      = document.getElementById('leaveBackdrop');
 const leaveDrawer        = document.getElementById('leaveDrawer');
 const leaveDrawerWeekLabel = document.getElementById('leaveDrawerWeekLabel');
 const closeLeaveDrawerBtn = document.getElementById('closeLeaveDrawerBtn');
+const leaveCategoryForeignTripBtn = document.getElementById('leaveCategoryForeignTripBtn');
+const leaveCategoryUmrahBtn       = document.getElementById('leaveCategoryUmrahBtn');
+const leaveCategoryMedicalBtn     = document.getElementById('leaveCategoryMedicalBtn');
+const leaveCategoryCasualBtn      = document.getElementById('leaveCategoryCasualBtn');
+const leaveCasualSubRow  = document.getElementById('leaveCasualSubRow');
 const leaveTypeShortBtn  = document.getElementById('leaveTypeShortBtn');
 const leaveTypeFullBtn   = document.getElementById('leaveTypeFullBtn');
 const leaveFullCooldownNote = document.getElementById('leaveFullCooldownNote');
+const leaveDateRangeInput = document.getElementById('leaveDateRangeInput');
+const leaveDateRangeError = document.getElementById('leaveDateRangeError');
 const leaveToolbar       = document.getElementById('leaveToolbar');
 const leaveReasonEditor  = document.getElementById('leaveReasonEditor');
 const leaveCancelBtn     = document.getElementById('leaveCancelBtn');
 const leaveSendBtn       = document.getElementById('leaveSendBtn');
 const leaveAttachmentInput  = document.getElementById('leaveAttachmentInput');
 const leaveAttachmentDrop   = document.getElementById('leaveAttachmentDrop');
-const leaveAttachmentChip   = document.getElementById('leaveAttachmentChip');
-const leaveAttachmentName   = document.getElementById('leaveAttachmentName');
-const leaveAttachmentRemove = document.getElementById('leaveAttachmentRemove');
+const leaveAttachmentList   = document.getElementById('leaveAttachmentList');
 const leaveAttachmentError  = document.getElementById('leaveAttachmentError');
 const viewMyLeavesBtn      = document.getElementById('viewMyLeavesBtn');
 const myLeavesBackdrop     = document.getElementById('myLeavesBackdrop');
@@ -588,6 +594,23 @@ leaveReasonEditor.addEventListener('beforeinput', handleListAutoformat);
 addTaskRow();
 
 // ---------- ISO week math ----------
+// The reverse of isoWeekToMonday below - derives {year, week} from an
+// arbitrary calendar date. Used to compute weekLabel from whichever date the
+// user picks in the leave calendar, instead of mirroring the separate
+// timesheet week selector.
+function dateToIsoWeek_(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return { year: d.getUTCFullYear(), week: week };
+}
+function weekLabelFromDate_(date) {
+  const info = dateToIsoWeek_(date);
+  return `Week ${info.week}, ${info.year}`;
+}
+
 function isoWeekToMonday(year, week) {
   const jan4 = new Date(Date.UTC(year, 0, 4));
   const jan4Day = jan4.getUTCDay() || 7;
@@ -694,9 +717,49 @@ function refreshWeekSummary() {
 // reflects what Firestore says - no local state to fall out of sync.
 const LEAVE_FULL_COOLDOWN_DAYS = 7;
 const LEAVE_ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024;
-const LEAVE_ATTACHMENT_EXTS = ['.pdf', '.txt', '.doc', '.docx'];
-let selectedLeaveType = 'short';
-let leaveAttachmentFile = null;
+const LEAVE_ATTACHMENT_MAX_FILES = 5;
+const LEAVE_ATTACHMENT_EXTS = ['.pdf', '.txt', '.doc', '.docx', '.zip'];
+
+// Five real leave types. 'casualShort'/'casualFull' are the two sub-choices
+// shown only when the "Casual" category is picked - the other three are
+// single, unambiguous types on their own. Kept in the same `type` Firestore
+// field the old binary 'short'/'full' values lived in (no field rename) -
+// LEAVE_TYPE_ALIASES below maps those legacy values forward so historical
+// docs keep reading correctly with zero data migration.
+const LEAVE_TYPES = {
+  foreignTrip: 'Foreign Trip',
+  umrah: 'Umrah',
+  medical: 'Medical',
+  casualShort: 'Short Leave',
+  casualFull: 'Full Leave'
+};
+const LEAVE_TYPE_ALIASES = { short: 'casualShort', full: 'casualFull' };
+function normalizeLeaveType_(type) {
+  return LEAVE_TYPE_ALIASES[type] || type || 'casualShort';
+}
+function leaveTypeLabel_(type) {
+  return LEAVE_TYPES[normalizeLeaveType_(type)] || 'Leave';
+}
+function isFullLeaveType_(type) {
+  return normalizeLeaveType_(type) === 'casualFull';
+}
+
+// New docs store an `attachments` array; old docs have the singular
+// attachmentName/attachmentUrl/attachmentFileId trio instead. Every read
+// path normalizes to a list so display code never has to branch on shape.
+function normalizeLeaveAttachments_(data) {
+  if (Array.isArray(data.attachments)) return data.attachments;
+  if (data.attachmentUrl) {
+    return [{ name: data.attachmentName || 'Attachment', url: data.attachmentUrl, fileId: data.attachmentFileId || '' }];
+  }
+  return [];
+}
+
+let selectedLeaveCategory = 'casual'; // 'foreignTrip' | 'umrah' | 'medical' | 'casual'
+let selectedLeaveType = 'casualShort'; // the concrete value written to Firestore
+let leaveAttachmentFiles = [];
+let leaveDateRangePicker = null;
+let leaveSelectedDates = []; // [start] or [start, end], plain JS Date objects
 let myLeavesSelectedYear = null;
 let myLeavesTrendChartInstance = null;
 // Last successful leaveStatus_ fetch - reused by the cooldown check, the
@@ -736,7 +799,7 @@ async function fetchLeaveStatus_() {
     // Cooldown scan includes dismissed rows (matches prior server behavior).
     let lastFullAt = null;
     allDocs.forEach(function (entry) {
-      if (entry.data.type === 'full' && entry.data.requestedAt) {
+      if (isFullLeaveType_(entry.data.type) && entry.data.requestedAt) {
         const ts = entry.data.requestedAt.toDate ? entry.data.requestedAt.toDate() : new Date(entry.data.requestedAt);
         if (!lastFullAt || ts > lastFullAt) lastFullAt = ts;
       }
@@ -749,14 +812,15 @@ async function fetchLeaveStatus_() {
         return {
           requestId: entry.id,
           requestedAt: data.requestedAt && data.requestedAt.toDate ? data.requestedAt.toDate().toISOString() : '',
+          startDate: data.startDate && data.startDate.toDate ? data.startDate.toDate().toISOString() : '',
+          endDate: data.endDate && data.endDate.toDate ? data.endDate.toDate().toISOString() : '',
           weekLabel: data.weekLabel || '',
-          type: data.type || 'short',
+          type: normalizeLeaveType_(data.type),
           reasonHtml: data.reasonHtml || '',
           status: data.status || 'requested',
           resolvedAt: data.resolvedAt && data.resolvedAt.toDate ? data.resolvedAt.toDate().toISOString() : '',
           resolvedBy: data.resolvedBy || '',
-          attachmentName: data.attachmentName || '',
-          attachmentUrl: data.attachmentUrl || ''
+          attachments: normalizeLeaveAttachments_(data)
         };
       })
       .sort(function (a, b) { return new Date(b.requestedAt) - new Date(a.requestedAt); });
@@ -792,8 +856,24 @@ async function refreshApplyLeaveButton() {
   if (!data) return; // network hiccup - leave the button showing whatever it last showed
   latestLeaveStatusData = data;
 
+  // Leave requests carry their own explicit startDate/endDate now, and can
+  // span more than one week (a Foreign Trip/Umrah could run for several) -
+  // so "does this week already have a leave request" is an overlap check
+  // against the selected week's Mon-Fri span, not an exact weekLabel match.
+  // Old docs without startDate/endDate fall back to the exact match they
+  // always used.
   const weekLabel = currentWeekLabel_();
-  const rec = data.records.find(function (r) { return r.weekLabel === weekLabel; }) || null;
+  const weekInfo = weekdaysFor(weekInput.value);
+  const weekMonday = weekInfo ? isoWeekToMonday(weekInfo.year, weekInfo.week) : null;
+  const weekFriday = weekMonday ? new Date(weekMonday.getTime() + 4 * 86400000) : null;
+  const rec = data.records.find(function (r) {
+    if (r.startDate && r.endDate && weekMonday && weekFriday) {
+      const s = new Date(r.startDate);
+      const e = new Date(r.endDate);
+      return s <= weekFriday && e >= weekMonday;
+    }
+    return r.weekLabel === weekLabel;
+  }) || null;
 
   applyLeaveBtn.classList.remove('is-idle', 'is-requested', 'is-approved', 'is-rejected');
   if (!rec) {
@@ -824,11 +904,31 @@ function stopLeaveStatusPolling_() {
   if (leaveStatusPollTimer) { clearInterval(leaveStatusPollTimer); leaveStatusPollTimer = null; }
 }
 
+const LEAVE_CATEGORY_BTNS = {
+  foreignTrip: leaveCategoryForeignTripBtn,
+  umrah: leaveCategoryUmrahBtn,
+  medical: leaveCategoryMedicalBtn,
+  casual: leaveCategoryCasualBtn
+};
+
+function selectLeaveCategory_(category) {
+  selectedLeaveCategory = category;
+  Object.keys(LEAVE_CATEGORY_BTNS).forEach(function (key) {
+    LEAVE_CATEGORY_BTNS[key].classList.toggle('is-selected', key === category);
+  });
+  leaveCasualSubRow.classList.toggle('hidden', category !== 'casual');
+  if (category === 'casual') {
+    selectLeaveType_('casualShort');
+  } else {
+    selectedLeaveType = category; // 'foreignTrip' | 'umrah' | 'medical' - no sub-choice
+  }
+}
+
 function selectLeaveType_(type) {
-  if (leaveTypeFullBtn.disabled && type === 'full') return;
+  if (leaveTypeFullBtn.disabled && type === 'casualFull') return;
   selectedLeaveType = type;
-  leaveTypeShortBtn.classList.toggle('is-selected', type === 'short');
-  leaveTypeFullBtn.classList.toggle('is-selected', type === 'full');
+  leaveTypeShortBtn.classList.toggle('is-selected', type === 'casualShort');
+  leaveTypeFullBtn.classList.toggle('is-selected', type === 'casualFull');
 }
 
 function updateFullLeaveCooldownUI_() {
@@ -840,27 +940,77 @@ function updateFullLeaveCooldownUI_() {
   if (active) {
     leaveFullCooldownNote.textContent = 'Full Leave is unavailable until ' + fmtFull(until) + ' (once every ' + LEAVE_FULL_COOLDOWN_DAYS + ' days).';
     leaveFullCooldownNote.classList.remove('hidden');
-    if (selectedLeaveType === 'full') selectLeaveType_('short');
+    if (selectedLeaveType === 'casualFull') selectLeaveType_('casualShort');
   } else {
     leaveFullCooldownNote.classList.add('hidden');
   }
 }
 
 function resetLeaveAttachment_() {
-  leaveAttachmentFile = null;
+  leaveAttachmentFiles = [];
   leaveAttachmentInput.value = '';
-  leaveAttachmentChip.classList.add('hidden');
+  leaveAttachmentList.innerHTML = '';
+  leaveAttachmentList.classList.add('hidden');
   leaveAttachmentDrop.classList.remove('hidden');
   leaveAttachmentError.classList.add('hidden');
+}
+
+// Flatpickr (date-range calendar for the leave drawer) - lazy-loaded like
+// the other optional third-party libs (ExcelJS, Chart.js, jsPDF) since it's
+// only needed once someone actually opens the leave drawer.
+let flatpickrPromise = null;
+function loadFlatpickr_() {
+  if (window.flatpickr) return Promise.resolve(window.flatpickr);
+  if (flatpickrPromise) return flatpickrPromise;
+  flatpickrPromise = new Promise(function (resolve, reject) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css';
+    document.head.appendChild(link);
+    const sc = document.createElement('script');
+    sc.src = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js';
+    sc.onload = function () {
+      if (window.flatpickr) resolve(window.flatpickr);
+      else reject(new Error('Calendar library failed to initialise.'));
+    };
+    sc.onerror = function () {
+      flatpickrPromise = null;
+      reject(new Error('Could not load the calendar library (check your connection).'));
+    };
+    document.head.appendChild(sc);
+  });
+  return flatpickrPromise;
+}
+
+async function ensureLeaveDatePicker_() {
+  if (leaveDateRangePicker) return leaveDateRangePicker;
+  const flatpickr = await loadFlatpickr_();
+  leaveDateRangePicker = flatpickr(leaveDateRangeInput, {
+    mode: 'range',
+    dateFormat: 'd M Y',
+    minDate: 'today',
+    onChange: function (selectedDates) {
+      leaveSelectedDates = selectedDates;
+      leaveDateRangeError.classList.add('hidden');
+    }
+  });
+  return leaveDateRangePicker;
+}
+
+function resetLeaveDateRange_() {
+  leaveSelectedDates = [];
+  if (leaveDateRangePicker) leaveDateRangePicker.clear();
+  leaveDateRangeError.classList.add('hidden');
 }
 
 async function openLeaveDrawer() {
   if (!currentUserContext || !weekInput.value) return;
   closeMyLeavesDrawer();
-  leaveDrawerWeekLabel.textContent = weekSummary.textContent || '-';
   leaveReasonEditor.innerHTML = '';
   resetLeaveAttachment_();
-  selectLeaveType_('short');
+  await ensureLeaveDatePicker_();
+  resetLeaveDateRange_();
+  selectLeaveCategory_('casual');
   leaveDrawer.classList.add('open');
   leaveBackdrop.classList.add('open');
   // Focus immediately so activeCell/activeToolbarEl point at this editor
@@ -1010,7 +1160,7 @@ function renderMyLeavesList_(records) {
   records.forEach((rec) => {
     const card = document.createElement('div');
     card.className = 'bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm';
-    const typeLabel = rec.type === 'full' ? 'Full Leave' : 'Short Leave';
+    const typeLabel = leaveTypeLabel_(rec.type);
     const statusLabel = rec.status === 'approved' ? 'Approved' : rec.status === 'rejected' ? 'Rejected' : 'Requested';
     const reasonHtml = rec.reasonHtml && rec.reasonHtml.trim() ? rec.reasonHtml : '<i class="text-slate-400">No reason provided.</i>';
 
@@ -1022,22 +1172,22 @@ function renderMyLeavesList_(records) {
         '</div>' +
         '<span class="shrink-0 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full ' + leaveStatusBadgeClasses_(rec.status) + '">' + statusLabel + '</span>' +
       '</div>' +
-      '<div class="text-xs text-slate-600 leading-relaxed mt-2">' + reasonHtml + '</div>';
+      '<div class="rich-text text-xs text-slate-600 leading-relaxed mt-2">' + reasonHtml + '</div>';
 
-    if (rec.attachmentUrl) {
+    (rec.attachments || []).forEach(function (att) {
       html +=
-        '<a href="' + escapeHtml(rec.attachmentUrl) + '" target="_blank" rel="noopener" ' +
-          'class="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-orange-700 hover:text-orange-800 hover:underline">' +
+        '<a href="' + escapeHtml(att.url) + '" target="_blank" rel="noopener" ' +
+          'class="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-orange-700 hover:text-orange-800 hover:underline mr-3">' +
           '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>' +
-          escapeHtml(rec.attachmentName || 'View attachment') +
+          escapeHtml(att.name || 'View attachment') +
         '</a>';
-    }
+    });
 
     if (rec.status === 'approved' || rec.status === 'rejected') {
       html +=
         '<div class="mt-2.5 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">' +
           '<span class="text-xs text-slate-500">' + statusLabel +
-            (rec.resolvedBy ? ' by ' + escapeHtml(rec.resolvedBy) : '') +
+            (rec.resolvedBy ? ' by <b class="font-semibold text-slate-700">' + escapeHtml(rec.resolvedBy) + '</b>' : '') +
             (rec.resolvedAt ? ' &middot; ' + escapeHtml(formatTimestamp(rec.resolvedAt)) : '') +
           '</span>' +
           '<button type="button" class="my-leave-dismiss-btn shrink-0 text-xs font-semibold text-slate-500 hover:text-slate-800 underline underline-offset-2" data-request-id="' + escapeHtml(rec.requestId) + '">Ok, got it</button>' +
@@ -1087,8 +1237,12 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && myLeavesDrawer.classList.contains('open')) closeMyLeavesDrawer();
 });
 
-leaveTypeShortBtn.addEventListener('click', () => selectLeaveType_('short'));
-leaveTypeFullBtn.addEventListener('click', () => selectLeaveType_('full'));
+leaveCategoryForeignTripBtn.addEventListener('click', () => selectLeaveCategory_('foreignTrip'));
+leaveCategoryUmrahBtn.addEventListener('click', () => selectLeaveCategory_('umrah'));
+leaveCategoryMedicalBtn.addEventListener('click', () => selectLeaveCategory_('medical'));
+leaveCategoryCasualBtn.addEventListener('click', () => selectLeaveCategory_('casual'));
+leaveTypeShortBtn.addEventListener('click', () => selectLeaveType_('casualShort'));
+leaveTypeFullBtn.addEventListener('click', () => selectLeaveType_('casualFull'));
 
 viewMyLeavesBtn.addEventListener('click', openMyLeavesDrawer);
 closeMyLeavesDrawerBtn.addEventListener('click', closeMyLeavesDrawer);
@@ -1098,29 +1252,56 @@ myLeavesList.addEventListener('click', (e) => {
   if (btn) dismissLeaveRequest_(btn.dataset.requestId, btn);
 });
 
+function renderLeaveAttachmentList_() {
+  if (!leaveAttachmentFiles.length) {
+    leaveAttachmentList.classList.add('hidden');
+    leaveAttachmentList.innerHTML = '';
+    leaveAttachmentDrop.classList.remove('hidden');
+    return;
+  }
+  leaveAttachmentList.classList.remove('hidden');
+  leaveAttachmentDrop.classList.toggle('hidden', leaveAttachmentFiles.length >= LEAVE_ATTACHMENT_MAX_FILES);
+  leaveAttachmentList.innerHTML = leaveAttachmentFiles.map(function (file, i) {
+    return '<div class="lv-attachment-chip">' +
+      '<span class="truncate">' + escapeHtml(file.name) + '</span>' +
+      '<button type="button" class="lv-attachment-remove" data-index="' + i + '" aria-label="Remove attachment">&times;</button>' +
+    '</div>';
+  }).join('');
+}
+
 leaveAttachmentInput.addEventListener('change', () => {
-  const file = leaveAttachmentInput.files && leaveAttachmentInput.files[0];
+  const files = Array.from(leaveAttachmentInput.files || []);
   leaveAttachmentError.classList.add('hidden');
-  if (!file) return;
-  const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
-  if (LEAVE_ATTACHMENT_EXTS.indexOf(ext) === -1) {
-    leaveAttachmentError.textContent = 'Unsupported file type - use PDF, DOC, DOCX, or TXT.';
-    leaveAttachmentError.classList.remove('hidden');
-    leaveAttachmentInput.value = '';
-    return;
+  leaveAttachmentInput.value = '';
+  if (!files.length) return;
+
+  for (const file of files) {
+    if (leaveAttachmentFiles.length >= LEAVE_ATTACHMENT_MAX_FILES) {
+      leaveAttachmentError.textContent = 'You can attach up to ' + LEAVE_ATTACHMENT_MAX_FILES + ' files.';
+      leaveAttachmentError.classList.remove('hidden');
+      break;
+    }
+    const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+    if (LEAVE_ATTACHMENT_EXTS.indexOf(ext) === -1) {
+      leaveAttachmentError.textContent = 'Unsupported file type: ' + file.name + ' - use PDF, DOC, DOCX, TXT, or ZIP.';
+      leaveAttachmentError.classList.remove('hidden');
+      continue;
+    }
+    if (file.size > LEAVE_ATTACHMENT_MAX_BYTES) {
+      leaveAttachmentError.textContent = file.name + ' is too large - max 8MB.';
+      leaveAttachmentError.classList.remove('hidden');
+      continue;
+    }
+    leaveAttachmentFiles.push(file);
   }
-  if (file.size > LEAVE_ATTACHMENT_MAX_BYTES) {
-    leaveAttachmentError.textContent = 'File is too large - max 8MB.';
-    leaveAttachmentError.classList.remove('hidden');
-    leaveAttachmentInput.value = '';
-    return;
-  }
-  leaveAttachmentFile = file;
-  leaveAttachmentName.textContent = file.name;
-  leaveAttachmentChip.classList.remove('hidden');
-  leaveAttachmentDrop.classList.add('hidden');
+  renderLeaveAttachmentList_();
 });
-leaveAttachmentRemove.addEventListener('click', () => resetLeaveAttachment_());
+leaveAttachmentList.addEventListener('click', (e) => {
+  const btn = e.target.closest('.lv-attachment-remove');
+  if (!btn) return;
+  leaveAttachmentFiles.splice(parseInt(btn.dataset.index, 10), 1);
+  renderLeaveAttachmentList_();
+});
 
 // Uploads directly to the signed-in user's own Google Drive using the
 // drive.file OAuth scope granted at sign-in (see ensureDriveAccessToken_),
@@ -1176,8 +1357,14 @@ async function uploadAttachmentToDrive_(file) {
 
 leaveSendBtn.addEventListener('click', async () => {
   if (!currentUserContext) return;
-  const weekLabel = currentWeekLabel_();
-  if (!weekLabel) return;
+  if (!leaveSelectedDates.length) {
+    leaveDateRangeError.textContent = 'Please select a date (or date range) for this leave.';
+    leaveDateRangeError.classList.remove('hidden');
+    return;
+  }
+  const startDate = leaveSelectedDates[0];
+  const endDate = leaveSelectedDates[leaveSelectedDates.length - 1];
+  const weekLabel = weekLabelFromDate_(startDate);
 
   const reasonHtml = (leaveReasonEditor.innerHTML || '').trim();
   const email = currentUserEmail_();
@@ -1195,7 +1382,7 @@ leaveSendBtn.addEventListener('click', async () => {
     // network await (like addDoc) risk being silently blocked by the
     // browser.
     let driveTokenError = null;
-    if (leaveAttachmentFile) {
+    if (leaveAttachmentFiles.length) {
       try {
         await ensureDriveAccessToken_();
       } catch (tokenErr) {
@@ -1208,32 +1395,32 @@ leaveSendBtn.addEventListener('click', async () => {
       name: currentUserContext.displayName,
       weekLabel: weekLabel,
       type: selectedLeaveType,
+      startDate: Timestamp.fromDate(startDate),
+      endDate: Timestamp.fromDate(endDate),
       reasonHtml: reasonHtml === '<br>' ? '' : reasonHtml,
       status: 'requested',
       requestedAt: serverTimestamp(),
       resolvedAt: null,
       resolvedBy: null,
-      attachmentName: null,
-      attachmentUrl: null,
-      attachmentFileId: null,
+      attachments: [],
       dismissed: false
     });
 
-    if (leaveAttachmentFile) {
+    if (leaveAttachmentFiles.length) {
       try {
         if (driveTokenError) throw driveTokenError;
-        const uploaded = await uploadAttachmentToDrive_(leaveAttachmentFile);
-        await updateDoc(docRef, {
-          attachmentName: leaveAttachmentFile.name,
-          attachmentUrl: uploaded.url,
-          attachmentFileId: uploaded.fileId
-        });
+        const uploaded = [];
+        for (const file of leaveAttachmentFiles) {
+          const result = await uploadAttachmentToDrive_(file);
+          uploaded.push({ name: file.name, url: result.url, fileId: result.fileId });
+        }
+        await updateDoc(docRef, { attachments: uploaded });
       } catch (attachErr) {
         // Best-effort, matching prior behavior - the leave request itself
         // still stands even if the attachment upload failed.
         console.error('Attachment upload failed:', attachErr);
         const detail = attachErr && (attachErr.code || attachErr.message);
-        showToast_('Leave request sent, but the attachment could not be uploaded' + (detail ? ' (' + detail + ')' : '.'), 'error');
+        showToast_('Leave request sent, but attachments could not be uploaded' + (detail ? ' (' + detail + ')' : '.'), 'error');
       }
     }
 
@@ -3217,17 +3404,21 @@ async function renderLeaveKpis_() {
   try {
     if (!currentUserContext) throw new Error('Not signed in.');
     const snap = await getDocs(collection(db, 'leaveRequests'));
-    const counts = { shortTaken: 0, fullTaken: 0, approved: 0, rejected: 0 };
+    const typeCounts = { foreignTrip: 0, umrah: 0, medical: 0, casualShort: 0, casualFull: 0 };
+    const counts = { approved: 0, rejected: 0 };
     snap.docs.forEach(function (d) {
       const data = d.data();
-      if (data.type === 'short') counts.shortTaken++;
-      else if (data.type === 'full') counts.fullTaken++;
+      const type = normalizeLeaveType_(data.type);
+      if (typeCounts.hasOwnProperty(type)) typeCounts[type]++;
       if (data.status === 'approved') counts.approved++;
       else if (data.status === 'rejected') counts.rejected++;
     });
     const cards = [
-      { label: 'Short leaves taken', value: counts.shortTaken },
-      { label: 'Full leaves taken', value: counts.fullTaken },
+      { label: 'Foreign Trip', value: typeCounts.foreignTrip },
+      { label: 'Umrah', value: typeCounts.umrah },
+      { label: 'Medical', value: typeCounts.medical },
+      { label: 'Casual - Short', value: typeCounts.casualShort },
+      { label: 'Casual - Full', value: typeCounts.casualFull },
       { label: 'Leaves approved', value: counts.approved },
       { label: 'Leaves rejected', value: counts.rejected }
     ];

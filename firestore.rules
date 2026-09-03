@@ -86,7 +86,7 @@ service cloud.firestore {
           resource.data.email == emailLower() &&
           resource.data.status == 'requested' &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['attachmentName', 'attachmentUrl', 'attachmentFileId'])
+            .hasOnly(['attachmentName', 'attachmentUrl', 'attachmentFileId', 'attachments'])
         );
 
       allow delete: if false;

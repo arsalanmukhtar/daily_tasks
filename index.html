@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Inter+Tight:wght@600;700;800&family=Archivo+Narrow:wght@600;700&display=swap" rel="stylesheet" />
 
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="styles.css?v=20260902a" rel="stylesheet" />
+  <link href="styles.css?v=20260903a" rel="stylesheet" />
 </head>
 <!-- `app-shell` drives the desktop single-viewport lock - see the media query
      in styles.css (engages only when the screen is wide AND tall enough). -->
@@ -373,7 +373,7 @@
     <header class="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-slate-200 flex items-start justify-between gap-3 shrink-0 bg-gradient-to-r from-slate-50 to-orange-50/60">
       <div class="min-w-0">
         <h2 class="text-base font-semibold text-slate-800">Apply for Leave</h2>
-        <p id="leaveDrawerWeekLabel" class="text-xs text-slate-500 mt-0.5">-</p>
+        <p id="leaveDrawerWeekLabel" class="text-xs text-slate-500 mt-0.5">Pick a type, date(s), and reason</p>
       </div>
       <div class="flex items-center gap-1 shrink-0">
         <button type="button" id="closeLeaveDrawerBtn"
@@ -390,23 +390,33 @@
       <div>
         <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Leave type</div>
         <div class="grid grid-cols-2 gap-2">
-          <button type="button" id="leaveTypeShortBtn" data-type="short" class="lv-type-btn">Short Leave</button>
-          <button type="button" id="leaveTypeFullBtn" data-type="full" class="lv-type-btn">Full Leave</button>
+          <button type="button" id="leaveCategoryForeignTripBtn" data-category="foreignTrip" class="lv-type-btn">Foreign Trip</button>
+          <button type="button" id="leaveCategoryUmrahBtn" data-category="umrah" class="lv-type-btn">Umrah</button>
+          <button type="button" id="leaveCategoryMedicalBtn" data-category="medical" class="lv-type-btn">Medical</button>
+          <button type="button" id="leaveCategoryCasualBtn" data-category="casual" class="lv-type-btn">Casual</button>
+        </div>
+        <div id="leaveCasualSubRow" class="hidden grid grid-cols-2 gap-2 mt-2">
+          <button type="button" id="leaveTypeShortBtn" data-type="casualShort" class="lv-type-btn lv-type-sub-btn">Short Leave</button>
+          <button type="button" id="leaveTypeFullBtn" data-type="casualFull" class="lv-type-btn lv-type-sub-btn">Full Leave</button>
         </div>
         <p id="leaveFullCooldownNote" class="hidden mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5"></p>
       </div>
 
       <div>
-        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Attachment (optional)</div>
-        <input type="file" id="leaveAttachmentInput" class="hidden"
-          accept=".pdf,.txt,.doc,.docx,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Date(s)</div>
+        <input type="text" id="leaveDateRangeInput" readonly placeholder="Select date(s)"
+          class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-700 bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-300" />
+        <p id="leaveDateRangeError" class="hidden mt-1 text-xs text-red-600"></p>
+      </div>
+
+      <div>
+        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Attachments (optional)</div>
+        <input type="file" id="leaveAttachmentInput" class="hidden" multiple
+          accept=".pdf,.txt,.doc,.docx,.zip,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/zip,application/x-zip-compressed" />
         <label for="leaveAttachmentInput" id="leaveAttachmentDrop" class="lv-file-drop">
-          PDF, DOC, DOCX, or TXT &middot; max 8MB
+          PDF, DOC, DOCX, TXT, or ZIP &middot; max 8MB each, up to 5 files
         </label>
-        <div id="leaveAttachmentChip" class="hidden lv-attachment-chip">
-          <span id="leaveAttachmentName" class="truncate"></span>
-          <button type="button" id="leaveAttachmentRemove" aria-label="Remove attachment">&times;</button>
-        </div>
+        <div id="leaveAttachmentList" class="hidden space-y-1.5 mt-1.5"></div>
         <p id="leaveAttachmentError" class="hidden mt-1 text-xs text-red-600"></p>
       </div>
 
@@ -437,7 +447,7 @@
             <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><text x="0" y="7" font-size="6" font-weight="700">1.</text><text x="0" y="13" font-size="6" font-weight="700">2.</text><text x="0" y="19" font-size="6" font-weight="700">3.</text><rect x="7" y="4" width="11" height="2" rx="1"/><rect x="7" y="9" width="11" height="2" rx="1"/><rect x="7" y="14" width="11" height="2" rx="1"/></svg>
           </button>
         </div>
-        <div id="leaveReasonEditor" class="cell-editor lv-reason-editor border border-t-0 border-slate-300 rounded-b-lg" contenteditable="true" data-placeholder="Describe your reason for leave..."></div>
+        <div id="leaveReasonEditor" class="cell-editor lv-reason-editor rich-text border border-t-0 border-slate-300 rounded-b-lg" contenteditable="true" data-placeholder="Describe your reason for leave..."></div>
       </div>
     </div>
 
@@ -752,6 +762,6 @@
 
   <!-- ?v= is a cache-buster: bump it whenever app.js changes so browsers
        fetch the new file instead of serving a stale cached copy. -->
-  <script type="module" src="app.js?v=20260902c"></script>
+  <script type="module" src="app.js?v=20260903a"></script>
 </body>
 </html>

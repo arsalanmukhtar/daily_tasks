@@ -1454,7 +1454,22 @@ textarea {
 }
 .lv-attachment-chip button:hover { background: #fed7aa; }
 
+.lv-type-sub-btn { padding: 0.45rem 0.75rem; font-size: 0.75rem; }
+
 .lv-reason-editor { min-height: 8rem; }
+
+/* Applied wherever a leave request's rich-text `reasonHtml` is shown
+   read-only (My Leaves history cards) - without this, the contenteditable
+   editor's raw output (lists, bold/colour spans) renders as an unstyled
+   wall of text, since the browser has no default list/paragraph spacing
+   for content injected via innerHTML outside of a real content context. */
+.rich-text ul, .rich-text ol { padding-left: 1.25rem; margin: 0.35rem 0; }
+.rich-text ul { list-style: disc; }
+.rich-text ol { list-style: decimal; }
+.rich-text li { margin: 0.15rem 0; }
+.rich-text p, .rich-text div { margin: 0.35rem 0; }
+.rich-text p:first-child, .rich-text div:first-child { margin-top: 0; }
+.rich-text b, .rich-text strong { font-weight: 700; }
 /* Neutral focus ring - the amber tint used for task-table cells reads as an
    error/warning state here, so the reason box gets its own quieter one. */
 .lv-reason-editor:focus {
