@@ -27,12 +27,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.text.HtmlCompat
 import com.techew.leaveapprovals.data.LeaveRequest
+import com.techew.leaveapprovals.data.LeaveType
 import com.techew.leaveapprovals.ui.theme.StatusApproved
 import com.techew.leaveapprovals.ui.theme.StatusApprovedBg
 import com.techew.leaveapprovals.ui.theme.StatusRejected
 import com.techew.leaveapprovals.ui.theme.StatusRejectedBg
 import com.techew.leaveapprovals.ui.theme.StatusRequested
 import com.techew.leaveapprovals.ui.theme.StatusRequestedBg
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 /**
  * Compact summary card for the Requests list. Full formatted description,
@@ -91,8 +95,10 @@ fun RequestCard(
                 modifier = Modifier.padding(top = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                MetaChip(LeaveType.label(request.type))
                 MetaChip(request.weekLabel)
-                MetaChip(if (request.type == "full") "Full Leave" else "Short Leave")
+                val time = formatTimeHHmm(request.requestedAt)
+                if (time.isNotBlank()) MetaChip(time)
             }
 
             HorizontalDivider(modifier = Modifier.padding(top = 12.dp, bottom = 10.dp))
@@ -146,6 +152,17 @@ internal fun StatusBadge(label: String, color: androidx.compose.ui.graphics.Colo
             softWrap = false
         )
     }
+}
+
+private val TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm")
+
+// Local HH:mm the request was submitted at - shared by RequestCard and
+// RequestDetailSheet's chip rows (same package, internal visibility).
+internal fun formatTimeHHmm(iso: String): String {
+    if (iso.isBlank()) return ""
+    return runCatching {
+        Instant.parse(iso).atZone(ZoneId.systemDefault()).format(TIME_FORMATTER)
+    }.getOrDefault("")
 }
 
 @Composable

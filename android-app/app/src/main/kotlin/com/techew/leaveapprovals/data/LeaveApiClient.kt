@@ -28,7 +28,7 @@ class LeaveApiClient(
     // call .remove() on it when done (these ViewModels aren't backed by a
     // real ViewModelStore, so onCleared() never fires for them - see
     // RequestListViewModel/LeaveSummaryViewModel's stopListening()).
-    fun listenLeaveRequests(limit: Int = 50, onResult: (Result<List<LeaveRequest>>) -> Unit): ListenerRegistration {
+    fun listenLeaveRequests(limit: Int = 300, onResult: (Result<List<LeaveRequest>>) -> Unit): ListenerRegistration {
         return db.collection("leaveRequests")
             .orderBy("requestedAt", Query.Direction.DESCENDING)
             .limit(limit.toLong())
@@ -85,16 +85,45 @@ class LeaveApiClient(
 private fun DocumentSnapshot.toLeaveRequest(): LeaveRequest = LeaveRequest(
     requestId = id,
     requestedAt = getTimestamp("requestedAt").toIsoStringOrEmpty(),
+    startDate = getTimestamp("startDate").toIsoStringOrEmpty(),
+    endDate = getTimestamp("endDate").toIsoStringOrEmpty(),
     email = getString("email") ?: "",
     name = getString("name") ?: "",
     weekLabel = getString("weekLabel") ?: "",
-    type = getString("type") ?: "short",
+    type = LeaveType.normalize(getString("type") ?: ""),
     reasonHtml = getString("reasonHtml") ?: "",
     status = getString("status") ?: "requested",
     resolvedAt = getTimestamp("resolvedAt").toIsoStringOrEmpty(),
     resolvedBy = getString("resolvedBy") ?: "",
-    attachmentName = getString("attachmentName") ?: "",
-    attachmentUrl = getString("attachmentUrl") ?: ""
+    attachments = toAttachments()
 )
 
 private fun Timestamp?.toIsoStringOrEmpty(): String = this?.toDate()?.toInstant()?.toString() ?: ""
+
+// New docs store an `attachments` array; old docs have the singular
+// attachmentName/attachmentUrl/attachmentFileId trio instead. Normalize to a
+// list here so display code never has to branch on which shape a doc has.
+@Suppress("UNCHECKED_CAST")
+private fun DocumentSnapshot.toAttachments(): List<Attachment> {
+    val list = get("attachments") as? List<Map<String, Any?>>
+    if (list != null) {
+        return list.map {
+            Attachment(
+                name = it["name"] as? String ?: "",
+                url = it["url"] as? String ?: "",
+                fileId = it["fileId"] as? String ?: ""
+            )
+        }
+    }
+    val legacyUrl = getString("attachmentUrl")
+    if (!legacyUrl.isNullOrBlank()) {
+        return listOf(
+            Attachment(
+                name = getString("attachmentName") ?: "Attachment",
+                url = legacyUrl,
+                fileId = getString("attachmentFileId") ?: ""
+            )
+        )
+    }
+    return emptyList()
+}

@@ -28,11 +28,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.text.HtmlCompat
+import com.techew.leaveapprovals.data.Attachment
 import com.techew.leaveapprovals.data.LeaveRequest
+import com.techew.leaveapprovals.data.LeaveType
 import com.techew.leaveapprovals.ui.theme.StatusApproved
 import com.techew.leaveapprovals.ui.theme.StatusRejected
 
@@ -52,7 +57,7 @@ fun RequestDetailSheet(
 ) {
     val context = LocalContext.current
     val (statusColor, statusBg) = statusColors(request.status)
-    val typeLabel = if (request.type == "full") "Full Leave" else "Short Leave"
+    val typeLabel = LeaveType.label(request.type)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
@@ -88,8 +93,10 @@ fun RequestDetailSheet(
                     modifier = Modifier.padding(top = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    MetaChip(request.weekLabel)
                     MetaChip(typeLabel)
+                    MetaChip(request.weekLabel)
+                    val time = formatTimeHHmm(request.requestedAt)
+                    if (time.isNotBlank()) MetaChip(time)
                 }
 
                 HorizontalDivider(modifier = Modifier.padding(top = 16.dp, bottom = 14.dp))
@@ -107,17 +114,20 @@ fun RequestDetailSheet(
                     },
                     update = { textView ->
                         val html = request.reasonHtml.ifBlank { "<i>No reason provided.</i>" }
-                        textView.text = HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_COMPACT)
+                        // LEGACY mode (vs COMPACT) keeps real paragraph/list spacing
+                        // from the web editor's contenteditable output instead of
+                        // collapsing it into one dense run of text.
+                        textView.text = HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_LEGACY)
                     }
                 )
 
-                if (request.attachmentUrl.isNotBlank()) {
+                request.attachments.forEach { attachment: Attachment ->
                     OutlinedButton(
-                        onClick = { openAttachment(context, request.attachmentUrl) },
-                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+                        onClick = { openAttachment(context, attachment.url) },
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
                     ) {
                         Icon(Icons.Outlined.AttachFile, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                        Text(request.attachmentName.ifBlank { "Open attachment" })
+                        Text(attachment.name.ifBlank { "Open attachment" })
                     }
                 }
             }
@@ -125,7 +135,10 @@ fun RequestDetailSheet(
             if (request.status != "requested") {
                 HorizontalDivider(modifier = Modifier.padding(top = 18.dp, bottom = 14.dp))
                 Text(
-                    "${if (request.status == "approved") "Approved" else "Rejected"} by ${request.resolvedBy}",
+                    buildAnnotatedString {
+                        append(if (request.status == "approved") "Approved by " else "Rejected by ")
+                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(request.resolvedBy) }
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

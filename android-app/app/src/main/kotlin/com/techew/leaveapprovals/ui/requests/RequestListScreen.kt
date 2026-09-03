@@ -1,7 +1,9 @@
 package com.techew.leaveapprovals.ui.requests
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.techew.leaveapprovals.data.LeaveRequest
 import kotlinx.coroutines.launch
 
 /**
@@ -37,10 +40,37 @@ fun RequestListScreen(
     highlightRequestId: String?,
     onHighlightHandled: () -> Unit
 ) {
-    val records by viewModel.records.collectAsState()
+    val records by viewModel.activeRecords.collectAsState()
+    LeaveRequestList(
+        viewModel = viewModel,
+        records = records,
+        emptyMessage = "No leave requests yet.",
+        highlightRequestId = highlightRequestId,
+        onHighlightHandled = onHighlightHandled
+    )
+}
+
+/**
+ * Shared by RequestListScreen (activeRecords) and ArchivedRequestsScreen
+ * (archivedRecords) - same filter bar, list, and detail-sheet mechanics,
+ * differing only in which derived list is passed in.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun LeaveRequestList(
+    viewModel: RequestListViewModel,
+    records: List<LeaveRequest>,
+    emptyMessage: String,
+    highlightRequestId: String?,
+    onHighlightHandled: () -> Unit
+) {
     val isLoading by viewModel.isLoading.collectAsState()
     val isDeciding by viewModel.isDeciding.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val typeFilter by viewModel.typeFilter.collectAsState()
+    val statusFilter by viewModel.statusFilter.collectAsState()
+    val emailFilter by viewModel.emailFilter.collectAsState()
+    val roster by viewModel.roster.collectAsState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
@@ -80,28 +110,39 @@ fun RequestListScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        when {
-            isLoading && records.isEmpty() -> {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            }
-            records.isEmpty() -> {
-                Text(
-                    errorMessage ?: "No leave requests yet.",
-                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-            else -> {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)
-                ) {
-                    items(records, key = { it.requestId }) { request ->
-                        RequestCard(
-                            request = request,
-                            onViewDetails = { selectedRequestId = request.requestId }
-                        )
+    Column(modifier = Modifier.fillMaxSize()) {
+        LeaveFilterBar(
+            typeFilter = typeFilter,
+            statusFilter = statusFilter,
+            emailFilter = emailFilter,
+            roster = roster,
+            onTypeChange = viewModel::setTypeFilter,
+            onStatusChange = viewModel::setStatusFilter,
+            onEmailChange = viewModel::setEmailFilter
+        )
+        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            when {
+                isLoading && records.isEmpty() -> {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                }
+                records.isEmpty() -> {
+                    Text(
+                        errorMessage ?: emptyMessage,
+                        modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                else -> {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)
+                    ) {
+                        items(records, key = { it.requestId }) { request ->
+                            RequestCard(
+                                request = request,
+                                onViewDetails = { selectedRequestId = request.requestId }
+                            )
+                        }
                     }
                 }
             }

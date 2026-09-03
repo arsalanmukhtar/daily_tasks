@@ -1,23 +1,34 @@
 package com.techew.leaveapprovals.ui.summary
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.ListenerRegistration
+import com.techew.leaveapprovals.data.AllowlistEntry
+import com.techew.leaveapprovals.data.AllowlistRepository
 import com.techew.leaveapprovals.data.LeaveApiClient
 import com.techew.leaveapprovals.data.LeaveRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 // Well past what a small team accumulates even over a couple of years - large
 // enough that the Summary tab's trends aren't quietly missing older history.
 private const val SUMMARY_LIMIT = 500
 
 class LeaveSummaryViewModel(
-    private val apiClient: LeaveApiClient
+    private val apiClient: LeaveApiClient,
+    private val allowlistRepository: AllowlistRepository = AllowlistRepository()
 ) : ViewModel() {
 
     private val _records = MutableStateFlow<List<LeaveRequest>>(emptyList())
     val records: StateFlow<List<LeaveRequest>> = _records.asStateFlow()
+
+    // Full roster (regardless of leave history) so every allowlisted
+    // developer is selectable in the multi-user filter, not just the ones
+    // who happen to have leave records.
+    private val _roster = MutableStateFlow<List<AllowlistEntry>>(emptyList())
+    val roster: StateFlow<List<AllowlistEntry>> = _roster.asStateFlow()
 
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -33,6 +44,10 @@ class LeaveSummaryViewModel(
     // open in the background.
     init {
         startListening()
+        viewModelScope.launch {
+            runCatching { allowlistRepository.listAll() }
+                .onSuccess { _roster.value = it }
+        }
     }
 
     private fun startListening() {
