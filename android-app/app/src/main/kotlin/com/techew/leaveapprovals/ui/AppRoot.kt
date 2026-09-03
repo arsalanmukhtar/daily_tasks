@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -113,6 +114,17 @@ fun AppRoot(
         is AuthState.SignedInOwner -> {
             val requestListViewModel = remember(state.user.uid) { RequestListViewModel(apiClient) }
             val summaryViewModel = remember(state.user.uid) { LeaveSummaryViewModel(apiClient) }
+            // Both ViewModels above are plain `remember{}` instances, not
+            // ones obtained from a real ViewModelStore, so ViewModel.onCleared()
+            // never fires for them on its own - stop their live Firestore
+            // listeners explicitly on sign-out or an account switch (a new
+            // uid), or they'd keep running in the background indefinitely.
+            DisposableEffect(state.user.uid) {
+                onDispose {
+                    requestListViewModel.stopListening()
+                    summaryViewModel.stopListening()
+                }
+            }
             ManagerHomeScreen(
                 requestListViewModel = requestListViewModel,
                 summaryViewModel = summaryViewModel,

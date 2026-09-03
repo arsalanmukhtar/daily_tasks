@@ -3,6 +3,7 @@ package com.techew.leaveapprovals.ui.requests
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.firestore.ListenerRegistration
 import com.techew.leaveapprovals.data.LeaveApiClient
 import com.techew.leaveapprovals.data.LeaveRequest
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,36 +18,51 @@ class RequestListViewModel(
     private val _records = MutableStateFlow<List<LeaveRequest>>(emptyList())
     val records: StateFlow<List<LeaveRequest>> = _records.asStateFlow()
 
-    private val _isLoading = MutableStateFlow(false)
+    private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    // True from the moment Approve/Reject is tapped until the refreshed list
-    // (with the new status) has actually loaded - lets the detail sheet show
-    // a spinner for the whole round trip instead of closing instantly with
-    // no feedback.
+    // True from the moment Approve/Reject is tapped until the decision's
+    // transaction finishes - the live listener below picks up the resulting
+    // status change on its own, no manual reload needed.
     private val _isDeciding = MutableStateFlow(false)
     val isDeciding: StateFlow<Boolean> = _isDeciding.asStateFlow()
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    fun refresh() {
-        viewModelScope.launch { doRefresh() }
+    private var listenerRegistration: ListenerRegistration? = null
+
+    init {
+        startListening()
     }
 
-    private suspend fun doRefresh() {
+    private fun startListening() {
+        listenerRegistration?.remove()
         _isLoading.value = true
-        _errorMessage.value = null
-        runCatching {
-            apiClient.listLeaveRequests()
-        }.onSuccess {
-            Log.i("RequestListViewModel", "doRefresh got ${it.size} docs, top=${it.firstOrNull()?.requestId} reason=${it.firstOrNull()?.reasonHtml}")
-            _records.value = it
-        }.onFailure {
-            Log.e("RequestListViewModel", "doRefresh failed", it)
-            _errorMessage.value = it.message ?: "Could not load requests."
+        listenerRegistration = apiClient.listenLeaveRequests { result ->
+            _isLoading.value = false
+            result.onSuccess {
+                _errorMessage.value = null
+                _records.value = it
+            }.onFailure {
+                Log.e("RequestListViewModel", "listener error", it)
+                _errorMessage.value = it.message ?: "Could not load requests."
+            }
         }
-        _isLoading.value = false
+    }
+
+    // The list is already live without this - kept as a manual "force
+    // resync" for the topBar's refresh button (e.g. after a long stretch in
+    // the background, or a suspected dropped listener).
+    fun refresh() = startListening()
+
+    // Must be called explicitly when this ViewModel is done with (sign-out,
+    // switching accounts) - it's a plain `remember{}` instance, not one
+    // obtained from a real ViewModelStore, so ViewModel.onCleared() never
+    // fires and the listener would otherwise run forever.
+    fun stopListening() {
+        listenerRegistration?.remove()
+        listenerRegistration = null
     }
 
     fun decide(requestId: String, decision: String) {
@@ -58,7 +74,6 @@ class RequestListViewModel(
             }.onFailure {
                 _errorMessage.value = it.message ?: "Could not save decision."
             }
-            doRefresh()
             _isDeciding.value = false
         }
     }

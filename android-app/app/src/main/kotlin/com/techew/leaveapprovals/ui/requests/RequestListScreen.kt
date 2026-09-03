@@ -55,11 +55,11 @@ fun RequestListScreen(
         }
     }
 
-    LaunchedEffect(Unit) { viewModel.refresh() }
-
     // Approve/Reject just sets isDeciding true and lets the sheet show a
-    // spinner for the round trip; once the refreshed list lands and
-    // isDeciding flips back to false, close the sheet automatically.
+    // spinner for the round trip; once the decision's transaction finishes
+    // and isDeciding flips back to false, close the sheet automatically -
+    // the live listener (started when the ViewModel was constructed) picks
+    // up the resulting status change on its own.
     var wasDeciding by remember { mutableStateOf(false) }
     LaunchedEffect(isDeciding) {
         if (wasDeciding && !isDeciding) closeSheet()

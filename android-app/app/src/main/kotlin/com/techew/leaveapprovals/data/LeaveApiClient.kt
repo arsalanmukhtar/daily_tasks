@@ -5,8 +5,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.Source
 import kotlinx.coroutines.tasks.await
 
 class ApiException(message: String) : Exception(message)
@@ -22,18 +22,23 @@ class LeaveApiClient(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
 ) {
 
-    // Source.SERVER, not the default - a plain .get() can be satisfied from
-    // the SDK's local cache without a real round trip once a query has been
-    // run before, so a manual refresh could silently keep showing stale data
-    // even though a fresh app launch (no cache yet for that query) picks up
-    // the latest documents fine.
-    suspend fun listLeaveRequests(limit: Int = 50): List<LeaveRequest> {
-        val snapshot = db.collection("leaveRequests")
+    // A live listener, not a one-shot fetch - the caller gets pushed a fresh
+    // list the instant a request is created or decided anywhere, with no
+    // manual refresh needed. Caller owns the returned registration and must
+    // call .remove() on it when done (these ViewModels aren't backed by a
+    // real ViewModelStore, so onCleared() never fires for them - see
+    // RequestListViewModel/LeaveSummaryViewModel's stopListening()).
+    fun listenLeaveRequests(limit: Int = 50, onResult: (Result<List<LeaveRequest>>) -> Unit): ListenerRegistration {
+        return db.collection("leaveRequests")
             .orderBy("requestedAt", Query.Direction.DESCENDING)
             .limit(limit.toLong())
-            .get(Source.SERVER)
-            .await()
-        return snapshot.documents.map { it.toLeaveRequest() }
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    onResult(Result.failure(error))
+                } else if (snapshot != null) {
+                    onResult(Result.success(snapshot.documents.map { it.toLeaveRequest() }))
+                }
+            }
     }
 
     suspend fun registerPushToken(token: String) {

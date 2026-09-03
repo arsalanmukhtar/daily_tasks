@@ -52,8 +52,6 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
 
-    LaunchedEffect(Unit) { viewModel.loadIfNeeded() }
-
     var selectedEmail by remember { mutableStateOf<String?>(null) } // null = All developers
     var selectedYear by remember { mutableStateOf(java.time.Year.now().value) }
 
