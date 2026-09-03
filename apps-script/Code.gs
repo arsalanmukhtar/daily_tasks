@@ -1,4 +1,13 @@
 /**
+ * ARCHIVED - retired from the live path. The web app and Android app now
+ * talk to Firestore directly (client SDK, authorized by firestore.rules);
+ * neither one calls this Apps Script endpoint anymore. Kept in the repo
+ * only as reference for tools/import-from-sheets.js, which reuses this
+ * file's Delta/RichText-to-rows-v1 conversion logic for the one-time
+ * historical import. See the migration plan for the full Apps Script
+ * decommission steps (undeploy the live web app, etc.) once the Firestore
+ * cutover has had a soak period.
+ *
  * Tech EW – Weekly Time Sheet backend (Firebase-authenticated).
  *
  * Setup:

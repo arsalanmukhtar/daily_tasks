@@ -151,7 +151,6 @@ const exportWeekLabel    = document.getElementById('exportWeekLabel');
 const exportWeekPanel    = document.getElementById('exportWeekPanel');
 const exportStatus       = document.getElementById('exportStatus');
 
-const leaveApprovalsLink  = document.getElementById('leaveApprovalsLink');
 const analyticsBtn        = document.getElementById('analyticsBtn');
 const analyticsBackdrop   = document.getElementById('analyticsBackdrop');
 const analyticsPanel      = document.getElementById('analyticsPanel');
@@ -1622,8 +1621,6 @@ function showForm(user, displayName, designation, reportedTo) {
   exportSummaryBtn.classList.toggle('flex', isOwner);
   analyticsBtn.classList.toggle('hidden', !isOwner);
   analyticsBtn.classList.toggle('flex', isOwner);
-  leaveApprovalsLink.classList.toggle('hidden', !isOwner);
-  leaveApprovalsLink.classList.toggle('flex', isOwner);
 
   const FALLBACK_AVATAR = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22white%22%3E%3Cpath d=%22M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z%22/%3E%3C/svg%3E';
   userPhoto.onerror = () => { userPhoto.onerror = null; userPhoto.src = FALLBACK_AVATAR; };
