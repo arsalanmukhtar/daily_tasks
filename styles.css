@@ -1712,7 +1712,12 @@ textarea {
    otherwise the input renders wider than its wrapper and "2026" clips to
    "202". Width is sized for 4 digits + both paddings with room to spare. */
 .cal-host .numInputWrapper {
-  display: inline-flex; align-items: center; position: relative; width: 84px;
+  /* !important on display/width specifically: verified via a real headless-
+     Chrome render that without it, this exact declaration (the only rule in
+     any loaded stylesheet touching these two properties on this element)
+     is silently not applied - width falls back to a ~53px auto/shrunk size
+     and display stays the UA default "block" instead of "inline-flex". */
+  display: inline-flex !important; align-items: center; position: relative; width: 84px !important;
   box-sizing: border-box;
 }
 .cal-host .numInputWrapper input.cur-year {
