@@ -120,6 +120,8 @@ const leaveCasualSubRow  = document.getElementById('leaveCasualSubRow');
 const leaveTypeShortBtn  = document.getElementById('leaveTypeShortBtn');
 const leaveTypeFullBtn   = document.getElementById('leaveTypeFullBtn');
 const leaveFullCooldownNote = document.getElementById('leaveFullCooldownNote');
+const leaveDateModeSingleBtn = document.getElementById('leaveDateModeSingleBtn');
+const leaveDateModeRangeBtn  = document.getElementById('leaveDateModeRangeBtn');
 const leaveDateRangeInput = document.getElementById('leaveDateRangeInput');
 const leaveDateRangeError = document.getElementById('leaveDateRangeError');
 const leaveToolbar       = document.getElementById('leaveToolbar');
@@ -760,6 +762,7 @@ let selectedLeaveType = 'casualShort'; // the concrete value written to Firestor
 let leaveAttachmentFiles = [];
 let leaveDateRangePicker = null;
 let leaveSelectedDates = []; // [start] or [start, end], plain JS Date objects
+let leaveDateMode = 'single'; // 'single' | 'range' - which Flatpickr mode is active
 let myLeavesSelectedYear = null;
 let myLeavesTrendChartInstance = null;
 // Last successful leaveStatus_ fetch - reused by the cooldown check, the
@@ -986,7 +989,7 @@ async function ensureLeaveDatePicker_() {
   if (leaveDateRangePicker) return leaveDateRangePicker;
   const flatpickr = await loadFlatpickr_();
   leaveDateRangePicker = flatpickr(leaveDateRangeInput, {
-    mode: 'range',
+    mode: leaveDateMode,
     dateFormat: 'd M Y',
     minDate: 'today',
     onChange: function (selectedDates) {
@@ -997,9 +1000,21 @@ async function ensureLeaveDatePicker_() {
   return leaveDateRangePicker;
 }
 
-function resetLeaveDateRange_() {
+// Single Date vs Date Range is an explicit toggle rather than relying on
+// Flatpickr's range mode alone for a one-day pick (clicking the same day
+// twice in range mode is not an obvious gesture) - switching modes clears
+// whatever was selected under the previous mode to avoid a stale mixed
+// selection (e.g. a leftover range end date after switching to Single Date).
+function selectLeaveDateMode_(mode) {
+  leaveDateMode = mode;
+  leaveDateModeSingleBtn.classList.toggle('is-selected', mode === 'single');
+  leaveDateModeRangeBtn.classList.toggle('is-selected', mode === 'range');
+  leaveDateRangeInput.placeholder = mode === 'range' ? 'Select start and end date' : 'Select a date';
+  if (leaveDateRangePicker) {
+    leaveDateRangePicker.clear();
+    leaveDateRangePicker.set('mode', mode);
+  }
   leaveSelectedDates = [];
-  if (leaveDateRangePicker) leaveDateRangePicker.clear();
   leaveDateRangeError.classList.add('hidden');
 }
 
@@ -1009,7 +1024,7 @@ async function openLeaveDrawer() {
   leaveReasonEditor.innerHTML = '';
   resetLeaveAttachment_();
   await ensureLeaveDatePicker_();
-  resetLeaveDateRange_();
+  selectLeaveDateMode_('single');
   selectLeaveCategory_('casual');
   leaveDrawer.classList.add('open');
   leaveBackdrop.classList.add('open');
@@ -1243,6 +1258,8 @@ leaveCategoryMedicalBtn.addEventListener('click', () => selectLeaveCategory_('me
 leaveCategoryCasualBtn.addEventListener('click', () => selectLeaveCategory_('casual'));
 leaveTypeShortBtn.addEventListener('click', () => selectLeaveType_('casualShort'));
 leaveTypeFullBtn.addEventListener('click', () => selectLeaveType_('casualFull'));
+leaveDateModeSingleBtn.addEventListener('click', () => selectLeaveDateMode_('single'));
+leaveDateModeRangeBtn.addEventListener('click', () => selectLeaveDateMode_('range'));
 
 viewMyLeavesBtn.addEventListener('click', openMyLeavesDrawer);
 closeMyLeavesDrawerBtn.addEventListener('click', closeMyLeavesDrawer);

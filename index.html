@@ -404,7 +404,11 @@
 
       <div>
         <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Date(s)</div>
-        <input type="text" id="leaveDateRangeInput" readonly placeholder="Select date(s)"
+        <div class="grid grid-cols-2 gap-2 mb-2">
+          <button type="button" id="leaveDateModeSingleBtn" data-mode="single" class="lv-type-btn lv-type-sub-btn">Single Date</button>
+          <button type="button" id="leaveDateModeRangeBtn" data-mode="range" class="lv-type-btn lv-type-sub-btn">Date Range</button>
+        </div>
+        <input type="text" id="leaveDateRangeInput" readonly placeholder="Select a date"
           class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-700 bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-300" />
         <p id="leaveDateRangeError" class="hidden mt-1 text-xs text-red-600"></p>
       </div>
@@ -762,6 +766,6 @@
 
   <!-- ?v= is a cache-buster: bump it whenever app.js changes so browsers
        fetch the new file instead of serving a stale cached copy. -->
-  <script type="module" src="app.js?v=20260903a"></script>
+  <script type="module" src="app.js?v=20260903b"></script>
 </body>
 </html>
