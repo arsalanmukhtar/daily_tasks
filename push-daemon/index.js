@@ -3,9 +3,12 @@
 // allowlist doc(s) have isOwner==true. Replaces the old Apps Script
 // sendPushToOwner_() path - same message shape (title/body/data.requestId)
 // so the existing Android LeaveFcmService needs no changes.
+const nodemailer = require('nodemailer');
 const { initializeApp, applicationDefault } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
+const { leaveTypeLabel } = require('./leaveType');
+const { buildDecisionEmail } = require('./emailTemplate');
 
 initializeApp({
   credential: applicationDefault()
@@ -13,6 +16,18 @@ initializeApp({
 
 const db = getFirestore();
 const messaging = getMessaging();
+
+// Email is a soft dependency - if GMAIL_USER/GMAIL_APP_PASSWORD aren't set
+// (e.g. push-only deployments, or before the App Password has been
+// generated), the daemon logs it once and simply skips sending, rather than
+// crashing the whole process over a feature that isn't wired up yet.
+const mailer =
+  process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD
+    ? nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD }
+      })
+    : null;
 
 function log(...args) {
   console.log(new Date().toISOString(), ...args);
@@ -49,7 +64,7 @@ async function pruneToken(token) {
 async function handleNewRequest(doc) {
   const data = doc.data();
   const requestId = doc.id;
-  const typeLabel = data.type === 'full' ? 'Full Leave' : 'Short Leave';
+  const typeLabel = leaveTypeLabel(data.type);
   const title = 'New leave request';
   const body = `${data.name || 'Someone'} - ${typeLabel} for ${data.weekLabel || ''}`;
 
@@ -83,6 +98,30 @@ async function handleNewRequest(doc) {
   );
 }
 
+// Emails the employee once their request is approved/rejected - a request
+// newly satisfying the status in ['approved','rejected'] query (below) is
+// exactly "just got decided", the same trick the push listener uses instead
+// of manually diffing old/new field values.
+async function handleDecidedRequest(doc) {
+  const data = doc.data();
+  if (!mailer) {
+    log('Request', doc.id, 'decided - GMAIL_USER/GMAIL_APP_PASSWORD not set, skipping email.');
+    return;
+  }
+  if (!data.email) {
+    log('Request', doc.id, 'decided - no email on the request, skipping.');
+    return;
+  }
+  const { subject, html } = buildDecisionEmail(data);
+  await mailer.sendMail({
+    from: `"Tech EW - Leave Approvals" <${process.env.GMAIL_USER}>`,
+    to: data.email,
+    subject,
+    html
+  });
+  log(`Sent decision email for ${doc.id} to ${data.email} (${data.status}).`);
+}
+
 log('Starting leave-approvals push daemon...');
 
 // onSnapshot's very first callback always reports every doc already matching
@@ -91,7 +130,7 @@ log('Starting leave-approvals push daemon...');
 // reboot) would re-notify for every still-pending request all over again.
 let isInitialSnapshot = true;
 
-const unsubscribe = db
+const unsubscribeNew = db
   .collection('leaveRequests')
   .where('status', '==', 'requested')
   .onSnapshot(
@@ -120,9 +159,39 @@ const unsubscribe = db
 
 log('Listening for new leave requests.');
 
+// Same baseline-skip guard as above, tracked separately since this listener
+// starts its own independent initial snapshot.
+let isInitialDecidedSnapshot = true;
+
+const unsubscribeDecided = db
+  .collection('leaveRequests')
+  .where('status', 'in', ['approved', 'rejected'])
+  .onSnapshot(
+    (snapshot) => {
+      if (isInitialDecidedSnapshot) {
+        isInitialDecidedSnapshot = false;
+        log(`Baseline loaded: ${snapshot.size} already-decided request(s), not emailing for these.`);
+        return;
+      }
+      snapshot.docChanges().forEach((change) => {
+        if (change.type !== 'added') return;
+        handleDecidedRequest(change.doc).catch((err) => {
+          logError('Error handling decided request', change.doc.id, err);
+        });
+      });
+    },
+    (err) => {
+      logError('Firestore listener error (decided), exiting for systemd to restart:', err);
+      process.exit(1);
+    }
+  );
+
+log('Listening for decided leave requests.');
+
 function shutdown() {
   log('Shutting down.');
-  unsubscribe();
+  unsubscribeNew();
+  unsubscribeDecided();
   process.exit(0);
 }
 

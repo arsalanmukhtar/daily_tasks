@@ -1,5 +1,5 @@
 [Unit]
-Description=Leave Approvals push notification daemon
+Description=Leave Approvals push notification + decision email daemon
 After=network-online.target
 Wants=network-online.target
 
@@ -8,6 +8,10 @@ Type=simple
 User=gtechapp
 WorkingDirectory=/home/gtechapp/push-daemon
 Environment=GOOGLE_APPLICATION_CREDENTIALS=/home/gtechapp/push-daemon/service-account.json
+# GMAIL_USER / GMAIL_APP_PASSWORD live here, not as inline Environment= lines
+# above - unlike the service-account path, the App Password is itself a
+# secret, and this unit file is world-readable at /etc/systemd/system/.
+EnvironmentFile=-/home/gtechapp/push-daemon/.env
 ExecStart=/usr/bin/node index.js
 Restart=on-failure
 RestartSec=5
