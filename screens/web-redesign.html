@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tech EW · Web layout refactor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* ---- brand (unchanged from your build) ---- */
+  --brand-600:#E8590C; --brand-700:#C2410C; --brand-800:#9A3412;
+  --brand-50:#FFF5EE;  --brand-100:#FFE6D5; --brand-200:#FBC9A4;
+  --header-a:#0F172A;  --header-b:#7B341E;
+
+  /* ---- neutrals ---- */
+  --ink-900:#0F172A; --ink-800:#1E293B; --ink-700:#334155;
+  --ink-600:#475569; --ink-500:#64748B; --ink-400:#94A3B8;
+  --line:#E3E8EF; --line-soft:#EEF2F6;
+  --surface:#FFFFFF; --surface-2:#F8FAFC; --canvas:#F2F4F7;
+
+  /* ---- status (kept, desaturated for a sober read) ---- */
+  --ok-600:#12996B; --ok-800:#0A6B4A; --ok-50:#E9F7F1; --ok-200:#B4E3CF;
+  --no-600:#D64545; --no-800:#A32C2C; --no-50:#FCEDED; --no-200:#F2C4C4;
+  --wait-600:#C77A08; --wait-800:#8C5904; --wait-50:#FDF5E6; --wait-200:#F0D8A6;
+
+  /* ---- NEW secondaries: leave type ---- */
+  --t-foreign:#3B5BDB; --t-foreign-bg:#EDF1FE; --t-foreign-bd:#C7D3F7;
+  --t-umrah:#0E8A7D;   --t-umrah-bg:#E4F4F2;   --t-umrah-bd:#B4E0DA;
+  --t-medical:#0B7FA8; --t-medical-bg:#E4F2F9; --t-medical-bd:#B2DAEA;
+  --t-casual:#6C4CC4;  --t-casual-bg:#F0ECFB;  --t-casual-bd:#D3C8F0;
+
+  /* ---- NEW secondaries: duration / meta ---- */
+  --d-short:#0369A1; --d-short-bg:#E7F1F8;
+  --d-full:#3730A3;  --d-full-bg:#ECEBFA;
+  --meta:#54657A;    --meta-bg:#EDF1F5; --meta-bd:#D9E1E9;
+
+  --r-sm:8px; --r-md:10px; --r-lg:14px; --r-xl:18px;
+  --sh-1:0 1px 2px rgba(15,23,42,.05);
+  --sh-2:0 4px 14px rgba(15,23,42,.07);
+  --sh-3:-18px 0 48px rgba(15,23,42,.16);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:#E7EAEE;font-family:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink-900);-webkit-font-smoothing:antialiased}
+.page{padding:28px clamp(12px,3vw,40px) 80px;max-width:1560px;margin:0 auto}
+.doc-h{margin:0 0 4px;font-size:19px;font-weight:700;letter-spacing:-.01em}
+.doc-s{margin:0 0 26px;font-size:13.5px;color:var(--ink-500);max-width:74ch;line-height:1.55}
+
+.plate-wrap{margin:0 0 34px}
+.plate-bar{display:flex;align-items:baseline;gap:10px;margin:0 0 10px;flex-wrap:wrap}
+.plate-id{font-size:11px;font-weight:700;letter-spacing:.06em;color:#fff;background:var(--ink-800);padding:3px 8px;border-radius:5px}
+.plate-t{font-size:14px;font-weight:600}
+.plate-n{font-size:12.5px;color:var(--ink-500)}
+.stage{position:relative;overflow:hidden;border-radius:14px}
+.plate{width:1440px;height:900px;transform-origin:top left;background:var(--canvas);position:relative;overflow:hidden;
+       border:1px solid #D7DDE5;border-radius:14px;box-shadow:0 12px 30px rgba(15,23,42,.1)}
+
+/* ============ app chrome ============ */
+.app{position:absolute;inset:0;display:flex;flex-direction:column;padding:16px 22px 0}
+.topbar{height:82px;border-radius:16px;background:linear-gradient(101deg,var(--header-a) 0%,#3C2418 58%,var(--header-b) 100%);
+        display:flex;align-items:center;justify-content:space-between;padding:0 18px 0 26px;color:#fff;flex:none}
+.topbar h1{margin:0;font-size:19px;font-weight:700;letter-spacing:-.01em}
+.topbar p{margin:3px 0 0;font-size:12.5px;color:#E3D6CE}
+.usr{display:flex;align-items:center;gap:11px;background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.16);
+     padding:7px 8px 7px 10px;border-radius:11px}
+.av{width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.2);display:grid;place-items:center;font-size:12.5px;font-weight:700}
+.usr b{display:block;font-size:13px;font-weight:600;line-height:1.25}
+.usr span{display:block;font-size:11.5px;color:#DDCFC7}
+.signout{margin-left:8px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.2);color:#fff;
+         font:600 12px Inter;padding:7px 11px;border-radius:8px;cursor:pointer}
+
+.body{flex:1;display:grid;grid-template-columns:452px 1fr;gap:18px;padding:16px 0 14px;min-height:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);box-shadow:var(--sh-1);display:flex;flex-direction:column;min-height:0}
+.pad{padding:16px 18px}
+.sec-lbl{font-size:10.5px;font-weight:700;letter-spacing:.07em;color:var(--ink-400);margin:0 0 9px}
+.req{color:var(--brand-600)}
+
+/* left column bits */
+.wk-select{display:flex;align-items:center;gap:9px;height:44px;border:1px solid var(--line);border-radius:var(--r-md);
+           padding:0 12px;font-size:14px;font-weight:600;background:var(--surface-2)}
+.wk-select .chev{margin-left:auto;color:var(--ink-400)}
+.seg{display:flex;border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;margin-top:9px;background:var(--surface)}
+.seg button{flex:1;height:36px;border:0;background:transparent;font:600 12.5px Inter;color:var(--ink-600);cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--brand-50);color:var(--brand-700)}
+.range-note{margin:10px 0 0;font-size:12.5px;font-weight:600;color:var(--brand-700)}
+
+.days{border-top:1px solid var(--line-soft);margin-top:14px;padding-top:12px}
+.day{display:flex;align-items:center;justify-content:space-between;height:34px;padding:0 10px;border-radius:8px;font-size:13.5px}
+.day b{font-weight:600}
+.day span{color:var(--ink-500);font-variant-numeric:tabular-nums}
+.day.today{background:var(--brand-50);box-shadow:inset 2px 0 0 var(--brand-600)}
+.day.today b,.day.today span{color:var(--brand-800)}
+.pill-today{font-size:9.5px;font-weight:700;letter-spacing:.05em;background:var(--brand-600);color:#fff;padding:2px 6px;border-radius:99px;margin-left:8px}
+
+.who{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;border-top:1px solid var(--line-soft);margin-top:12px;padding-top:13px}
+.who .k{font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--ink-400);margin-bottom:3px}
+.who .v{font-size:13px;font-weight:600}
+.who .v.mail{font-weight:400;font-size:11.5px;color:var(--ink-500);margin-top:2px}
+
+/* ---------- 02: the two nav cards, rebuilt ---------- */
+.navcards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.navcard{position:relative;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+         padding:12px 12px 11px 13px;cursor:pointer;display:flex;flex-direction:column;gap:9px;box-shadow:var(--sh-1);
+         transition:border-color .14s,box-shadow .14s,transform .14s}
+.navcard:hover{border-color:var(--brand-200);box-shadow:var(--sh-2);transform:translateY(-1px)}
+.navcard:focus-visible{outline:2px solid var(--brand-600);outline-offset:2px}
+.navcard .row1{display:flex;align-items:center;gap:9px}
+.nc-ico{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:none}
+.nc-ico svg{width:17px;height:17px}
+.navcard .ttl{font-size:13.5px;font-weight:700;letter-spacing:-.01em;line-height:1.2}
+.navcard .sub{font-size:11.5px;color:var(--ink-500);line-height:1.35}
+.navcard .arrow{margin-left:auto;color:var(--ink-400);flex:none}
+.nc-stats{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.tag{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:6px;font-size:11px;font-weight:600;
+     border:1px solid transparent;white-space:nowrap}
+.tag .dot{width:6px;height:6px;border-radius:99px}
+.tag.ok{background:var(--ok-50);color:var(--ok-800);border-color:var(--ok-200)} .tag.ok .dot{background:var(--ok-600)}
+.tag.no{background:var(--no-50);color:var(--no-800);border-color:var(--no-200)} .tag.no .dot{background:var(--no-600)}
+.tag.wait{background:var(--wait-50);color:var(--wait-800);border-color:var(--wait-200)} .tag.wait .dot{background:var(--wait-600)}
+.tag.neutral{background:var(--meta-bg);color:var(--meta);border-color:var(--meta-bd)}
+.navcard.primary{background:linear-gradient(180deg,var(--brand-50),#fff 62%);border-color:var(--brand-200)}
+.navcard.primary .nc-ico{background:var(--brand-600);color:#fff}
+.navcard.primary .ttl{color:var(--brand-800)}
+.navcard.secondary .nc-ico{background:var(--ink-900);color:#fff}
+
+.foot{margin-top:auto;border-top:1px solid var(--line-soft);padding:13px 18px;display:flex;gap:10px}
+.btn{height:42px;border-radius:var(--r-md);font:600 13.5px Inter;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink-700);padding:0 18px}
+.btn.primary{background:var(--brand-600);border-color:var(--brand-600);color:#fff;flex:1}
+.btn.primary:hover{background:var(--brand-700)}
+.btn.ghost{flex:0 0 132px}
+
+/* right column: tasks grid */
+.tk-head{display:flex;align-items:baseline;justify-content:space-between;padding:16px 18px 12px}
+.tk-head h2{margin:0;font-size:15.5px;font-weight:700}
+.tk-head p{margin:0;font-size:12px;color:var(--ink-500)}
+.tools{display:flex;gap:2px;align-items:center;border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);padding:7px 14px}
+.tool{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;font-size:12.5px;color:var(--ink-600);border:0;background:transparent;cursor:pointer}
+.tool:hover{background:var(--surface-2)}
+.tsep{width:1px;height:18px;background:var(--line);margin:0 7px}
+.grid{flex:1;display:grid;grid-template-columns:repeat(5,1fr);min-height:0}
+.col{border-right:1px solid var(--line-soft);display:flex;flex-direction:column;min-width:0}
+.col:last-child{border-right:0}
+.col .ch{padding:11px 12px 10px;background:var(--surface-2);border-bottom:1px solid var(--line-soft)}
+.col .ch b{display:block;font-size:10.5px;letter-spacing:.06em;color:var(--ink-500);font-weight:700}
+.col .ch span{display:block;font-size:12.5px;font-weight:600;margin-top:2px}
+.col.today .ch{background:var(--brand-50);box-shadow:inset 0 2px 0 var(--brand-600)}
+.col.today .ch b,.col.today .ch span{color:var(--brand-800)}
+.col.future .ch{opacity:.55}
+.col .cb{flex:1;padding:12px;font-size:12.5px;color:#B6C0CC;font-style:italic}
+.addrow{padding:12px 18px;border-top:1px solid var(--line-soft)}
+.addrow button{height:36px;padding:0 14px;border:1px solid var(--line);background:#fff;border-radius:8px;font:600 12.5px Inter;color:var(--ink-700);cursor:pointer}
+.pfoot{text-align:center;font-size:11.5px;color:var(--ink-400);padding:6px 0 14px;flex:none}
+
+/* ============ drawer ============ */
+.scrim{position:absolute;inset:0;background:rgba(15,23,42,.34);backdrop-filter:blur(1.5px)}
+.drawer{position:absolute;top:0;right:0;bottom:0;background:var(--surface);box-shadow:var(--sh-3);display:flex;flex-direction:column}
+.dw-660{width:660px} .dw-560{width:560px}
+.dh{display:flex;align-items:flex-start;gap:12px;padding:16px 18px 14px;border-bottom:1px solid var(--line);flex:none}
+.dh h2{margin:0;font-size:16.5px;font-weight:700;letter-spacing:-.01em}
+.dh p{margin:3px 0 0;font-size:12.5px;color:var(--ink-500)}
+.x{margin-left:auto;width:32px;height:32px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink-500);cursor:pointer;font-size:15px;line-height:1}
+.x:hover{background:var(--surface-2);color:var(--ink-800)}
+.dcols{flex:1;display:grid;grid-template-columns:314px 1fr;min-height:0}
+.dcol{padding:15px 16px;min-height:0;overflow:auto}
+.dcol.l{border-right:1px solid var(--line-soft);background:var(--surface-2)}
+.blk+.blk{margin-top:15px}
+
+/* type chips */
+.chips2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tchip{position:relative;display:flex;flex-direction:column;gap:2px;align-items:flex-start;padding:9px 10px;border:1px solid var(--line);
+       border-radius:var(--r-md);background:#fff;cursor:pointer;text-align:left;transition:.14s}
+.tchip .nm{font:600 13px Inter;color:var(--ink-800)}
+.tchip .hint{font-size:10.5px;color:var(--ink-400)}
+.tchip .swatch{position:absolute;top:9px;right:9px;width:8px;height:8px;border-radius:99px}
+.tchip:hover{border-color:var(--ink-400)}
+.tchip:focus-visible{outline:2px solid var(--brand-600);outline-offset:2px}
+.tchip[data-t=foreign] .swatch{background:var(--t-foreign)}
+.tchip[data-t=umrah]   .swatch{background:var(--t-umrah)}
+.tchip[data-t=medical] .swatch{background:var(--t-medical)}
+.tchip[data-t=casual]  .swatch{background:var(--t-casual)}
+.tchip.on[data-t=casual]{background:var(--t-casual-bg);border-color:var(--t-casual-bd)}
+.tchip.on[data-t=casual] .nm{color:var(--t-casual)}
+.tchip.on[data-t=medical]{background:var(--t-medical-bg);border-color:var(--t-medical-bd)}
+
+/* nested duration */
+.nest{margin-top:9px;padding:10px 11px 11px;border-radius:var(--r-md);background:var(--t-casual-bg);
+      border:1px solid var(--t-casual-bd)}
+.nest .cap{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--t-casual);margin-bottom:8px}
+.nest .cap svg{width:12px;height:12px}
+.dseg{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.dopt{border:1px solid #D9D2F0;background:#fff;border-radius:9px;padding:8px 9px;text-align:left;cursor:pointer;transition:.14s}
+.dopt:hover{border-color:#B9AEE0}
+.dopt b{display:block;font-size:12.5px;font-weight:600;color:var(--ink-800)}
+.dopt span{display:block;font-size:10.5px;color:var(--ink-500);margin-top:2px}
+.dopt.on{border-color:var(--d-short);background:var(--d-short-bg)}
+.dopt.on b{color:var(--d-short)}
+.dopt.on.full{border-color:var(--d-full);background:var(--d-full-bg)}
+.dopt.on.full b{color:var(--d-full)}
+
+/* calendar */
+.cal{border:1px solid var(--line);border-radius:var(--r-md);background:#fff;padding:10px 11px 11px;margin-top:9px}
+.cal-h{display:flex;align-items:center;gap:6px;margin-bottom:9px}
+.cal-h .mo{font:600 13.5px Inter;letter-spacing:-.01em}
+.cal-h .yr{font:500 13.5px Inter;color:var(--ink-500)}
+.nav{margin-left:auto;display:flex;gap:4px}
+.nav button{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:#fff;color:var(--ink-600);cursor:pointer;font-size:12px;line-height:1}
+.nav button:hover{background:var(--surface-2)}
+.cal-g{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-g .wd{text-align:center;font-size:10px;font-weight:700;color:var(--ink-400);padding:2px 0 5px}
+.cal-g .d{height:31px;border-radius:7px;display:grid;place-items:center;font-size:12.5px;color:var(--ink-800);cursor:pointer;
+          font-variant-numeric:tabular-nums;border:1px solid transparent}
+.cal-g .d:hover{background:var(--surface-2)}
+.cal-g .d.mute{color:#C4CDD8}
+.cal-g .d.off{color:#C4CDD8;cursor:not-allowed;background:repeating-linear-gradient(135deg,#FAFBFC,#FAFBFC 3px,#F1F4F7 3px,#F1F4F7 6px)}
+.cal-g .d.today{border-color:var(--brand-600);color:var(--brand-700);font-weight:700}
+.cal-g .d.sel{background:var(--brand-600);color:#fff;font-weight:700;border-color:var(--brand-600)}
+.cal-g .d.inrange{background:var(--brand-50);color:var(--brand-800);border-radius:0}
+.cal-g .d.r-start{border-radius:7px 0 0 7px}
+.cal-g .d.r-end{border-radius:0 7px 7px 0}
+.cal-legend{display:flex;gap:12px;margin-top:9px;padding-top:8px;border-top:1px solid var(--line-soft);font-size:10.5px;color:var(--ink-500)}
+.cal-legend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.picked{display:flex;align-items:center;gap:8px;margin-top:9px;padding:9px 10px;border:1px solid var(--brand-200);background:var(--brand-50);border-radius:var(--r-md)}
+.picked b{font-size:12.5px;color:var(--brand-800)}
+.picked span{margin-left:auto;font-size:11px;font-weight:600;color:var(--brand-700)}
+
+/* attachments */
+.drop{border:1.5px dashed #C3CEDB;border-radius:var(--r-md);background:var(--surface-2);padding:14px;text-align:center;cursor:pointer}
+.drop:hover{border-color:var(--brand-600);background:var(--brand-50)}
+.drop .ic{width:34px;height:34px;border-radius:9px;background:#fff;border:1px solid var(--line);display:grid;place-items:center;margin:0 auto 8px}
+.drop b{font-size:12.5px;font-weight:600}
+.drop b em{font-style:normal;color:var(--brand-700);text-decoration:underline}
+.drop p{margin:4px 0 0;font-size:11px;color:var(--ink-500)}
+.files{margin-top:8px;display:flex;flex-direction:column;gap:6px}
+.file{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:9px;padding:7px 8px 7px 9px;background:#fff}
+.file .fic{width:26px;height:26px;border-radius:6px;display:grid;place-items:center;font:700 9px Inter;color:#fff;flex:none}
+.file .fic.pdf{background:#B4342B} .file .fic.doc{background:#2B5EB4} .file .fic.txt{background:#5A6B7C}
+.file b{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file span{font-size:10.5px;color:var(--ink-500)}
+.file .rm{margin-left:auto;width:24px;height:24px;border-radius:6px;border:1px solid var(--line);background:#fff;color:var(--ink-500);cursor:pointer;font-size:12px;line-height:1}
+.file .rm:hover{border-color:var(--no-200);background:var(--no-50);color:var(--no-800)}
+.cap-note{font-size:10.5px;color:var(--ink-400);margin-top:7px}
+
+/* editor (untouched styling, structure only) */
+.ed{border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;background:#fff}
+.ed-bar{display:flex;align-items:center;gap:1px;padding:5px 7px;border-bottom:1px solid var(--line-soft);background:var(--surface-2)}
+.ed-body{padding:11px 12px;font-size:12.5px;line-height:1.6;color:var(--ink-700);min-height:104px}
+.ed-body strong{color:var(--ink-900)}
+.ed-body a{color:var(--no-600)}
+.ed-body ul{margin:7px 0 0;padding-left:17px}
+.ed-count{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink-400);padding:6px 10px;border-top:1px solid var(--line-soft);background:var(--surface-2)}
+
+/* drawer footer */
+.dfoot{flex:none;border-top:1px solid var(--line);padding:11px 16px;display:flex;align-items:center;gap:12px;background:var(--surface-2)}
+.summary{display:flex;flex-wrap:wrap;gap:5px;flex:1;min-width:0}
+.dfoot .btn{height:40px}
+
+/* ============ My Leaves panel ============ */
+.scroll{flex:1;overflow:auto;padding:14px 16px 18px;background:var(--canvas)}
+.panel{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:13px 14px}
+.panel+.panel{margin-top:11px}
+.p-lbl{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.p-lbl h3{margin:0;font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--ink-400)}
+
+.banner{display:flex;align-items:center;gap:11px;border-radius:var(--r-lg);padding:12px 13px;border:1px solid var(--wait-200);background:var(--wait-50)}
+.banner .bic{width:34px;height:34px;border-radius:9px;background:#fff;border:1px solid var(--wait-200);display:grid;place-items:center;color:var(--wait-800);flex:none}
+.banner b{display:block;font-size:13px;font-weight:700;color:var(--wait-800)}
+.banner span{display:block;font-size:11.5px;color:#96703A;margin-top:2px}
+.banner .link{margin-left:auto;font:600 12px Inter;color:var(--wait-800);background:#fff;border:1px solid var(--wait-200);
+              padding:7px 11px;border-radius:8px;cursor:pointer}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stat{border:1px solid var(--line);border-radius:var(--r-md);padding:9px 10px;background:var(--surface-2)}
+.stat .k{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--ink-500)}
+.stat .k i{width:6px;height:6px;border-radius:99px;display:inline-block}
+.stat .v{font-size:21px;font-weight:700;letter-spacing:-.02em;margin-top:3px;font-variant-numeric:tabular-nums}
+.stat.ok{background:var(--ok-50);border-color:var(--ok-200)} .stat.ok .v{color:var(--ok-800)} .stat.ok .k i{background:var(--ok-600)}
+.stat.no{background:var(--no-50);border-color:var(--no-200)} .stat.no .v{color:var(--no-800)} .stat.no .k i{background:var(--no-600)}
+.stat.wait{background:var(--wait-50);border-color:var(--wait-200)} .stat.wait .v{color:var(--wait-800)} .stat.wait .k i{background:var(--wait-600)}
+.stat.all .k i{background:var(--ink-400)}
+
+.yrtog{display:flex;gap:5px}
+.yrtog button{height:26px;padding:0 11px;border-radius:99px;border:1px solid var(--line);background:#fff;font:600 11.5px Inter;color:var(--ink-600);cursor:pointer}
+.yrtog button.on{background:var(--ink-900);border-color:var(--ink-900);color:#fff}
+
+.qs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.q{border:1px solid var(--line);border-radius:var(--r-md);padding:9px 10px 10px;background:#fff;cursor:pointer}
+.q:hover{border-color:var(--ink-400)}
+.q .qh{display:flex;align-items:baseline;justify-content:space-between}
+.q .qn{font-size:10.5px;font-weight:700;color:var(--ink-500)}
+.q .qv{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+.qbar{display:flex;height:5px;border-radius:99px;overflow:hidden;background:var(--line-soft);margin-top:7px}
+.qbar i{display:block}
+.q .qm{font-size:10px;color:var(--ink-500);margin-top:5px;display:flex;gap:7px}
+.q.on{border-color:var(--brand-600);background:var(--brand-50)}
+
+.chart{display:grid;grid-template-columns:22px 1fr;gap:8px}
+.yax{display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;font-size:9.5px;color:var(--ink-400);height:104px;padding-bottom:15px}
+.bars{position:relative;height:104px;display:grid;grid-template-columns:repeat(12,1fr);gap:5px;align-items:end;
+      background:linear-gradient(to top,var(--line-soft) 1px,transparent 1px) 0 0/100% 29.6px}
+.bcol{display:flex;flex-direction:column;justify-content:flex-end;height:89px;gap:0}
+.bcol .lbl{text-align:center;font-size:9.5px;color:var(--ink-500);margin-top:5px;height:15px;line-height:15px}
+.stack{display:flex;flex-direction:column-reverse;border-radius:4px 4px 0 0;overflow:hidden;min-height:2px}
+.stack i{display:block}
+.stack i.a{background:var(--ok-600)} .stack i.r{background:var(--no-600)} .stack i.p{background:var(--wait-600)}
+.stack.empty{background:var(--line-soft);height:3px;border-radius:99px}
+.legend{display:flex;gap:14px;margin-top:11px;padding-top:9px;border-top:1px solid var(--line-soft);font-size:10.5px;color:var(--ink-600)}
+.legend i{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:-1px}
+
+/* history */
+.hfilter{display:flex;gap:6px;align-items:center;margin:16px 0 9px}
+.hfilter .t{font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--ink-400);margin-right:2px}
+.fchip{height:26px;padding:0 10px;border-radius:99px;border:1px solid var(--line);background:#fff;font:600 11.5px Inter;color:var(--ink-600);cursor:pointer}
+.fchip.on{background:var(--ink-900);border-color:var(--ink-900);color:#fff}
+.fchip .n{opacity:.6;margin-left:4px}
+
+.lv{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:11px 12px;box-shadow:var(--sh-1)}
+.lv+.lv{margin-top:9px}
+.lv-h{display:flex;align-items:flex-start;gap:9px}
+.lv-h .wk{font-size:13.5px;font-weight:700;letter-spacing:-.01em}
+.lv-h .dt{font-size:11.5px;color:var(--ink-500);margin-top:2px}
+.status{margin-left:auto;display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px;border-radius:99px;
+        font-size:10px;font-weight:700;letter-spacing:.05em;border:1px solid transparent;flex:none}
+.status i{width:5px;height:5px;border-radius:99px}
+.status.ok{background:var(--ok-50);color:var(--ok-800);border-color:var(--ok-200)} .status.ok i{background:var(--ok-600)}
+.status.no{background:var(--no-50);color:var(--no-800);border-color:var(--no-200)} .status.no i{background:var(--no-600)}
+.status.wait{background:var(--wait-50);color:var(--wait-800);border-color:var(--wait-200)} .status.wait i{background:var(--wait-600)}
+.meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.mchip{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:6px;font-size:11px;font-weight:600;border:1px solid}
+.mchip svg{width:11px;height:11px}
+.mchip.type-foreign{background:var(--t-foreign-bg);color:var(--t-foreign);border-color:var(--t-foreign-bd)}
+.mchip.type-umrah{background:var(--t-umrah-bg);color:var(--t-umrah);border-color:var(--t-umrah-bd)}
+.mchip.type-medical{background:var(--t-medical-bg);color:var(--t-medical);border-color:var(--t-medical-bd)}
+.mchip.type-casual{background:var(--t-casual-bg);color:var(--t-casual);border-color:var(--t-casual-bd)}
+.mchip.dur-short{background:var(--d-short-bg);color:var(--d-short);border-color:#BCD9EC}
+.mchip.dur-full{background:var(--d-full-bg);color:var(--d-full);border-color:#CBC9F0}
+.mchip.n{background:var(--meta-bg);color:var(--meta);border-color:var(--meta-bd)}
+.lv-r{font-size:12.5px;line-height:1.5;color:var(--ink-700);margin:9px 0 0;
+      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.lv-f{display:flex;align-items:center;gap:8px;margin-top:9px;padding-top:9px;border-top:1px solid var(--line-soft)}
+.lv-f .by{font-size:11.5px;color:var(--ink-500)}
+.lv-f .by b{color:var(--ink-800);font-weight:600}
+.lv-f .act{margin-left:auto;display:flex;gap:6px}
+.mini{height:26px;padding:0 10px;border-radius:7px;border:1px solid var(--line);background:#fff;font:600 11.5px Inter;color:var(--ink-600);cursor:pointer}
+.mini:hover{background:var(--surface-2)}
+.mini.brand{border-color:var(--brand-200);color:var(--brand-700);background:var(--brand-50)}
+
+.toast{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);background:#0F5132;color:#fff;border-radius:99px;
+       padding:11px 20px;font:600 13px Inter;display:flex;align-items:center;gap:9px;box-shadow:0 10px 24px rgba(15,81,50,.32)}
+.mut{color:var(--ink-400)}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1 class="doc-h">Tech EW — web layout refactor</h1>
+  <p class="doc-s">Target viewport 1440 × 900. Same palette as the current build; new secondary colours added for leave type, duration and file meta so those read at a glance without competing with the approve / reject / pending set.</p>
+
+<!-- ============================== 02 ============================== -->
+<div class="plate-wrap">
+  <div class="plate-bar"><span class="plate-id">02</span><span class="plate-t">Weekly timesheet</span>
+    <span class="plate-n">Nav cards rebuilt in place — full labels, matched icon weight, live counts, no truncation.</span></div>
+  <div class="stage"><div class="plate">
+    <div class="app">
+      <div class="topbar">
+        <div><h1>Tech EW — Weekly Time Sheet</h1><p>Log your weekly tasks. Submissions sync straight to the team sheet.</p></div>
+        <div class="usr"><div class="av">AK</div><div><b>Alice Khan</b><span>alice.khan@example.com</span></div><button class="signout">Sign out</button></div>
+      </div>
+
+      <div class="body">
+        <!-- LEFT -->
+        <div class="card">
+          <div class="pad" style="padding-bottom:0">
+            <p class="sec-lbl">WEEK <span class="req">*</span></p>
+            <div class="wk-select">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+              Week 36 · Aug 2026 <span class="chev">▾</span>
+            </div>
+            <div class="seg"><button>Last week</button><button class="on">This week</button><button>Clear</button></div>
+            <p class="range-note">Week 36, 2026 · 31 Aug – 4 Sept 2026</p>
+
+            <div class="days">
+              <p class="sec-lbl">WEEK DAYS</p>
+              <div class="day"><b>Monday</b><span>31 Aug 2026</span></div>
+              <div class="day"><b>Tuesday</b><span>01 Sept 2026</span></div>
+              <div class="day"><b>Wednesday</b><span>02 Sept 2026</span></div>
+              <div class="day today"><b>Thursday <span class="pill-today">TODAY</span></b><span>03 Sept 2026</span></div>
+              <div class="day"><b>Friday</b><span>04 Sept 2026</span></div>
+            </div>
+
+            <div class="who">
+              <div><div class="k">SUBMITTING AS</div><div class="v" style="color:var(--brand-700)">Alice Khan</div><div class="v mail">alice.khan@example.com</div></div>
+              <div><div class="k">DESIGNATION</div><div class="v">GIS Developer</div></div>
+              <div><div class="k">DOMAIN</div><div class="v">GIS Developer</div></div>
+              <div><div class="k">REPORTED TO</div><div class="v">Farah Bukhari</div></div>
+            </div>
+
+            <!-- the two cards -->
+            <div class="navcards">
+              <button class="navcard primary">
+                <div class="row1">
+                  <div class="nc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 4h6v3H9z"/><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 12h8M8 16h5"/></svg></div>
+                  <div><div class="ttl">My submissions</div><div class="sub">View and edit past weeks</div></div>
+                  <span class="arrow">›</span>
+                </div>
+                <div class="nc-stats"><span class="tag neutral">18 weeks</span><span class="tag wait"><i class="dot"></i>1 draft</span></div>
+              </button>
+
+              <button class="navcard secondary">
+                <div class="row1">
+                  <div class="nc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18M12 14v4M10 16h4"/></svg></div>
+                  <div><div class="ttl">My leaves</div><div class="sub">Apply and track approvals</div></div>
+                  <span class="arrow">›</span>
+                </div>
+                <div class="nc-stats"><span class="tag wait"><i class="dot"></i>2 pending</span><span class="tag ok"><i class="dot"></i>4 approved</span></div>
+              </button>
+            </div>
+          </div>
+
+          <div class="foot"><button class="btn ghost">Reset</button><button class="btn primary">Submit week</button></div>
+        </div>
+
+        <!-- RIGHT -->
+        <div class="card">
+          <div class="tk-head"><h2>Daily tasks <span class="req">*</span></h2><p>Add rows for multiple tasks per day. Formatting applies to the focused cell.</p></div>
+          <div class="tools">
+            <button class="tool"><b>B</b></button><button class="tool"><i>I</i></button><button class="tool"><u>U</u></button><button class="tool"><s>S</s></button>
+            <span class="tsep"></span><button class="tool">A</button><button class="tool">✎</button>
+            <span class="tsep"></span><button class="tool">☰</button><button class="tool">⒈</button>
+          </div>
+          <div class="grid">
+            <div class="col"><div class="ch"><b>MON</b><span>31 Aug 2026</span></div><div class="cb">Mon tasks…</div></div>
+            <div class="col"><div class="ch"><b>TUE</b><span>01 Sept 2026</span></div><div class="cb">Tue tasks…</div></div>
+            <div class="col"><div class="ch"><b>WED</b><span>02 Sept 2026</span></div><div class="cb">Wed tasks…</div></div>
+            <div class="col today"><div class="ch"><b>THU</b><span>03 Sept 2026</span></div><div class="cb">Thu tasks…</div></div>
+            <div class="col future"><div class="ch"><b>FRI</b><span>04 Sept 2026</span></div><div class="cb">Upcoming</div></div>
+          </div>
+          <div class="addrow"><button>+ Add row</button></div>
+        </div>
+      </div>
+      <div class="pfoot">Tech EW · Internal use only</div>
+    </div>
+  </div></div>
+</div>
+
+<!-- ============================== 05 ============================== -->
+<div class="plate-wrap">
+  <div class="plate-bar"><span class="plate-id">05</span><span class="plate-t">Apply for leave — type &amp; dates</span>
+    <span class="plate-n">Two-column drawer: nothing overlaps, calendar is inline, Short/Full nests visibly under Casual.</span></div>
+  <div class="stage"><div class="plate">
+    <div class="app" style="filter:saturate(.5) blur(.4px);opacity:.5"><div class="topbar"><div><h1>Tech EW — Weekly Time Sheet</h1></div></div><div class="body"><div class="card"></div><div class="card"></div></div></div>
+    <div class="scrim"></div>
+
+    <aside class="drawer dw-660">
+      <div class="dh">
+        <div><h2>Apply for leave</h2><p>Alice Khan · GIS Developer · approver Farah Bukhari</p></div>
+        <button class="x">✕</button>
+      </div>
+
+      <div class="dcols">
+        <div class="dcol l">
+          <div class="blk">
+            <p class="sec-lbl">LEAVE TYPE <span class="req">*</span></p>
+            <div class="chips2">
+              <button class="tchip" data-t="foreign"><span class="swatch"></span><span class="nm">Foreign trip</span><span class="hint">Travel abroad</span></button>
+              <button class="tchip" data-t="umrah"><span class="swatch"></span><span class="nm">Umrah</span><span class="hint">Pilgrimage</span></button>
+              <button class="tchip" data-t="medical"><span class="swatch"></span><span class="nm">Medical</span><span class="hint">Health related</span></button>
+              <button class="tchip on" data-t="casual"><span class="swatch"></span><span class="nm">Casual</span><span class="hint">Personal time</span></button>
+            </div>
+
+            <div class="nest">
+              <div class="cap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 4v10a4 4 0 0 0 4 4h12"/></svg>CASUAL LEAVE DURATION <span class="req">*</span></div>
+              <div class="dseg">
+                <button class="dopt on"><b>Short leave</b><span>Part of the day</span></button>
+                <button class="dopt full"><b>Full leave</b><span>Whole day off</span></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="blk">
+            <p class="sec-lbl">DATE(S) <span class="req">*</span></p>
+            <div class="seg" style="margin-top:0"><button class="on">Single date</button><button>Date range</button></div>
+
+            <div class="cal">
+              <div class="cal-h"><span class="mo">September</span><span class="yr">2026</span>
+                <span class="nav"><button>‹</button><button>›</button></span></div>
+              <div class="cal-g">
+                <div class="wd">Sun</div><div class="wd">Mon</div><div class="wd">Tue</div><div class="wd">Wed</div><div class="wd">Thu</div><div class="wd">Fri</div><div class="wd">Sat</div>
+                <div class="d mute">30</div><div class="d mute">31</div><div class="d off">1</div><div class="d off">2</div><div class="d sel">3</div><div class="d">4</div><div class="d off">5</div>
+                <div class="d off">6</div><div class="d">7</div><div class="d">8</div><div class="d">9</div><div class="d">10</div><div class="d">11</div><div class="d off">12</div>
+                <div class="d off">13</div><div class="d">14</div><div class="d">15</div><div class="d">16</div><div class="d">17</div><div class="d">18</div><div class="d off">19</div>
+                <div class="d off">20</div><div class="d">21</div><div class="d">22</div><div class="d">23</div><div class="d">24</div><div class="d">25</div><div class="d off">26</div>
+                <div class="d off">27</div><div class="d">28</div><div class="d">29</div><div class="d">30</div><div class="d mute">1</div><div class="d mute">2</div><div class="d mute">3</div>
+              </div>
+              <div class="cal-legend"><span><i style="background:var(--brand-600)"></i>Selected</span><span><i style="border:1.5px solid var(--brand-600);background:#fff"></i>Today</span><span><i style="background:#EAEEF3"></i>Weekend / holiday</span></div>
+            </div>
+
+            <div class="picked">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C2410C" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+              <b>Thursday, 3 September 2026</b><span>Week 36</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="dcol">
+          <div class="blk">
+            <p class="sec-lbl">ATTACHMENTS <span class="mut">· optional</span></p>
+            <div class="drop">
+              <div class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></div>
+              <b>Drop files here or <em>browse</em></b>
+              <p>PDF, DOC, DOCX, TXT, ZIP · max 8 MB each · up to 5 files</p>
+            </div>
+            <p class="cap-note">0 of 5 files added</p>
+          </div>
+
+          <div class="blk">
+            <p class="sec-lbl">REASON <span class="req">*</span></p>
+            <div class="ed">
+              <div class="ed-bar">
+                <button class="tool"><b>B</b></button><button class="tool"><i>I</i></button><button class="tool"><u>U</u></button><button class="tool"><s>S</s></button>
+                <span class="tsep"></span><button class="tool">A</button><button class="tool">✎</button><span class="tsep"></span><button class="tool">☰</button><button class="tool">⒈</button>
+              </div>
+              <div class="ed-body" style="color:#AEB9C6">Explain the reason for your leave, plus any handover notes for the team…</div>
+              <div class="ed-count"><span>Minimum 20 characters</span><span>0 / 1000</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dfoot">
+        <div class="summary">
+          <span class="mchip type-casual">Casual</span>
+          <span class="mchip dur-short">Short leave</span>
+          <span class="mchip n">Thu 3 Sept 2026</span>
+          <span class="mchip n">Week 36</span>
+        </div>
+        <button class="btn">Cancel</button>
+        <button class="btn primary" style="flex:0 0 130px">Send request</button>
+      </div>
+    </aside>
+  </div></div>
+</div>
+
+<!-- ============================== 05b ============================== -->
+<div class="plate-wrap">
+  <div class="plate-bar"><span class="plate-id">05b</span><span class="plate-t">Apply for leave — filled</span>
+    <span class="plate-n">Full leave selected, date range active, two files attached. Editor chrome left as-is per your note.</span></div>
+  <div class="stage"><div class="plate">
+    <div class="app" style="filter:saturate(.5) blur(.4px);opacity:.5"><div class="topbar"><div><h1>Tech EW — Weekly Time Sheet</h1></div></div><div class="body"><div class="card"></div><div class="card"></div></div></div>
+    <div class="scrim"></div>
+
+    <aside class="drawer dw-660">
+      <div class="dh"><div><h2>Apply for leave</h2><p>Alice Khan · GIS Developer · approver Farah Bukhari</p></div><button class="x">✕</button></div>
+
+      <div class="dcols">
+        <div class="dcol l">
+          <div class="blk">
+            <p class="sec-lbl">LEAVE TYPE <span class="req">*</span></p>
+            <div class="chips2">
+              <button class="tchip" data-t="foreign"><span class="swatch"></span><span class="nm">Foreign trip</span><span class="hint">Travel abroad</span></button>
+              <button class="tchip" data-t="umrah"><span class="swatch"></span><span class="nm">Umrah</span><span class="hint">Pilgrimage</span></button>
+              <button class="tchip" data-t="medical"><span class="swatch"></span><span class="nm">Medical</span><span class="hint">Health related</span></button>
+              <button class="tchip on" data-t="casual"><span class="swatch"></span><span class="nm">Casual</span><span class="hint">Personal time</span></button>
+            </div>
+            <div class="nest">
+              <div class="cap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 4v10a4 4 0 0 0 4 4h12"/></svg>CASUAL LEAVE DURATION <span class="req">*</span></div>
+              <div class="dseg">
+                <button class="dopt"><b>Short leave</b><span>Part of the day</span></button>
+                <button class="dopt full on"><b>Full leave</b><span>Whole day off</span></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="blk">
+            <p class="sec-lbl">DATE(S) <span class="req">*</span></p>
+            <div class="seg" style="margin-top:0"><button>Single date</button><button class="on">Date range</button></div>
+            <div class="cal">
+              <div class="cal-h"><span class="mo">September</span><span class="yr">2026</span><span class="nav"><button>‹</button><button>›</button></span></div>
+              <div class="cal-g">
+                <div class="wd">Sun</div><div class="wd">Mon</div><div class="wd">Tue</div><div class="wd">Wed</div><div class="wd">Thu</div><div class="wd">Fri</div><div class="wd">Sat</div>
+                <div class="d mute">30</div><div class="d mute">31</div><div class="d off">1</div><div class="d off">2</div><div class="d today">3</div><div class="d">4</div><div class="d off">5</div>
+                <div class="d off">6</div><div class="d sel r-start">7</div><div class="d inrange">8</div><div class="d inrange">9</div><div class="d sel r-end">10</div><div class="d">11</div><div class="d off">12</div>
+                <div class="d off">13</div><div class="d">14</div><div class="d">15</div><div class="d">16</div><div class="d">17</div><div class="d">18</div><div class="d off">19</div>
+                <div class="d off">20</div><div class="d">21</div><div class="d">22</div><div class="d">23</div><div class="d">24</div><div class="d">25</div><div class="d off">26</div>
+                <div class="d off">27</div><div class="d">28</div><div class="d">29</div><div class="d">30</div><div class="d mute">1</div><div class="d mute">2</div><div class="d mute">3</div>
+              </div>
+              <div class="cal-legend"><span><i style="background:var(--brand-600)"></i>Start / end</span><span><i style="background:var(--brand-50);border:1px solid var(--brand-200)"></i>In range</span><span><i style="border:1.5px solid var(--brand-600);background:#fff"></i>Today</span></div>
+            </div>
+            <div class="picked">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C2410C" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+              <b>7 – 10 September 2026</b><span>4 working days</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="dcol">
+          <div class="blk">
+            <p class="sec-lbl">ATTACHMENTS <span class="mut">· optional</span></p>
+            <div class="drop" style="padding:11px">
+              <div class="ic" style="width:30px;height:30px;margin-bottom:6px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></div>
+              <b>Drop files here or <em>browse</em></b>
+              <p>PDF, DOC, DOCX, TXT, ZIP · max 8 MB each</p>
+            </div>
+            <div class="files">
+              <div class="file"><span class="fic pdf">PDF</span><div style="min-width:0"><b>medical-certificate.pdf</b><span>412 KB · added just now</span></div><button class="rm">✕</button></div>
+              <div class="file"><span class="fic doc">DOC</span><div style="min-width:0"><b>handover-notes.docx</b><span>88 KB · added just now</span></div><button class="rm">✕</button></div>
+            </div>
+            <p class="cap-note">2 of 5 files added · 500 KB total</p>
+          </div>
+
+          <div class="blk">
+            <p class="sec-lbl">REASON <span class="req">*</span></p>
+            <div class="ed">
+              <div class="ed-bar">
+                <button class="tool"><b>B</b></button><button class="tool"><i>I</i></button><button class="tool"><u>U</u></button><button class="tool"><s>S</s></button>
+                <span class="tsep"></span><button class="tool">A</button><button class="tool">✎</button><span class="tsep"></span><button class="tool">☰</button><button class="tool">⒈</button>
+              </div>
+              <div class="ed-body">
+                <strong>Family emergency</strong> — travelling to <a>Karachi</a> for a few days.
+                <ul><li>Reachable by phone throughout</li><li>Handover notes shared with the team</li><li>Layer QA reassigned to Zeeshan Nasir</li></ul>
+              </div>
+              <div class="ed-count"><span>Looks good</span><span>168 / 1000</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dfoot">
+        <div class="summary">
+          <span class="mchip type-casual">Casual</span>
+          <span class="mchip dur-full">Full leave</span>
+          <span class="mchip n">7 – 10 Sept 2026</span>
+          <span class="mchip n">4 days</span>
+          <span class="mchip n">2 files</span>
+        </div>
+        <button class="btn">Cancel</button>
+        <button class="btn primary" style="flex:0 0 130px">Send request</button>
+      </div>
+    </aside>
+  </div></div>
+</div>
+
+<!-- ============================== 07 ============================== -->
+<div class="plate-wrap">
+  <div class="plate-bar"><span class="plate-id">07</span><span class="plate-t">My leaves — overview</span>
+    <span class="plate-n">Status banner, four counters, quarter tiles with approve/reject split, and a readable stacked trend.</span></div>
+  <div class="stage"><div class="plate">
+    <div class="app" style="filter:saturate(.5) blur(.4px);opacity:.5"><div class="topbar"><div><h1>Tech EW — Weekly Time Sheet</h1></div></div><div class="body"><div class="card"></div><div class="card"></div></div></div>
+    <div class="scrim"></div>
+    <div class="toast"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Leave request sent</div>
+
+    <aside class="drawer dw-560">
+      <div class="dh"><div><h2>My leaves</h2><p>Apply, track approvals and review your history.</p></div>
+        <button class="btn" style="height:34px;padding:0 12px;font-size:12.5px;border-color:var(--brand-200);color:var(--brand-700);background:var(--brand-50)">+ Apply</button>
+        <button class="x" style="margin-left:8px">✕</button></div>
+
+      <div class="scroll">
+        <div class="banner">
+          <div class="bic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+          <div><b>Awaiting approval — Week 36, 2026</b><span>Medical · 3 Sept 2026 · sent 12:42 · with Farah Bukhari</span></div>
+          <button class="link">View</button>
+        </div>
+
+        <div class="panel" style="margin-top:11px">
+          <div class="p-lbl"><h3>LEAVE ACTIVITY</h3><span class="mut" style="font-size:11.5px">Last 12 months</span></div>
+          <div class="stats">
+            <div class="stat all"><div class="k"><i></i>TOTAL</div><div class="v">9</div></div>
+            <div class="stat ok"><div class="k"><i></i>APPROVED</div><div class="v">4</div></div>
+            <div class="stat no"><div class="k"><i></i>REJECTED</div><div class="v">3</div></div>
+            <div class="stat wait"><div class="k"><i></i>PENDING</div><div class="v">2</div></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="p-lbl"><h3>BY QUARTER</h3>
+            <span class="yrtog"><button class="on">2026</button><button>2025</button></span></div>
+          <div class="qs">
+            <div class="q"><div class="qh"><span class="qn">Q1</span><span class="qv">1</span></div>
+              <div class="qbar"><i style="background:var(--ok-600);width:100%"></i></div>
+              <div class="qm"><span>1 approved</span></div></div>
+            <div class="q on"><div class="qh"><span class="qn">Q2</span><span class="qv">3</span></div>
+              <div class="qbar"><i style="background:var(--ok-600);width:34%"></i><i style="background:var(--no-600);width:66%"></i></div>
+              <div class="qm"><span>1 ok</span><span>2 rejected</span></div></div>
+            <div class="q"><div class="qh"><span class="qn">Q3</span><span class="qv">3</span></div>
+              <div class="qbar"><i style="background:var(--ok-600);width:34%"></i><i style="background:var(--wait-600);width:66%"></i></div>
+              <div class="qm"><span>1 ok</span><span>2 pending</span></div></div>
+            <div class="q"><div class="qh"><span class="qn">Q4</span><span class="qv">0</span></div>
+              <div class="qbar"></div><div class="qm"><span class="mut">No leaves</span></div></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="p-lbl"><h3>MONTHLY TREND</h3><span class="mut" style="font-size:11.5px">2026</span></div>
+          <div class="chart">
+            <div class="yax"><span>2</span><span>1</span><span>0</span></div>
+            <div class="bars">
+              <div class="bcol"><div class="stack" style="height:44px"><i class="a" style="height:44px"></i></div><div class="lbl">Jan</div></div>
+              <div class="bcol"><div class="stack empty"></div><div class="lbl">Feb</div></div>
+              <div class="bcol"><div class="stack empty"></div><div class="lbl">Mar</div></div>
+              <div class="bcol"><div class="stack" style="height:44px"><i class="r" style="height:44px"></i></div><div class="lbl">Apr</div></div>
+              <div class="bcol"><div class="stack" style="height:44px"><i class="a" style="height:44px"></i></div><div class="lbl">May</div></div>
+              <div class="bcol"><div class="stack" style="height:44px"><i class="r" style="height:44px"></i></div><div class="lbl">Jun</div></div>
+              <div class="bcol"><div class="stack" style="height:44px"><i class="a" style="height:44px"></i></div><div class="lbl">Jul</div></div>
+              <div class="bcol"><div class="stack" style="height:44px"><i class="p" style="height:44px"></i></div><div class="lbl">Aug</div></div>
+              <div class="bcol"><div class="stack" style="height:44px"><i class="p" style="height:44px"></i></div><div class="lbl">Sep</div></div>
+              <div class="bcol"><div class="stack empty"></div><div class="lbl">Oct</div></div>
+              <div class="bcol"><div class="stack empty"></div><div class="lbl">Nov</div></div>
+              <div class="bcol"><div class="stack empty"></div><div class="lbl">Dec</div></div>
+            </div>
+          </div>
+          <div class="legend"><span><i style="background:var(--ok-600)"></i>Approved</span><span><i style="background:var(--no-600)"></i>Rejected</span><span><i style="background:var(--wait-600)"></i>Pending</span></div>
+        </div>
+
+        <div class="hfilter"><span class="t">HISTORY</span>
+          <button class="fchip on">All<span class="n">9</span></button>
+          <button class="fchip">Pending<span class="n">2</span></button>
+          <button class="fchip">Approved<span class="n">4</span></button>
+          <button class="fchip">Rejected<span class="n">3</span></button>
+        </div>
+
+        <div class="lv">
+          <div class="lv-h"><div><div class="wk">Week 36, 2026</div><div class="dt">3 Sept 2026 · applied 12:42</div></div>
+            <span class="status wait"><i></i>PENDING</span></div>
+          <div class="meta"><span class="mchip type-medical">Medical</span><span class="mchip dur-full">Full leave</span><span class="mchip n">1 day</span>
+            <span class="mchip n"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.5 12.5 21a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-3-3l7.5-7.5"/></svg>1 file</span></div>
+          <p class="lv-r">Doctor appointment this afternoon. Specialist slot could not be moved outside working hours.</p>
+          <div class="lv-f"><span class="by">With <b>Farah Bukhari</b> · 2 days</span>
+            <span class="act"><button class="mini">Withdraw</button><button class="mini brand">View</button></span></div>
+        </div>
+
+        <div class="lv">
+          <div class="lv-h"><div><div class="wk">Week 34, 2026</div><div class="dt">13 Aug 2026 · applied 05:00</div></div>
+            <span class="status wait"><i></i>PENDING</span></div>
+          <div class="meta"><span class="mchip type-foreign">Foreign trip</span><span class="mchip dur-full">Full leave</span><span class="mchip n">3 days</span><span class="mchip n">2 files</span></div>
+          <p class="lv-r">Site visit to the Lahore regional office for the cadastral handover. Field team briefed and layer QA reassigned for the week.</p>
+          <div class="lv-f"><span class="by">With <b>Farah Bukhari</b> · 21 days</span>
+            <span class="act"><button class="mini">Withdraw</button><button class="mini brand">View</button></span></div>
+        </div>
+      </div>
+    </aside>
+  </div></div>
+</div>
+
+<!-- ============================== 07b ============================== -->
+<div class="plate-wrap">
+  <div class="plate-bar"><span class="plate-id">07b</span><span class="plate-t">My leaves — history scrolled</span>
+    <span class="plate-n">Every card carries type, duration, day count, attachment count and the decision trail.</span></div>
+  <div class="stage"><div class="plate">
+    <div class="app" style="filter:saturate(.5) blur(.4px);opacity:.5"><div class="topbar"><div><h1>Tech EW — Weekly Time Sheet</h1></div></div><div class="body"><div class="card"></div><div class="card"></div></div></div>
+    <div class="scrim"></div>
+
+    <aside class="drawer dw-560">
+      <div class="dh"><div><h2>My leaves</h2><p>Apply, track approvals and review your history.</p></div>
+        <button class="btn" style="height:34px;padding:0 12px;font-size:12.5px;border-color:var(--brand-200);color:var(--brand-700);background:var(--brand-50)">+ Apply</button>
+        <button class="x" style="margin-left:8px">✕</button></div>
+
+      <div class="scroll">
+        <div class="hfilter" style="margin-top:0">
+          <span class="t">HISTORY</span>
+          <button class="fchip">All<span class="n">9</span></button>
+          <button class="fchip">Pending<span class="n">2</span></button>
+          <button class="fchip on">Resolved<span class="n">7</span></button>
+          <span style="margin-left:auto;font-size:11.5px" class="mut">Newest first ▾</span>
+        </div>
+
+        <div class="lv">
+          <div class="lv-h"><div><div class="wk">Week 25, 2026</div><div class="dt">18 Jun 2026 · applied 05:00</div></div><span class="status no"><i></i>REJECTED</span></div>
+          <div class="meta"><span class="mchip type-casual">Casual</span><span class="mchip dur-short">Short leave</span><span class="mchip n">Half day</span></div>
+          <p class="lv-r">Dentist appointment — requesting a single day off.</p>
+          <div class="lv-f"><span class="by">Rejected by <b>Farah Bukhari</b> · 20 Jun 2026</span>
+            <span class="act"><button class="mini">Ok, got it</button><button class="mini brand">View</button></span></div>
+        </div>
+
+        <div class="lv">
+          <div class="lv-h"><div><div class="wk">Week 22, 2026</div><div class="dt">21 May 2026 · applied 05:00</div></div><span class="status ok"><i></i>APPROVED</span></div>
+          <div class="meta"><span class="mchip type-casual">Casual</span><span class="mchip dur-short">Short leave</span><span class="mchip n">Half day</span></div>
+          <p class="lv-r">Family function — half day needed. Cover arranged with the reporting team for the afternoon standup.</p>
+          <div class="lv-f"><span class="by">Approved by <b>Farah Bukhari</b> · 23 May 2026</span>
+            <span class="act"><button class="mini">Ok, got it</button><button class="mini brand">View</button></span></div>
+        </div>
+
+        <div class="lv">
+          <div class="lv-h"><div><div class="wk">Week 16, 2026</div><div class="dt">9 Apr 2026 · applied 05:00</div></div><span class="status no"><i></i>REJECTED</span></div>
+          <div class="meta"><span class="mchip type-casual">Casual</span><span class="mchip dur-full">Full leave</span><span class="mchip n">2 days</span></div>
+          <p class="lv-r">Personal errands, two days.</p>
+          <div class="lv-f"><span class="by">Rejected by <b>Farah Bukhari</b> · 11 Apr 2026</span>
+            <span class="act"><button class="mini">Ok, got it</button><button class="mini brand">View</button></span></div>
+        </div>
+
+        <div class="lv">
+          <div class="lv-h"><div><div class="wk">Week 6, 2026</div><div class="dt">29 Jan 2026 · applied 05:00</div></div><span class="status ok"><i></i>APPROVED</span></div>
+          <div class="meta"><span class="mchip type-casual">Casual</span><span class="mchip dur-short">Short leave</span><span class="mchip n">Half day</span>
+            <span class="mchip n"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.5 12.5 21a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-3-3l7.5-7.5"/></svg>1 file</span></div>
+          <p class="lv-r">Moving apartments — need the morning.</p>
+          <div class="files" style="margin-top:8px"><div class="file"><span class="fic txt">TXT</span><div style="min-width:0"><b>notice.txt</b><span>4 KB</span></div><button class="rm" style="border-color:var(--line);color:var(--ink-500)">↓</button></div></div>
+          <div class="lv-f"><span class="by">Approved by <b>Farah Bukhari</b> · 31 Jan 2026</span>
+            <span class="act"><button class="mini">Ok, got it</button><button class="mini brand">View</button></span></div>
+        </div>
+
+        <div class="lv">
+          <div class="lv-h"><div><div class="wk">Week 43, 2025</div><div class="dt">16 Oct 2025 · applied 05:00</div></div><span class="status ok"><i></i>APPROVED</span></div>
+          <div class="meta"><span class="mchip type-medical">Medical</span><span class="mchip dur-full">Full leave</span><span class="mchip n">5 days</span><span class="mchip n">2 files</span></div>
+          <p class="lv-r">Recovering from minor surgery.</p>
+          <div class="lv-f"><span class="by">Approved by <b>Farah Bukhari</b> · 18 Oct 2025</span>
+            <span class="act"><button class="mini">Ok, got it</button><button class="mini brand">View</button></span></div>
+        </div>
+
+        <div class="lv">
+          <div class="lv-h"><div><div class="wk">Week 28, 2025</div><div class="dt">3 Jul 2025 · applied 05:00</div></div><span class="status no"><i></i>REJECTED</span></div>
+          <div class="meta"><span class="mchip type-foreign">Foreign trip</span><span class="mchip dur-full">Full leave</span><span class="mchip n">6 days</span><span class="mchip n">1 file</span></div>
+          <p class="lv-r">Conference travel request — budget not approved this quarter.</p>
+          <div class="lv-f"><span class="by">Rejected by <b>Farah Bukhari</b> · 5 Jul 2025</span>
+            <span class="act"><button class="mini">Ok, got it</button><button class="mini brand">View</button></span></div>
+        </div>
+      </div>
+    </aside>
+  </div></div>
+</div>
+
+</div>
+<script>
+function fit(){
+  document.querySelectorAll('.stage').forEach(function(s){
+    var p=s.querySelector('.plate'), w=s.clientWidth, k=Math.min(1,w/1440);
+    p.style.transform='scale('+k+')'; s.style.height=(900*k)+'px';
+  });
+}
+addEventListener('resize',fit); fit();
+</script>
+</body>
+</html>

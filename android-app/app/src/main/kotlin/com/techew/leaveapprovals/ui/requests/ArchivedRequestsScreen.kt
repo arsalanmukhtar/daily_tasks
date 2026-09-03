@@ -16,7 +16,8 @@ import androidx.compose.runtime.getValue
 fun ArchivedRequestsScreen(
     viewModel: RequestListViewModel,
     highlightRequestId: String?,
-    onHighlightHandled: () -> Unit
+    onHighlightHandled: () -> Unit,
+    onGoToRequests: () -> Unit
 ) {
     val records by viewModel.archivedRecords.collectAsState()
     LeaveRequestList(
@@ -24,6 +25,13 @@ fun ArchivedRequestsScreen(
         records = records,
         emptyMessage = "No archived leave requests yet.",
         highlightRequestId = highlightRequestId,
-        onHighlightHandled = onHighlightHandled
+        onHighlightHandled = onHighlightHandled,
+        emptySlot = { hasActiveFilters, onClearFilters ->
+            ArchivedEmptyState(
+                hasActiveFilters = hasActiveFilters,
+                onClearFilters = onClearFilters,
+                onGoToRequests = onGoToRequests
+            )
+        }
     )
 }

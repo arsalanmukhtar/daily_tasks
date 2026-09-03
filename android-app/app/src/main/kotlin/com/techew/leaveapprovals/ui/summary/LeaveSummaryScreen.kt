@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.techew.leaveapprovals.data.LeaveRequest
 import com.techew.leaveapprovals.data.LeaveType
 import com.techew.leaveapprovals.ui.charts.MonthlyTrendChart
+import com.techew.leaveapprovals.ui.common.Avatar
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.TextStyle
@@ -204,6 +205,26 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                             }
                         }
 
+                        // Drill-down breadcrumb - only meaningful once the manager
+                        // has actually narrowed past Year, mirroring the mockup's
+                        // "2026 › Q3 · Jul – Sep" / "2026 › Q3 › Sep · N requests".
+                        if (granularity == Granularity.QUARTER) {
+                            Breadcrumb(
+                                parts = listOf(selectedYear.toString() to false, "Q$selectedQuarter" to true),
+                                suffix = quarterMonthRange(selectedQuarter)
+                            )
+                        }
+                        if (granularity == Granularity.MONTH) {
+                            Breadcrumb(
+                                parts = listOf(
+                                    selectedYear.toString() to false,
+                                    "Q${(selectedMonth - 1) / 3 + 1}" to false,
+                                    MONTH_LABELS[selectedMonth - 1] to true
+                                ),
+                                suffix = "${finalRecords.size} request${if (finalRecords.size == 1) "" else "s"}"
+                            )
+                        }
+
                         SectionLabel("Activity", topPadding = 20.dp)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -281,9 +302,142 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                 }
                             }
                         }
+
+                        if (granularity == Granularity.MONTH) {
+                            val monthWeeks = remember(selectedYear, selectedMonth) {
+                                val firstDay = java.time.LocalDate.of(selectedYear, selectedMonth, 1)
+                                val lastDay = firstDay.withDayOfMonth(firstDay.lengthOfMonth())
+                                val weeks = mutableListOf<Int>()
+                                var d = firstDay
+                                while (!d.isAfter(lastDay)) {
+                                    val w = d.get(WeekFields.ISO.weekOfWeekBasedYear())
+                                    if (weeks.isEmpty() || weeks.last() != w) weeks.add(w)
+                                    d = d.plusDays(1)
+                                }
+                                weeks
+                            }
+                            val weekCounts = remember(finalRecords, monthWeeks) {
+                                monthWeeks.associateWith { w -> finalRecords.count { it.isoWeekOrNull() == w } }
+                            }
+
+                            SectionLabel("By week", topPadding = 20.dp)
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    weekCounts.toSortedMap().forEach { (week, count) ->
+                                        WeekTile("W$week", count, Modifier.weight(1f))
+                                    }
+                                }
+                            }
+
+                            val leaderboard = remember(finalRecords) {
+                                finalRecords.groupBy { it.email }
+                                    .map { (email, list) ->
+                                        Triple(list.firstOrNull { it.name.isNotBlank() }?.name ?: email, email, list.size)
+                                    }
+                                    .sortedByDescending { it.third }
+                                    .take(5)
+                            }
+
+                            SectionLabel("Most requests", topPadding = 20.dp)
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            ) {
+                                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+                                    if (leaderboard.isEmpty()) {
+                                        Text(
+                                            "No requests in this period.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(vertical = 12.dp)
+                                        )
+                                    } else {
+                                        leaderboard.forEach { (name, email, count) ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Avatar(name = name, email = email, size = 28.dp)
+                                                Text(
+                                                    name,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    modifier = Modifier.weight(1f).padding(start = 10.dp)
+                                                )
+                                                Text(
+                                                    count.toString(),
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(50))
+                                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
+    }
+}
+
+private fun quarterMonthRange(quarter: Int): String {
+    val startMonth = (quarter - 1) * 3 + 1
+    val endMonth = startMonth + 2
+    return "${MONTH_LABELS[startMonth - 1]} – ${MONTH_LABELS[endMonth - 1]}"
+}
+
+@Composable
+private fun Breadcrumb(parts: List<Pair<String, Boolean>>, suffix: String? = null) {
+    Row(modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)) {
+        parts.forEachIndexed { index, (label, isCurrent) ->
+            if (index > 0) {
+                Text(" › ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text(
+                label,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = if (isCurrent) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal,
+                color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (suffix != null) {
+            Text(" · $suffix", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun WeekTile(label: String, count: Int, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            count.toString(),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            color = if (count == 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(top = 2.dp)
+        )
     }
 }
 

@@ -29,4 +29,14 @@ object LeaveType {
     fun normalize(type: String): String = ALIASES[type] ?: type.ifBlank { CASUAL_SHORT }
 
     fun label(type: String): String = LABELS[normalize(type)] ?: "Leave"
+
+    // Collapses casualShort/casualFull into one "Casual" family label, for
+    // UI that shows the leave-type chip and the short/full duration chip
+    // separately (mirrors screens/mobile-redesign.html's card chips).
+    fun familyLabel(type: String): String =
+        if (normalize(type) == CASUAL_SHORT || normalize(type) == CASUAL_FULL) "Casual" else label(type)
+
+    fun isShort(type: String): Boolean = normalize(type) == CASUAL_SHORT
+
+    fun durationLabel(type: String): String = if (isShort(type)) "Short Leave" else "Full Leave"
 }

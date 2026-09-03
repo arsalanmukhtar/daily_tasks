@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tech EW · Mobile layout refactor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* ---- kept from your build (Material 3 lavender + orange accent) ---- */
+  --bg:#FAF5FD; --surf:#FFFFFF; --surf-var:#E9E2EE; --surf-var-2:#F1EBF6;
+  --container:#EADDFF; --on-container:#21005D; --outline:#7A7481; --outline-v:#D9D0DF;
+  --ink:#1C1B1F; --ink-2:#49454F; --ink-3:#6F6A76; --ink-4:#948E9B;
+  --brand:#E8590C; --brand-d:#C2410C; --brand-bg:#FFEFE4; --brand-bd:#F8CFAF;
+
+  /* ---- status (kept) ---- */
+  --ok:#0A7A38; --ok-bg:#CDF3D6; --ok-bd:#A7E4B6;
+  --no:#B3261E; --no-bg:#FBDDDC; --no-bd:#F1BDBB;
+  --wait:#8A5A00; --wait-bg:#FFECC7; --wait-bd:#F2D79B;
+
+  /* ---- NEW secondaries ---- */
+  --t-foreign:#3B5BDB; --t-foreign-bg:#E8EDFC;
+  --t-umrah:#0E8A7D;   --t-umrah-bg:#DFF2EF;
+  --t-medical:#0B7FA8; --t-medical-bg:#DFF0F8;
+  --t-casual:#6C4CC4;  --t-casual-bg:#EDE7FA;
+  --d-short:#0369A1;   --d-short-bg:#E3EFF8;
+  --d-full:#3730A3;    --d-full-bg:#E9E8F8;
+  --meta:#54607A;      --meta-bg:#ECEEF4;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:#E7E4EC;font-family:Roboto,-apple-system,"Segoe UI",sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+.page{padding:26px clamp(12px,3vw,34px) 70px;max-width:1720px;margin:0 auto}
+h1.doc{margin:0 0 4px;font-size:19px;font-weight:700}
+p.doc{margin:0 0 24px;font-size:13.5px;color:var(--ink-3);max-width:80ch;line-height:1.55}
+.rack{display:flex;flex-wrap:wrap;gap:26px}
+.slot{width:412px}
+.slot h2{margin:0 0 3px;font-size:13.5px;font-weight:700;display:flex;align-items:center;gap:8px}
+.slot h2 b{font-size:10.5px;font-weight:700;letter-spacing:.06em;background:#2B2731;color:#fff;padding:2px 7px;border-radius:5px}
+.slot p{margin:0 0 10px;font-size:12px;color:var(--ink-3);line-height:1.45;min-height:34px}
+.dev{width:412px;height:915px;background:var(--bg);border:9px solid #17141C;border-radius:36px;overflow:hidden;position:relative;
+     box-shadow:0 14px 34px rgba(23,20,28,.22);display:flex;flex-direction:column}
+
+/* chrome */
+.sb{height:30px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 18px;font-size:12px;font-weight:500;color:var(--ink-2)}
+.sb .r{display:flex;gap:5px;align-items:center;font-size:10px}
+.appbar{flex:none;height:54px;display:flex;align-items:center;gap:10px;padding:0 14px 0 16px}
+.appbar h3{margin:0;font-size:20px;font-weight:400;letter-spacing:-.01em}
+.cnt{font-size:11px;font-weight:700;background:var(--container);color:var(--on-container);border-radius:99px;padding:2px 8px}
+.iconbtn{margin-left:auto;width:38px;height:38px;border-radius:99px;border:0;background:transparent;display:grid;place-items:center;cursor:pointer;color:var(--ink-2)}
+.iconbtn:active{background:var(--surf-var)}
+.scr{flex:1;overflow:hidden;position:relative}
+.scrpad{padding:0 14px 12px}
+.nav{flex:none;height:74px;background:#F2EBF7;border-top:1px solid var(--outline-v);display:grid;grid-template-columns:repeat(3,1fr);align-items:center;padding-top:6px}
+.nvi{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:var(--ink-2)}
+.nvi .pillbox{width:64px;height:32px;border-radius:99px;display:grid;place-items:center}
+.nvi.on .pillbox{background:var(--container)}
+.nvi.on{color:var(--brand);font-weight:500}
+.gest{flex:none;height:22px;display:grid;place-items:center}
+.gest i{width:132px;height:4px;border-radius:99px;background:#2B2731;display:block}
+
+/* filters */
+.filterbar{display:flex;gap:8px;padding:2px 14px 8px}
+.fbtn{flex:1;min-width:0;height:38px;border-radius:10px;border:1px solid var(--outline-v);background:var(--surf);display:flex;align-items:center;
+      gap:5px;padding:0 9px;font-size:12.5px;font-weight:500;color:var(--ink-2);cursor:pointer}
+.fbtn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fbtn .cv{margin-left:auto;color:var(--ink-4);font-size:10px}
+.fbtn.set{background:var(--container);border-color:transparent;color:var(--on-container);font-weight:700}
+.sumrow{display:flex;align-items:center;padding:0 16px 8px;font-size:12px;color:var(--ink-3)}
+.sumrow b{color:var(--ink);font-weight:500}
+.sumrow button{margin-left:auto;border:0;background:transparent;color:var(--brand-d);font:700 12px Roboto;cursor:pointer;padding:2px 0}
+
+/* request card */
+.rq{background:var(--surf);border:1px solid var(--outline-v);border-radius:16px;padding:12px 12px 10px;margin-bottom:10px}
+.rq.pending{border-color:var(--wait-bd);box-shadow:inset 3px 0 0 #E0A430}
+.rq-h{display:flex;align-items:flex-start;gap:10px}
+.ava{width:36px;height:36px;border-radius:99px;display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff;flex:none;background:#6C4CC4}
+.ava.b{background:#0B7FA8}.ava.c{background:#0E8A7D}
+.rq-h .nm{font-size:14.5px;font-weight:500;line-height:1.2}
+.rq-h .em{font-size:11.5px;color:var(--ink-3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px}
+.st{margin-left:auto;flex:none;display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 9px;border-radius:99px;
+    font-size:10px;font-weight:700;letter-spacing:.05em;border:1px solid transparent}
+.st i{width:5px;height:5px;border-radius:99px}
+.st.ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok-bd)} .st.ok i{background:var(--ok)}
+.st.no{background:var(--no-bg);color:var(--no);border-color:var(--no-bd)} .st.no i{background:var(--no)}
+.st.wait{background:var(--wait-bg);color:var(--wait);border-color:var(--wait-bd)} .st.wait i{background:var(--wait)}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.c{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:7px;font-size:11px;font-weight:500;border:1px solid transparent}
+.c svg{width:11px;height:11px}
+.c.t-foreign{background:var(--t-foreign-bg);color:var(--t-foreign)}
+.c.t-umrah{background:var(--t-umrah-bg);color:var(--t-umrah)}
+.c.t-medical{background:var(--t-medical-bg);color:var(--t-medical)}
+.c.t-casual{background:var(--t-casual-bg);color:var(--t-casual)}
+.c.d-short{background:var(--d-short-bg);color:var(--d-short)}
+.c.d-full{background:var(--d-full-bg);color:var(--d-full)}
+.c.m{background:var(--meta-bg);color:var(--meta)}
+.c.att{background:var(--brand-bg);color:var(--brand-d)}
+.rsn{font-size:12.5px;line-height:1.45;color:var(--ink-2);margin:9px 0 0;
+     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.rq-f{display:flex;align-items:center;gap:8px;margin-top:9px;padding-top:8px;border-top:1px solid #EFEAF3}
+.rq-f .by{font-size:11.5px;color:var(--ink-3);line-height:1.3}
+.rq-f .by b{color:var(--ink-2);font-weight:500}
+.rq-f .go{margin-left:auto;color:var(--ink-4);font-size:16px}
+.acts{display:flex;gap:8px;margin-top:9px}
+.acts button{flex:1;height:36px;border-radius:10px;font:700 12.5px Roboto;cursor:pointer;border:1px solid}
+.acts .rej{background:var(--surf);border-color:var(--no-bd);color:var(--no)}
+.acts .app{background:var(--ok);border-color:var(--ok);color:#fff}
+
+/* bottom sheet */
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--bg);border-radius:26px 26px 0 0;box-shadow:0 -10px 34px rgba(28,27,31,.24);
+       display:flex;flex-direction:column;overflow:hidden}
+.grab{height:20px;display:grid;place-items:center;flex:none}
+.grab i{width:34px;height:4px;border-radius:99px;background:#CFC7D6;display:block}
+.dim{position:absolute;inset:0;background:rgba(28,27,31,.42)}
+.sh-h{padding:2px 16px 12px;flex:none}
+.sh-body{flex:1;overflow:hidden;padding:0 16px}
+.sh-f{flex:none;padding:11px 16px 14px;border-top:1px solid var(--outline-v);background:var(--surf)}
+
+.srch{display:flex;align-items:center;gap:9px;height:44px;border-radius:12px;background:var(--surf-var-2);border:1px solid var(--outline-v);padding:0 12px;margin:0 0 10px}
+.srch span{font-size:13.5px;color:var(--ink-4)}
+.opt{display:flex;align-items:center;gap:11px;height:52px;border-bottom:1px solid #EFEAF3;padding:0 2px}
+.opt .ava{width:32px;height:32px;font-size:12px}
+.opt .n{font-size:14px;font-weight:400}
+.opt .k{margin-left:auto;font-size:11px;color:var(--ink-3);background:var(--surf-var-2);border-radius:99px;padding:3px 8px}
+.opt.sel{background:var(--container);border-radius:12px;border-bottom-color:transparent;padding:0 10px}
+.opt.sel .n{font-weight:700;color:var(--on-container)}
+.opt .tick{color:var(--brand-d);font-size:15px;margin-left:8px}
+
+/* detail */
+.d-h{display:flex;align-items:flex-start;gap:10px}
+.d-h .nm{font-size:19px;font-weight:500;letter-spacing:-.01em}
+.d-h .em{font-size:12px;color:var(--ink-3);margin-top:2px}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.kvi{background:var(--surf);border:1px solid var(--outline-v);border-radius:12px;padding:8px 10px}
+.kvi .k{font-size:9.5px;font-weight:700;letter-spacing:.06em;color:var(--ink-4)}
+.kvi .v{font-size:13px;font-weight:500;margin-top:3px}
+.lbl{font-size:10.5px;font-weight:700;letter-spacing:.07em;color:var(--ink-4);margin:14px 0 7px}
+.reason{background:var(--surf);border:1px solid var(--outline-v);border-radius:14px;padding:12px;font-size:13px;line-height:1.55;color:var(--ink-2)}
+.reason p{margin:0 0 9px}.reason p:last-child{margin:0}
+.reason ul{margin:0 0 9px;padding-left:18px}.reason li{margin-bottom:5px}
+.fade{position:relative}
+.fade:after{content:"";position:absolute;left:1px;right:1px;bottom:1px;height:56px;border-radius:0 0 13px 13px;
+            background:linear-gradient(transparent,var(--surf) 78%)}
+.more{position:absolute;left:0;right:0;bottom:8px;text-align:center;z-index:2}
+.more button{border:1px solid var(--outline-v);background:var(--surf);border-radius:99px;padding:6px 14px;font:700 12px Roboto;color:var(--brand-d);cursor:pointer}
+.att{display:flex;align-items:center;gap:10px;background:var(--surf);border:1px solid var(--outline-v);border-radius:12px;padding:9px 10px;margin-bottom:7px}
+.fic{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font:700 9px Roboto;color:#fff;flex:none}
+.fic.doc{background:#2B5EB4}.fic.pdf{background:#B4342B}.fic.txt{background:#5A6B7C}
+.att b{display:block;font-size:12.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att span{display:block;font-size:11px;color:var(--ink-3)}
+.att .dl{margin-left:auto;width:32px;height:32px;border-radius:99px;border:1px solid var(--outline-v);background:var(--bg);color:var(--ink-2);cursor:pointer}
+.verdict{display:flex;align-items:center;gap:10px;border-radius:14px;padding:11px 12px}
+.verdict.ok{background:var(--ok-bg);border:1px solid var(--ok-bd)}
+.verdict.no{background:var(--no-bg);border:1px solid var(--no-bd)}
+.verdict .vi{width:30px;height:30px;border-radius:99px;background:#fff;display:grid;place-items:center;flex:none}
+.verdict b{display:block;font-size:13px;font-weight:700}
+.verdict span{display:block;font-size:11.5px;margin-top:1px;opacity:.85}
+.verdict.ok b,.verdict.ok span{color:var(--ok)} .verdict.no b,.verdict.no span{color:var(--no)}
+
+/* empty + loading */
+.empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 34px;text-align:center;gap:6px}
+.empty .art{width:96px;height:96px;border-radius:26px;background:var(--surf);border:1px solid var(--outline-v);display:grid;place-items:center;margin-bottom:12px}
+.empty h4{margin:0;font-size:16.5px;font-weight:500}
+.empty p{margin:0;font-size:13px;color:var(--ink-3);line-height:1.5}
+.empty .btns{display:flex;gap:8px;margin-top:14px}
+.empty .btns button{height:40px;padding:0 16px;border-radius:99px;font:700 13px Roboto;cursor:pointer}
+.empty .btns .p{background:var(--brand);border:0;color:#fff}
+.empty .btns .s{background:transparent;border:1px solid var(--outline-v);color:var(--ink-2)}
+.sk{background:var(--surf);border:1px solid var(--outline-v);border-radius:16px;padding:12px;margin-bottom:10px}
+.bar{background:linear-gradient(90deg,#E9E2EE,#F3EEF7,#E9E2EE);background-size:200% 100%;border-radius:6px;animation:sh 1.2s linear infinite}
+@keyframes sh{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.bar{animation:none}}
+.spin{width:18px;height:18px;border-radius:99px;border:2px solid var(--brand-bd);border-top-color:var(--brand);animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.refreshpill{display:flex;align-items:center;gap:8px;justify-content:center;margin:0 auto 10px;background:var(--surf);
+             border:1px solid var(--outline-v);border-radius:99px;padding:7px 14px;width:max-content;font-size:12px;font-weight:500;color:var(--ink-2)}
+
+/* summary */
+.scope{background:var(--surf);border:1px solid var(--outline-v);border-radius:16px;padding:11px 12px;margin-bottom:10px}
+.pickbtn{width:100%;height:44px;border-radius:12px;border:1px solid var(--outline-v);background:var(--bg);display:flex;align-items:center;gap:9px;
+         padding:0 11px;font-size:13.5px;font-weight:500;color:var(--ink);cursor:pointer;text-align:left}
+.pickbtn .cv{margin-left:auto;color:var(--ink-4)}
+.pickbtn .n{font-size:11px;font-weight:700;background:var(--container);color:var(--on-container);border-radius:99px;padding:2px 7px}
+.segm{display:flex;background:var(--surf-var-2);border:1px solid var(--outline-v);border-radius:11px;padding:3px;margin-top:9px;gap:3px}
+.segm button{flex:1;height:32px;border:0;border-radius:8px;background:transparent;font:500 12.5px Roboto;color:var(--ink-2);cursor:pointer}
+.segm button.on{background:var(--container);color:var(--on-container);font-weight:700}
+.stepper{display:flex;align-items:center;gap:8px;margin-top:9px}
+.stepper .arw{width:32px;height:32px;border-radius:99px;border:1px solid var(--outline-v);background:var(--bg);cursor:pointer;color:var(--ink-2);font-size:13px}
+.stepper .val{flex:1;text-align:center;font-size:14px;font-weight:700}
+.subrow{display:flex;gap:6px;margin-top:9px}
+.subrow button{flex:1;height:32px;border-radius:9px;border:1px solid var(--outline-v);background:var(--bg);font:500 12.5px Roboto;color:var(--ink-2);cursor:pointer}
+.subrow button.on{background:var(--container);border-color:transparent;color:var(--on-container);font-weight:700}
+.mrow{display:flex;gap:6px;margin-top:9px;overflow:hidden}
+.mrow button{flex:0 0 54px;height:32px;border-radius:9px;border:1px solid var(--outline-v);background:var(--bg);font:500 12.5px Roboto;color:var(--ink-2);cursor:pointer}
+.mrow button.on{background:var(--container);border-color:transparent;color:var(--on-container);font-weight:700}
+.selchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.selchip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 6px 0 10px;border-radius:99px;background:var(--container);
+         color:var(--on-container);font-size:12px;font-weight:500}
+.selchip b{width:18px;height:18px;border-radius:99px;background:rgba(33,0,93,.13);display:grid;place-items:center;font-size:11px;cursor:pointer}
+
+.panel{background:var(--surf);border:1px solid var(--outline-v);border-radius:16px;padding:12px;margin-bottom:10px}
+.ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.ph h4{margin:0;font-size:10.5px;font-weight:700;letter-spacing:.07em;color:var(--ink-4)}
+.ph .sm{font-size:11.5px;color:var(--ink-3)}
+.grid4{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tile{border-radius:12px;padding:9px 10px;border:1px solid}
+.tile .k{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:.05em}
+.tile .k i{width:6px;height:6px;border-radius:99px}
+.tile .v{font-size:24px;font-weight:700;margin-top:2px;line-height:1.1}
+.tile.all{background:var(--surf-var-2);border-color:var(--outline-v)} .tile.all .k{color:var(--ink-3)} .tile.all .k i{background:var(--ink-4)}
+.tile.ok{background:var(--ok-bg);border-color:var(--ok-bd);color:var(--ok)} .tile.ok .k i{background:var(--ok)}
+.tile.no{background:var(--no-bg);border-color:var(--no-bd);color:var(--no)} .tile.no .k i{background:var(--no)}
+.tile.wait{background:var(--wait-bg);border-color:var(--wait-bd);color:var(--wait)} .tile.wait .k i{background:var(--wait)}
+
+.tb{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.tb .nm{font-size:12px;font-weight:500;width:88px;flex:none;color:var(--ink-2)}
+.tb .track{flex:1;height:8px;border-radius:99px;background:var(--surf-var-2);overflow:hidden}
+.tb .track i{display:block;height:100%;border-radius:99px}
+.tb .vv{width:22px;text-align:right;font-size:12.5px;font-weight:700}
+.tb.zero .vv{color:var(--ink-4);font-weight:400}
+
+.qgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.qq{border:1px solid var(--outline-v);border-radius:12px;padding:8px 6px;text-align:center;background:var(--bg);cursor:pointer}
+.qq .qn{font-size:10.5px;font-weight:700;color:var(--ink-3)}
+.qq .qv{font-size:17px;font-weight:700;margin-top:1px}
+.qq.on{background:var(--brand-bg);border-color:var(--brand)}
+.qq.on .qv,.qq.on .qn{color:var(--brand-d)}
+.qq.zero .qv{color:var(--ink-4)}
+
+.chart{display:grid;grid-template-columns:18px 1fr;gap:7px;margin-top:2px}
+.yax{display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;font-size:9px;color:var(--ink-4);height:118px;padding-bottom:16px}
+.bars{height:118px;display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end;
+      background:linear-gradient(to top,#EFEAF3 1px,transparent 1px) 0 0/100% 33.6px}
+.bcol{display:flex;flex-direction:column;justify-content:flex-end;height:102px}
+.bcol .lbl2{text-align:center;font-size:9px;color:var(--ink-3);height:16px;line-height:16px}
+.stack{display:flex;flex-direction:column-reverse;border-radius:4px 4px 0 0;overflow:hidden}
+.stack i{display:block}
+.stack i.a{background:var(--ok)} .stack i.r{background:var(--no)} .stack i.p{background:#D08A16}
+.stack.z{height:3px;background:#EFEAF3;border-radius:99px}
+.bcol.on .lbl2{color:var(--brand-d);font-weight:700}
+.legend{display:flex;gap:12px;margin-top:10px;padding-top:9px;border-top:1px solid #EFEAF3;font-size:11px;color:var(--ink-2)}
+.legend i{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:-1px}
+.crumb{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-3);margin:0 0 9px;padding:0 2px}
+.crumb b{color:var(--brand-d);font-weight:700}
+.mut{color:var(--ink-4)}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1 class="doc">Tech EW — mobile layout refactor</h1>
+  <p class="doc">412 × 915 frames. Palette untouched: same lavender surfaces, orange accent, and approved / rejected / pending pills. New secondaries cover leave type, duration and attachments so a card can carry everything without extra height.</p>
+
+<div class="rack">
+
+<!-- ===== 01 ===== -->
+<div class="slot">
+  <h2><b>01</b>Leave requests</h2>
+  <p>Three stacked filter rows collapse into one. The "View details" button goes — the whole card is the target — which buys ~76px per card, so four fit instead of two.</p>
+  <div class="dev">
+    <div class="sb"><span>1:20</span><div class="r"><span>▮▮▮</span><span>◗</span><span>▰</span></div></div>
+    <div class="appbar"><h3>Leave requests</h3><span class="cnt">12</span>
+      <button class="iconbtn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></button></div>
+
+    <div class="filterbar">
+      <button class="fbtn"><span>All statuses</span><span class="cv">▾</span></button>
+      <button class="fbtn"><span>All types</span><span class="cv">▾</span></button>
+      <button class="fbtn"><span>Everyone</span><span class="cv">▾</span></button>
+    </div>
+    <div class="sumrow"><span><b>12 requests</b> · 3 waiting on you</span></div>
+
+    <div class="scr"><div class="scrpad">
+      <div class="rq pending">
+        <div class="rq-h"><div class="ava">SM</div>
+          <div style="min-width:0"><div class="nm">Syed Mustafa Haider</div><div class="em">mustafa.haider2011@gmail.com</div></div>
+          <span class="st wait"><i></i>REQUESTED</span></div>
+        <div class="chips">
+          <span class="c t-casual">Casual</span><span class="c d-short">Short leave</span>
+          <span class="c m">Week 36, 2026</span><span class="c m">3 Sept · 11:11</span>
+          <span class="c att"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.5 12.5 21a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-3-3l7.5-7.5"/></svg>2</span></div>
+        <p class="rsn">Applying for the testing leave with notification. Handover shared with the GIS team for the afternoon window.</p>
+        <div class="acts"><button class="rej">Reject</button><button class="app">Approve</button></div>
+      </div>
+
+      <div class="rq">
+        <div class="rq-h"><div class="ava b">SM</div>
+          <div style="min-width:0"><div class="nm">Syed Mustafa Haider</div><div class="em">mustafa.haider2011@gmail.com</div></div>
+          <span class="st ok"><i></i>APPROVED</span></div>
+        <div class="chips">
+          <span class="c t-casual">Casual</span><span class="c d-short">Short leave</span>
+          <span class="c m">Week 36, 2026</span><span class="c m">3 Sept · 10:16</span>
+          <span class="c att"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.5 12.5 21a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-3-3l7.5-7.5"/></svg>1</span></div>
+        <p class="rsn">Scheduled medical appointment with a specialist that could not be moved outside working hours, plus a family commitment the same afternoon.</p>
+        <div class="rq-f"><span class="by">Approved by <b>Developer NDMA</b> · 3 Sept</span><span class="go">›</span></div>
+      </div>
+
+      <div class="rq">
+        <div class="rq-h"><div class="ava c">ZN</div>
+          <div style="min-width:0"><div class="nm">Zeeshan Nasir</div><div class="em">zeeshan.nasir@ndma.gov.pk</div></div>
+          <span class="st no"><i></i>REJECTED</span></div>
+        <div class="chips">
+          <span class="c t-foreign">Foreign trip</span><span class="c d-full">Full leave</span>
+          <span class="c m">Week 35, 2026</span><span class="c m">6 days</span></div>
+        <p class="rsn">Conference travel to the regional GIS summit — budget not approved this quarter.</p>
+        <div class="rq-f"><span class="by">Rejected by <b>Developer NDMA</b> · 28 Aug</span><span class="go">›</span></div>
+      </div>
+
+      <div class="rq">
+        <div class="rq-h"><div class="ava">MA</div>
+          <div style="min-width:0"><div class="nm">Muqeet Ahmad</div><div class="em">muqeet.ahmad@ndma.gov.pk</div></div>
+          <span class="st ok"><i></i>APPROVED</span></div>
+        <div class="chips"><span class="c t-umrah">Umrah</span><span class="c d-full">Full leave</span><span class="c m">Week 33, 2026</span></div>
+      </div>
+    </div></div>
+
+    <div class="nav">
+      <div class="nvi on"><div class="pillbox"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M9 4h6v3H9z"/><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 12h8M8 16h5"/></svg></div>Requests</div>
+      <div class="nvi"><div class="pillbox"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 9v6M9 12l3 3 3-3"/></svg></div>Archived</div>
+      <div class="nvi"><div class="pillbox"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 17l5-6 4 4 6-8"/></svg></div>Summary</div>
+    </div>
+    <div class="gest"><i></i></div>
+  </div>
+</div>
+
+<!-- ===== 02 ===== -->
+<div class="slot">
+  <h2><b>02</b>Person filter</h2>
+  <p>Full-height menu replaced with a bottom sheet: search, initials, and a request count per person so you can see who is worth opening.</p>
+  <div class="dev">
+    <div class="sb"><span>1:21</span><div class="r"><span>▮▮▮</span><span>◗</span><span>▰</span></div></div>
+    <div class="appbar"><h3>Leave requests</h3><span class="cnt">12</span><button class="iconbtn">⟳</button></div>
+    <div class="filterbar">
+      <button class="fbtn"><span>All statuses</span><span class="cv">▾</span></button>
+      <button class="fbtn"><span>All types</span><span class="cv">▾</span></button>
+      <button class="fbtn set"><span>Everyone</span><span class="cv">▴</span></button>
+    </div>
+    <div class="scr">
+      <div class="scrpad" style="opacity:.5">
+        <div class="rq"><div class="rq-h"><div class="ava">SM</div><div><div class="nm">Syed Mustafa Haider</div><div class="em">mustafa.haider2011@gmail.com</div></div><span class="st no"><i></i>REJECTED</span></div></div>
+      </div>
+      <div class="dim"></div>
+      <div class="sheet" style="height:82%">
+        <div class="grab"><i></i></div>
+        <div class="sh-h"><div style="display:flex;align-items:center"><b style="font-size:16.5px;font-weight:500">Filter by person</b>
+          <button style="margin-left:auto;border:0;background:transparent;color:var(--brand-d);font:700 12.5px Roboto;cursor:pointer">Clear</button></div>
+          <div class="srch" style="margin-top:11px">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#948E9B" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+            <span>Search 14 developers</span></div></div>
+        <div class="sh-body">
+          <div class="opt sel"><div class="ava" style="background:#2B2731">All</div><span class="n">Everyone</span><span class="k">12</span><span class="tick">✓</span></div>
+          <div class="opt"><div class="ava">AS</div><span class="n">Abdul Sattar Sheikh</span><span class="k">0</span></div>
+          <div class="opt"><div class="ava b">IA</div><span class="n">Ibrahim Abdullah</span><span class="k">1</span></div>
+          <div class="opt"><div class="ava c">MS</div><span class="n">Muddasir Shah</span><span class="k">0</span></div>
+          <div class="opt"><div class="ava">MA</div><span class="n">Muhammad Ahad Khan</span><span class="k">2</span></div>
+          <div class="opt"><div class="ava b">MA</div><span class="n">Muhammad Arsalan Mukhtar</span><span class="k">3</span></div>
+          <div class="opt"><div class="ava c">MO</div><span class="n">Muhammad Osama Khan</span><span class="k">0</span></div>
+          <div class="opt"><div class="ava">MA</div><span class="n">Muqeet Ahmad</span><span class="k">1</span></div>
+          <div class="opt"><div class="ava b">SN</div><span class="n">Seemal Naeem</span><span class="k">0</span></div>
+        </div>
+        <div class="sh-f"><button style="width:100%;height:46px;border-radius:99px;border:0;background:var(--brand);color:#fff;font:700 14px Roboto;cursor:pointer">Show 12 requests</button></div>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nvi on"><div class="pillbox">▤</div>Requests</div>
+      <div class="nvi"><div class="pillbox">▣</div>Archived</div>
+      <div class="nvi"><div class="pillbox">◪</div>Summary</div>
+    </div>
+    <div class="gest"><i></i></div>
+  </div>
+</div>
+
+<!-- ===== 03 ===== -->
+<div class="slot">
+  <h2><b>03</b>Request detail — long reason</h2>
+  <p>Header and verdict are pinned; only the reason scrolls. Facts move into a 2×2 key block so they survive the scroll.</p>
+  <div class="dev">
+    <div class="sb"><span>1:22</span><div class="r"><span>▮▮▮</span><span>◗</span><span>▰</span></div></div>
+    <div class="scr" style="flex:1">
+      <div class="dim" style="opacity:.35"></div>
+      <div class="sheet" style="top:0;height:100%;border-radius:0">
+        <div class="grab" style="height:26px"><i></i></div>
+        <div class="sh-h">
+          <div class="d-h"><div style="min-width:0"><div class="nm">Syed Mustafa Haider</div><div class="em">mustafa.haider2011@gmail.com</div></div>
+            <span class="st ok" style="margin-top:4px"><i></i>APPROVED</span></div>
+          <div class="chips" style="margin-top:10px">
+            <span class="c t-casual">Casual</span><span class="c d-short">Short leave</span>
+            <span class="c m">Week 36, 2026</span><span class="c att">📎 1</span></div>
+          <div class="kv">
+            <div class="kvi"><div class="k">LEAVE DATE</div><div class="v">Thu 3 Sept 2026</div></div>
+            <div class="kvi"><div class="k">DURATION</div><div class="v">Half day · PM</div></div>
+            <div class="kvi"><div class="k">APPLIED</div><div class="v">3 Sept · 10:16</div></div>
+            <div class="kvi"><div class="k">DECIDED IN</div><div class="v">4 hours</div></div>
+          </div>
+        </div>
+        <div class="sh-body" style="overflow:hidden;position:relative">
+          <div class="lbl" style="margin-top:6px">REASON</div>
+          <div class="reason fade" style="max-height:284px;overflow:hidden">
+            <p>Requesting short leave for the reasons below.</p>
+            <p>I have a scheduled medical appointment with a specialist that could not be accommodated outside working hours, combined with a family commitment that requires my presence the same afternoon.</p>
+            <p><b>Handover while I am away</b></p>
+            <ul>
+              <li>Pending GIS layer validation for <i>Flood Risk Mapping</i> reassigned to Zeeshan Nasir, already briefed.</li>
+              <li>Weekly data QA checklist updated in the shared drive under <code>/QA/Week36/</code>.</li>
+              <li>Urgent client queries route to Muhammad Arsalan Mukhtar.</li>
+            </ul>
+          </div>
+          <div class="more"><button>Read full reason</button></div>
+        </div>
+        <div class="sh-f">
+          <div class="verdict ok"><div class="vi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0A7A38" stroke-width="2.6"><path d="M20 6 9 17l-5-5"/></svg></div>
+            <div><b>Approved by Developer NDMA</b><span>3 Sept 2026 · 14:08</span></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="gest"><i></i></div>
+  </div>
+</div>
+
+<!-- ===== 04 ===== -->
+<div class="slot">
+  <h2><b>04</b>Request detail — resolved</h2>
+  <p>Attachments become a real list with type, size and download. Short reasons no longer leave the sheet half empty.</p>
+  <div class="dev">
+    <div class="sb"><span>1:21</span><div class="r"><span>▮▮▮</span><span>◗</span><span>▰</span></div></div>
+    <div class="appbar" style="opacity:.35"><h3>Leave requests</h3><span class="cnt">12</span><button class="iconbtn">⟳</button></div>
+    <div class="filterbar" style="opacity:.35"><button class="fbtn"><span>All statuses</span><span class="cv">▾</span></button><button class="fbtn"><span>All types</span><span class="cv">▾</span></button><button class="fbtn"><span>Everyone</span><span class="cv">▾</span></button></div>
+    <div class="scr">
+      <div class="dim"></div>
+      <div class="sheet" style="height:76%">
+        <div class="grab"><i></i></div>
+        <div class="sh-h">
+          <div class="d-h"><div style="min-width:0"><div class="nm">Syed Mustafa Haider</div><div class="em">mustafa.haider2011@gmail.com</div></div>
+            <span class="st no" style="margin-top:4px"><i></i>REJECTED</span></div>
+          <div class="chips" style="margin-top:10px"><span class="c t-casual">Casual</span><span class="c d-short">Short leave</span><span class="c m">Week 36, 2026</span></div>
+          <div class="kv">
+            <div class="kvi"><div class="k">LEAVE DATE</div><div class="v">Thu 3 Sept 2026</div></div>
+            <div class="kvi"><div class="k">DURATION</div><div class="v">Half day · AM</div></div>
+            <div class="kvi"><div class="k">APPLIED</div><div class="v">3 Sept · 11:11</div></div>
+            <div class="kvi"><div class="k">ATTACHMENTS</div><div class="v">1 file · 96 KB</div></div>
+          </div>
+        </div>
+        <div class="sh-body">
+          <div class="lbl" style="margin-top:6px">REASON</div>
+          <div class="reason"><p>Applying for the testing leave with notification.</p></div>
+          <div class="lbl">ATTACHMENTS</div>
+          <div class="att"><span class="fic doc">DOC</span><div style="min-width:0"><b>subscription_plans.docx</b><span>96 KB · added 3 Sept</span></div>
+            <button class="dl">↓</button></div>
+        </div>
+        <div class="sh-f">
+          <div class="verdict no"><div class="vi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B3261E" stroke-width="2.6"><path d="M18 6 6 18M6 6l12 12"/></svg></div>
+            <div><b>Rejected by Developer NDMA</b><span>3 Sept 2026 · 11:40</span></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nvi on"><div class="pillbox">▤</div>Requests</div><div class="nvi"><div class="pillbox">▣</div>Archived</div><div class="nvi"><div class="pillbox">◪</div>Summary</div></div>
+    <div class="gest"><i></i></div>
+  </div>
+</div>
+
+<!-- ===== 05 ===== -->
+<div class="slot">
+  <h2><b>05</b>Archived — empty</h2>
+  <p>The empty state now says why the list is empty and offers the way out, instead of one grey sentence floating mid-screen.</p>
+  <div class="dev">
+    <div class="sb"><span>1:25</span><div class="r"><span>▮▮▮</span><span>◗</span><span>▰</span></div></div>
+    <div class="appbar"><h3>Archived</h3><span class="cnt">0</span>
+      <button class="iconbtn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></button></div>
+    <div class="filterbar">
+      <button class="fbtn"><span>All statuses</span><span class="cv">▾</span></button>
+      <button class="fbtn"><span>All types</span><span class="cv">▾</span></button>
+      <button class="fbtn"><span>Everyone</span><span class="cv">▾</span></button>
+    </div>
+    <div class="scr">
+      <div class="empty">
+        <div class="art"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9C93A6" stroke-width="1.6"><rect x="3" y="4" width="18" height="4.5" rx="1.5"/><path d="M5 8.5V19a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19V8.5"/><path d="M10 12h4"/></svg></div>
+        <h4>Nothing archived yet</h4>
+        <p>Requests move here once they are resolved and older than 90 days. Approved and rejected requests stay under Requests until then.</p>
+        <div class="btns"><button class="s">Clear filters</button><button class="p">Go to requests</button></div>
+      </div>
+    </div>
+    <div class="nav">
+      <div class="nvi"><div class="pillbox">▤</div>Requests</div>
+      <div class="nvi on"><div class="pillbox"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 9v6M9 12l3 3 3-3"/></svg></div>Archived</div>
+      <div class="nvi"><div class="pillbox">◪</div>Summary</div>
+    </div>
+    <div class="gest"><i></i></div>
+  </div>
+</div>
+
+<!-- ===== 06 ===== -->
+<div class="slot">
+  <h2><b>06</b>Refreshing</h2>
+  <p>Tapping refresh now shows a spinner in the icon, a status pill, and skeleton cards — so the tap is never silent.</p>
+  <div class="dev">
+    <div class="sb"><span>1:25</span><div class="r"><span>▮▮▮</span><span>◗</span><span>▰</span></div></div>
+    <div class="appbar"><h3>Leave requests</h3><span class="cnt">12</span>
+      <button class="iconbtn"><span class="spin"></span></button></div>
+    <div class="filterbar">
+      <button class="fbtn"><span>All statuses</span><span class="cv">▾</span></button>
+      <button class="fbtn"><span>All types</span><span class="cv">▾</span></button>
+      <button class="fbtn"><span>Everyone</span><span class="cv">▾</span></button>
+    </div>
+    <div class="scr"><div class="scrpad">
+      <div class="refreshpill"><span class="spin" style="width:14px;height:14px"></span>Refreshing requests…</div>
+      <div class="sk"><div style="display:flex;gap:10px;align-items:center"><div class="bar" style="width:36px;height:36px;border-radius:99px"></div>
+        <div style="flex:1"><div class="bar" style="width:64%;height:12px"></div><div class="bar" style="width:44%;height:9px;margin-top:6px"></div></div>
+        <div class="bar" style="width:70px;height:22px;border-radius:99px"></div></div>
+        <div style="display:flex;gap:5px;margin-top:11px"><div class="bar" style="width:58px;height:22px"></div><div class="bar" style="width:76px;height:22px"></div><div class="bar" style="width:88px;height:22px"></div></div>
+        <div class="bar" style="width:100%;height:11px;margin-top:11px"></div><div class="bar" style="width:72%;height:11px;margin-top:6px"></div></div>
+      <div class="sk"><div style="display:flex;gap:10px;align-items:center"><div class="bar" style="width:36px;height:36px;border-radius:99px"></div>
+        <div style="flex:1"><div class="bar" style="width:56%;height:12px"></div><div class="bar" style="width:48%;height:9px;margin-top:6px"></div></div>
+        <div class="bar" style="width:70px;height:22px;border-radius:99px"></div></div>
+        <div style="display:flex;gap:5px;margin-top:11px"><div class="bar" style="width:64px;height:22px"></div><div class="bar" style="width:70px;height:22px"></div></div>
+        <div class="bar" style="width:92%;height:11px;margin-top:11px"></div><div class="bar" style="width:60%;height:11px;margin-top:6px"></div></div>
+      <div class="sk" style="opacity:.55"><div style="display:flex;gap:10px;align-items:center"><div class="bar" style="width:36px;height:36px;border-radius:99px"></div>
+        <div style="flex:1"><div class="bar" style="width:60%;height:12px"></div><div class="bar" style="width:40%;height:9px;margin-top:6px"></div></div></div>
+        <div class="bar" style="width:88%;height:11px;margin-top:11px"></div></div>
+    </div></div>
+    <div class="nav">
+      <div class="nvi on"><div class="pillbox">▤</div>Requests</div><div class="nvi"><div class="pillbox">▣</div>Archived</div><div class="nvi"><div class="pillbox">◪</div>Summary</div></div>
+    <div class="gest"><i></i></div>
+  </div>
+</div>
+
+<!-- ===== 07 ===== -->
+<div class="slot">
+  <h2><b>07</b>Summary — year</h2>
+  <p>Scope collapses into one card. Counters go 2×2 so nothing clips, and leave types become bars — the truncated "SH… 10" column is gone.</p>
+  <div class="dev">
+    <div class="sb"><span>1:26</span><div class="r"><span>▮▮▮</span><span>◗</span><span>▰</span></div></div>
+    <div class="appbar"><h3>Leave summary</h3>
+      <button class="iconbtn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></button></div>
+    <div class="scr"><div class="scrpad">
+      <div class="scope">
+        <button class="pickbtn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6F6A76" stroke-width="2"><circle cx="12" cy="8" r="3.4"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>
+          All developers <span class="n">14</span><span class="cv">▾</span></button>
+        <div class="segm"><button class="on">Year</button><button>Quarter</button><button>Month</button><button>Week</button></div>
+        <div class="stepper"><button class="arw">‹</button><span class="val">2026</span><button class="arw">›</button></div>
+      </div>
+
+      <div class="panel">
+        <div class="ph"><h4>ACTIVITY</h4><span class="sm">1 Jan – 31 Dec 2026</span></div>
+        <div class="grid4">
+          <div class="tile all"><div class="k"><i></i>TOTAL</div><div class="v">10</div></div>
+          <div class="tile ok"><div class="k"><i></i>APPROVED</div><div class="v">6</div></div>
+          <div class="tile no"><div class="k"><i></i>REJECTED</div><div class="v">4</div></div>
+          <div class="tile wait"><div class="k"><i></i>PENDING</div><div class="v">0</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ph"><h4>BY LEAVE TYPE</h4><span class="sm">10 total</span></div>
+        <div class="tb"><span class="nm">Short leave</span><span class="track"><i style="width:100%;background:var(--d-short)"></i></span><span class="vv">10</span></div>
+        <div class="tb zero"><span class="nm">Full leave</span><span class="track"></span><span class="vv">0</span></div>
+        <div class="tb zero"><span class="nm">Foreign trip</span><span class="track"></span><span class="vv">0</span></div>
+        <div class="tb zero"><span class="nm">Umrah</span><span class="track"></span><span class="vv">0</span></div>
+        <div class="tb zero" style="margin-bottom:0"><span class="nm">Medical</span><span class="track"></span><span class="vv">0</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="ph"><h4>BY QUARTER</h4><span class="sm">Tap to drill in</span></div>
+        <div class="qgrid">
+          <div class="qq zero"><div class="qn">Q1</div><div class="qv">0</div></div>
+          <div class="qq zero"><div class="qn">Q2</div><div class="qv">0</div></div>
+          <div class="qq on"><div class="qn">Q3</div><div class="qv">10</div></div>
+          <div class="qq zero"><div class="qn">Q4</div><div class="qv">0</div></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="nav">
+      <div class="nvi"><div class="pillbox">▤</div>Requests</div><div class="nvi"><div class="pillbox">▣</div>Archived</div>
+      <div class="nvi on"><div class="pillbox"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 17l5-6 4 4 6-8"/></svg></div>Summary</div></div>
+    <div class="gest"><i></i></div>
+  </div>
+</div>
+
+<!-- ===== 08 ===== -->
+<div class="slot">
+  <h2><b>08</b>Summary — several people</h2>
+  <p>Multi-select shows as removable chips under the picker, so the selection is readable without a sideways scroll that hides names.</p>
+  <div class="dev">
+    <div class="sb"><span>1:27</span><div class="r"><span>▮▮▮</span><span>◗</span><span>▰</span></div></div>
+    <div class="appbar"><h3>Leave summary</h3><button class="iconbtn">⟳</button></div>
+    <div class="scr"><div class="scrpad">
+      <div class="scope">
+        <button class="pickbtn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6F6A76" stroke-width="2"><circle cx="12" cy="8" r="3.4"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>
+          3 developers <span class="n">of 14</span><span class="cv">▾</span></button>
+        <div class="selchips">
+          <span class="selchip">Abdul Sattar Sheikh <b>✕</b></span>
+          <span class="selchip">Ibrahim Abdullah <b>✕</b></span>
+          <span class="selchip">Muddasir Shah <b>✕</b></span>
+        </div>
+        <div class="segm"><button class="on">Year</button><button>Quarter</button><button>Month</button><button>Week</button></div>
+        <div class="stepper"><button class="arw">‹</button><span class="val">2026</span><button class="arw">›</button></div>
+      </div>
+
+      <div class="panel">
+        <div class="ph"><h4>ACTIVITY</h4><span class="sm">3 selected</span></div>
+        <div class="grid4">
+          <div class="tile all"><div class="k"><i></i>TOTAL</div><div class="v">0</div></div>
+          <div class="tile ok" style="opacity:.55"><div class="k"><i></i>APPROVED</div><div class="v">0</div></div>
+          <div class="tile no" style="opacity:.55"><div class="k"><i></i>REJECTED</div><div class="v">0</div></div>
+          <div class="tile wait" style="opacity:.55"><div class="k"><i></i>PENDING</div><div class="v">0</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="empty" style="padding:22px 10px 18px;gap:5px">
+          <div class="art" style="width:66px;height:66px;border-radius:20px;margin-bottom:8px;background:var(--surf-var-2)">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9C93A6" stroke-width="1.7"><path d="M4 18h16M6 18v-5M11 18V9M16 18v-7"/></svg></div>
+          <h4 style="font-size:15px">No leaves in 2026</h4>
+          <p style="font-size:12.5px">These three developers have no requests this year. Try another year or widen the selection.</p>
+          <div class="btns" style="margin-top:11px"><button class="s" style="height:36px;font-size:12.5px">View 2025</button><button class="p" style="height:36px;font-size:12.5px">Select all</button></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="nav">
+      <div class="nvi"><div class="pillbox">▤</div>Requests</div><div class="nvi"><div class="pillbox">▣</div>Archived</div><div class="nvi on"><div class="pillbox">◪</div>Summary</div></div>
+    <div class="gest"><i></i></div>
+  </div>
+</div>
+
+<!-- ===== 09 ===== -->
+<div class="slot">
+  <h2><b>09</b>Summary — quarter</h2>
+  <p>A breadcrumb keeps the drill-down path visible, and the chart is scaled with an axis so a single tall bar stops dominating the screen.</p>
+  <div class="dev">
+    <div class="sb"><span>1:28</span><div class="r"><span>▮▮▮</span><span>◗</span><span>▰</span></div></div>
+    <div class="appbar"><h3>Leave summary</h3><button class="iconbtn">⟳</button></div>
+    <div class="scr"><div class="scrpad">
+      <div class="scope">
+        <button class="pickbtn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6F6A76" stroke-width="2"><circle cx="12" cy="8" r="3.4"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>All developers <span class="n">14</span><span class="cv">▾</span></button>
+        <div class="segm"><button>Year</button><button class="on">Quarter</button><button>Month</button><button>Week</button></div>
+        <div class="stepper"><button class="arw">‹</button><span class="val">2026</span><button class="arw">›</button></div>
+        <div class="subrow"><button>Q1</button><button>Q2</button><button class="on">Q3</button><button>Q4</button></div>
+      </div>
+
+      <div class="crumb">2026 <span class="mut">›</span> <b>Q3</b> <span class="mut">· Jul – Sep</span></div>
+
+      <div class="panel">
+        <div class="ph"><h4>ACTIVITY</h4><span class="sm">Q3 2026</span></div>
+        <div class="grid4">
+          <div class="tile all"><div class="k"><i></i>TOTAL</div><div class="v">10</div></div>
+          <div class="tile ok"><div class="k"><i></i>APPROVED</div><div class="v">6</div></div>
+          <div class="tile no"><div class="k"><i></i>REJECTED</div><div class="v">4</div></div>
+          <div class="tile wait"><div class="k"><i></i>PENDING</div><div class="v">0</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ph"><h4>MONTHLY BREAKDOWN</h4><span class="sm">Tap a month</span></div>
+        <div class="chart">
+          <div class="yax"><span>10</span><span>5</span><span>0</span></div>
+          <div class="bars">
+            <div class="bcol"><div class="stack z"></div><div class="lbl2">Jan</div></div>
+            <div class="bcol"><div class="stack z"></div><div class="lbl2">Feb</div></div>
+            <div class="bcol"><div class="stack z"></div><div class="lbl2">Mar</div></div>
+            <div class="bcol"><div class="stack z"></div><div class="lbl2">Apr</div></div>
+            <div class="bcol"><div class="stack z"></div><div class="lbl2">May</div></div>
+            <div class="bcol"><div class="stack z"></div><div class="lbl2">Jun</div></div>
+            <div class="bcol"><div class="stack z"></div><div class="lbl2">Jul</div></div>
+            <div class="bcol"><div class="stack z"></div><div class="lbl2">Aug</div></div>
+            <div class="bcol on"><div class="stack" style="height:98px"><i class="a" style="height:59px"></i><i class="r" style="height:39px"></i></div><div class="lbl2">Sep</div></div>
+            <div class="bcol"><div class="stack z"></div><div class="lbl2">Oct</div></div>
+            <div class="bcol"><div class="stack z"></div><div class="lbl2">Nov</div></div>
+            <div class="bcol"><div class="stack z"></div><div class="lbl2">Dec</div></div>
+          </div>
+        </div>
+        <div class="legend"><span><i style="background:var(--ok)"></i>Approved</span><span><i style="background:var(--no)"></i>Rejected</span><span><i style="background:#D08A16"></i>Pending</span></div>
+      </div>
+    </div></div>
+    <div class="nav">
+      <div class="nvi"><div class="pillbox">▤</div>Requests</div><div class="nvi"><div class="pillbox">▣</div>Archived</div><div class="nvi on"><div class="pillbox">◪</div>Summary</div></div>
+    <div class="gest"><i></i></div>
+  </div>
+</div>
+
+<!-- ===== 10 ===== -->
+<div class="slot">
+  <h2><b>10</b>Summary — month</h2>
+  <p>Month view fills the space that was blank before: type split, weekly shape, and the people behind the number.</p>
+  <div class="dev">
+    <div class="sb"><span>1:28</span><div class="r"><span>▮▮▮</span><span>◗</span><span>▰</span></div></div>
+    <div class="appbar"><h3>Leave summary</h3><button class="iconbtn">⟳</button></div>
+    <div class="scr"><div class="scrpad">
+      <div class="scope">
+        <button class="pickbtn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6F6A76" stroke-width="2"><circle cx="12" cy="8" r="3.4"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>All developers <span class="n">14</span><span class="cv">▾</span></button>
+        <div class="segm"><button>Year</button><button>Quarter</button><button class="on">Month</button><button>Week</button></div>
+        <div class="stepper"><button class="arw">‹</button><span class="val">September 2026</span><button class="arw">›</button></div>
+        <div class="mrow"><button>Jul</button><button>Aug</button><button class="on">Sep</button><button>Oct</button><button>Nov</button><button>Dec</button></div>
+      </div>
+
+      <div class="crumb">2026 <span class="mut">›</span> Q3 <span class="mut">›</span> <b>Sep</b> <span class="mut">· 10 requests</span></div>
+
+      <div class="panel">
+        <div class="grid4">
+          <div class="tile all"><div class="k"><i></i>TOTAL</div><div class="v">10</div></div>
+          <div class="tile ok"><div class="k"><i></i>APPROVED</div><div class="v">6</div></div>
+          <div class="tile no"><div class="k"><i></i>REJECTED</div><div class="v">4</div></div>
+          <div class="tile wait"><div class="k"><i></i>PENDING</div><div class="v">0</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ph"><h4>BY LEAVE TYPE</h4><span class="sm">September</span></div>
+        <div class="tb"><span class="nm">Short leave</span><span class="track"><i style="width:100%;background:var(--d-short)"></i></span><span class="vv">10</span></div>
+        <div class="tb zero"><span class="nm">Full leave</span><span class="track"></span><span class="vv">0</span></div>
+        <div class="tb zero" style="margin-bottom:0"><span class="nm">Medical</span><span class="track"></span><span class="vv">0</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="ph"><h4>BY WEEK</h4><span class="sm">Weeks 36 – 40</span></div>
+        <div class="qgrid" style="grid-template-columns:repeat(5,1fr)">
+          <div class="qq on"><div class="qn">W36</div><div class="qv">7</div></div>
+          <div class="qq"><div class="qn">W37</div><div class="qv">3</div></div>
+          <div class="qq zero"><div class="qn">W38</div><div class="qv">0</div></div>
+          <div class="qq zero"><div class="qn">W39</div><div class="qv">0</div></div>
+          <div class="qq zero"><div class="qn">W40</div><div class="qv">0</div></div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:0">
+        <div class="ph"><h4>MOST REQUESTS</h4><span class="sm">September</span></div>
+        <div class="opt" style="height:44px"><div class="ava" style="width:28px;height:28px;font-size:11px">SM</div><span class="n" style="font-size:13px">Syed Mustafa Haider</span><span class="k">7</span></div>
+        <div class="opt" style="height:44px;border-bottom:0"><div class="ava b" style="width:28px;height:28px;font-size:11px">MA</div><span class="n" style="font-size:13px">Muhammad Arsalan Mukhtar</span><span class="k">3</span></div>
+      </div>
+    </div></div>
+    <div class="nav">
+      <div class="nvi"><div class="pillbox">▤</div>Requests</div><div class="nvi"><div class="pillbox">▣</div>Archived</div><div class="nvi on"><div class="pillbox">◪</div>Summary</div></div>
+    <div class="gest"><i></i></div>
+  </div>
+</div>
+
+</div>
+</div>
+</body>
+</html>

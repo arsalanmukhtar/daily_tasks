@@ -116,12 +116,12 @@ class RequestListViewModel(
         listenerRegistration = null
     }
 
-    fun decide(requestId: String, decision: String) {
+    fun decide(requestId: String, decision: String, note: String? = null) {
         viewModelScope.launch {
             _isDeciding.value = true
             _errorMessage.value = null
             runCatching {
-                apiClient.decideLeave(requestId, decision)
+                apiClient.decideLeave(requestId, decision, note)
             }.onFailure {
                 _errorMessage.value = it.message ?: "Could not save decision."
             }

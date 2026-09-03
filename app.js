@@ -144,7 +144,27 @@ const myLeavesKpiRejected  = document.getElementById('myLeavesKpiRejected');
 const myLeavesKpiPending   = document.getElementById('myLeavesKpiPending');
 const myLeavesYearChips    = document.getElementById('myLeavesYearChips');
 const myLeavesQuarterTiles = document.getElementById('myLeavesQuarterTiles');
+const myLeavesHistoryFilters = document.getElementById('myLeavesHistoryFilters');
 const myLeavesList         = document.getElementById('myLeavesList');
+const myLeavesBanner          = document.getElementById('myLeavesBanner');
+const myLeavesBannerTitle     = document.getElementById('myLeavesBannerTitle');
+const myLeavesBannerMeta      = document.getElementById('myLeavesBannerMeta');
+const myLeavesBannerViewBtn   = document.getElementById('myLeavesBannerViewBtn');
+// Nav-card stat badges (updateNavStatBadges_)
+const navSubWeeksTag      = document.getElementById('navSubWeeksTag');
+const navSubDraftTag      = document.getElementById('navSubDraftTag');
+const navLeavePendingTag  = document.getElementById('navLeavePendingTag');
+const navLeaveApprovedTag = document.getElementById('navLeaveApprovedTag');
+// Leave drawer: AM/PM half-day toggle, inline-calendar picked summary, live
+// footer summary chips, attachment count note.
+const leaveHalfDayRow     = document.getElementById('leaveHalfDayRow');
+const leaveHalfDayAmBtn   = document.getElementById('leaveHalfDayAmBtn');
+const leaveHalfDayPmBtn   = document.getElementById('leaveHalfDayPmBtn');
+const leaveDatePicked       = document.getElementById('leaveDatePicked');
+const leaveDatePickedLabel  = document.getElementById('leaveDatePickedLabel');
+const leaveDatePickedMeta   = document.getElementById('leaveDatePickedMeta');
+const leaveSummaryChips      = document.getElementById('leaveSummaryChips');
+const leaveAttachmentCountNote = document.getElementById('leaveAttachmentCountNote');
 const toastContainer     = document.getElementById('toastContainer');
 const analyticsLeaveKpis = document.getElementById('analyticsLeaveKpis');
 const exportSummaryBtn   = document.getElementById('exportSummaryBtn');
@@ -442,6 +462,10 @@ function handleListAutoformat(e) {
 }
 
 taskTbody.addEventListener('beforeinput', handleListAutoformat);
+// Keeps the "My Submissions" nav-card draft badge live while typing (it
+// reflects whether the selected week has unsaved content) - cheap enough to
+// run on every keystroke since it's just a couple of DOM class toggles.
+taskTbody.addEventListener('input', () => updateNavStatBadges_());
 
 addRowBtn.addEventListener('click', () => {
   const tr = addTaskRow();
@@ -650,6 +674,39 @@ function fmtWeekRange(start, end) {
   return start.getUTCDate() + '–' + end.getUTCDate() + ' ' + fmtMonthYear(end);
 }
 
+// "3 Sept 2026" - like fmtFull, but reads the Date object's LOCAL calendar
+// fields rather than its UTC ones. fmtFull is correct for values built via
+// Date.UTC(...) (week Mondays, etc.) - but Flatpickr hands back plain local
+// Date objects (local midnight) for whatever the user clicked, and Firestore
+// Timestamps decoded with .toDate() are also read back through the same
+// local lens elsewhere in this file (see weekLabelFromDate_/dateToIsoWeek_).
+// Using fmtFull (UTC) on those would silently shift the displayed day in any
+// timezone ahead of UTC.
+function fmtDateLocal_(d) {
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+// "412 KB" / "1.2 MB" - human-readable file size for attachment rows.
+function formatBytes_(bytes) {
+  if (!bytes && bytes !== 0) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// Colour-coded file-type badge, shared by the Apply-for-Leave attachment
+// list and My Leaves history cards - one small helper instead of duplicating
+// the extension -> label/colour mapping in both render paths.
+function fileTypeBadgeHtml_(filename) {
+  const ext = ('.' + (String(filename || '').split('.').pop() || '')).toLowerCase();
+  let cls = 'fic-other', label = (ext.replace('.', '') || 'file').slice(0, 4).toUpperCase();
+  if (ext === '.pdf') { cls = 'fic-pdf'; label = 'PDF'; }
+  else if (ext === '.doc' || ext === '.docx') { cls = 'fic-doc'; label = 'DOC'; }
+  else if (ext === '.txt') { cls = 'fic-txt'; label = 'TXT'; }
+  else if (ext === '.zip') { cls = 'fic-zip'; label = 'ZIP'; }
+  return '<span class="fic ' + cls + '">' + escapeHtml(label) + '</span>';
+}
+
 // Renders a stored "YYYY-MM-DD to YYYY-MM-DD" range in the readable form above.
 function prettyWeekRange(rangeStr) {
   const m = /(\d{4})-(\d{2})-(\d{2})\s+to\s+(\d{4})-(\d{2})-(\d{2})/.exec(String(rangeStr || ''));
@@ -701,6 +758,7 @@ function refreshWeekSummary() {
     updateColumnHeaderDates(null);
     applyFutureDayLocks(null);
     refreshApplyLeaveButton();
+    updateNavStatBadges_();
     return null;
   }
   weekSummary.textContent =
@@ -710,6 +768,7 @@ function refreshWeekSummary() {
   updateColumnHeaderDates(info);
   applyFutureDayLocks(info);
   refreshApplyLeaveButton();
+  updateNavStatBadges_();
   return info;
 }
 
@@ -745,6 +804,16 @@ function leaveTypeLabel_(type) {
 function isFullLeaveType_(type) {
   return normalizeLeaveType_(type) === 'casualFull';
 }
+// Which mchip colour family a given leave `type` belongs to (mockup
+// .mchip.type-foreign/umrah/medical/casual) - both Casual sub-types share
+// the one Casual colour, distinguished instead by the separate duration chip.
+function leaveTypeChipClass_(type) {
+  const t = normalizeLeaveType_(type);
+  if (t === 'foreignTrip') return 'type-foreign';
+  if (t === 'umrah') return 'type-umrah';
+  if (t === 'medical') return 'type-medical';
+  return 'type-casual';
+}
 
 // New docs store an `attachments` array; old docs have the singular
 // attachmentName/attachmentUrl/attachmentFileId trio instead. Every read
@@ -759,11 +828,15 @@ function normalizeLeaveAttachments_(data) {
 
 let selectedLeaveCategory = 'casual'; // 'foreignTrip' | 'umrah' | 'medical' | 'casual'
 let selectedLeaveType = 'casualShort'; // the concrete value written to Firestore
+let leaveSelectedHalfDay = 'AM'; // 'AM' | 'PM' - only meaningful when selectedLeaveType === 'casualShort'
 let leaveAttachmentFiles = [];
 let leaveDateRangePicker = null;
 let leaveSelectedDates = []; // [start] or [start, end], plain JS Date objects
 let leaveDateMode = 'single'; // 'single' | 'range' - which Flatpickr mode is active
 let myLeavesSelectedYear = null;
+let myLeavesSelectedQuarter = null; // 1-4, or null - clicking a quarter tile filters the history list to it
+let myLeavesHistoryFilter = 'all'; // 'all' | 'pending' | 'resolved' - the hfilter chips
+let myLeavesExpandedReasons = new Set(); // requestIds whose history-card reason clamp is expanded
 let myLeavesTrendChartInstance = null;
 // Last successful leaveStatus_ fetch - reused by the cooldown check, the
 // per-request "Ok, got it" dismiss, and the My Leaves stats/history, so
@@ -792,6 +865,32 @@ function currentWeekLabel_() {
   return info ? `Week ${info.week}, ${info.year}` : '';
 }
 
+// Nav-card stat badges (mockup .nc-stats/.tag). "Weeks"/"draft" come from
+// submissionsCache + the live task table; "pending"/"approved" come from the
+// last known leaveRequests fetch. Called after any of those reload so the
+// badges never go stale.
+function updateNavStatBadges_() {
+  const weeksCount = submissionsCache ? submissionsCache.length : 0;
+  navSubWeeksTag.textContent = weeksCount + (weeksCount === 1 ? ' week' : ' weeks');
+  navSubWeeksTag.classList.toggle('hidden', weeksCount === 0);
+
+  // "Draft" = the currently-selected week has typed content that hasn't been
+  // Submitted yet (no matching submissionsCache entry) - a real, computed
+  // signal rather than a new persisted field.
+  const hasDraft = !!weekInput.value && !isTaskTableEmpty() &&
+    !(submissionsCache || []).some(function (s) { return s.weekLabel === currentWeekLabel_(); });
+  navSubDraftTag.innerHTML = '<i class="dot"></i>1 draft';
+  navSubDraftTag.classList.toggle('hidden', !hasDraft);
+
+  const leaveRecords = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
+  const pendingCount = leaveRecords.filter(function (r) { return r.status === 'requested'; }).length;
+  const approvedCount = leaveRecords.filter(function (r) { return r.status === 'approved'; }).length;
+  navLeavePendingTag.innerHTML = '<i class="dot"></i>' + pendingCount + ' pending';
+  navLeavePendingTag.classList.toggle('hidden', pendingCount === 0);
+  navLeaveApprovedTag.innerHTML = '<i class="dot"></i>' + approvedCount + ' approved';
+  navLeaveApprovedTag.classList.toggle('hidden', approvedCount === 0);
+}
+
 async function fetchLeaveStatus_() {
   if (!currentUserContext) return null;
   try {
@@ -817,6 +916,7 @@ async function fetchLeaveStatus_() {
         endDate: data.endDate && data.endDate.toDate ? data.endDate.toDate().toISOString() : '',
         weekLabel: data.weekLabel || '',
         type: normalizeLeaveType_(data.type),
+        halfDayPeriod: data.halfDayPeriod || '',
         reasonHtml: data.reasonHtml || '',
         status: data.status || 'requested',
         resolvedAt: data.resolvedAt && data.resolvedAt.toDate ? data.resolvedAt.toDate().toISOString() : '',
@@ -873,6 +973,7 @@ async function refreshApplyLeaveButton() {
   const data = await fetchLeaveStatus_();
   if (!data) return; // network hiccup - leave the button showing whatever it last showed
   latestLeaveStatusData = data;
+  updateNavStatBadges_();
 
   // Leave requests carry their own explicit startDate/endDate now, and can
   // span more than one week (a Foreign Trip/Umrah could run for several) -
@@ -939,7 +1040,9 @@ function selectLeaveCategory_(category) {
     selectLeaveType_('casualShort');
   } else {
     selectedLeaveType = category; // 'foreignTrip' | 'umrah' | 'medical' - no sub-choice
+    leaveHalfDayRow.classList.add('hidden');
   }
+  updateLeaveDrawerSummaryChips_();
 }
 
 function selectLeaveType_(type) {
@@ -947,6 +1050,70 @@ function selectLeaveType_(type) {
   selectedLeaveType = type;
   leaveTypeShortBtn.classList.toggle('is-selected', type === 'casualShort');
   leaveTypeFullBtn.classList.toggle('is-selected', type === 'casualFull');
+  // AM/PM only makes sense for a partial (Short Leave) day.
+  leaveHalfDayRow.classList.toggle('hidden', type !== 'casualShort');
+  if (type === 'casualShort' && !leaveSelectedHalfDay) selectLeaveHalfDay_('AM');
+  updateLeaveDrawerSummaryChips_();
+}
+
+function selectLeaveHalfDay_(period) {
+  leaveSelectedHalfDay = period;
+  leaveHalfDayAmBtn.classList.toggle('is-selected', period === 'AM');
+  leaveHalfDayPmBtn.classList.toggle('is-selected', period === 'PM');
+}
+
+// Live footer summary-chip strip (mockup .summary/.mchip) - reflects the
+// category/type/dates/day-count/file-count currently chosen in the drawer.
+const LEAVE_CATEGORY_LABELS_ = { foreignTrip: 'Foreign Trip', umrah: 'Umrah', medical: 'Medical', casual: 'Casual' };
+const LEAVE_CATEGORY_CHIP_CLASS_ = { foreignTrip: 'type-foreign', umrah: 'type-umrah', medical: 'type-medical', casual: 'type-casual' };
+function updateLeaveDrawerSummaryChips_() {
+  if (!leaveSummaryChips) return;
+  const chips = [];
+  const categoryClass = LEAVE_CATEGORY_CHIP_CLASS_[selectedLeaveCategory] || 'type-casual';
+  const categoryLabel = LEAVE_CATEGORY_LABELS_[selectedLeaveCategory] || 'Leave';
+  chips.push('<span class="mchip ' + categoryClass + '">' + escapeHtml(categoryLabel) + '</span>');
+  if (selectedLeaveCategory === 'casual') {
+    const isShort = selectedLeaveType === 'casualShort';
+    chips.push('<span class="mchip ' + (isShort ? 'dur-short' : 'dur-full') + '">' + (isShort ? 'Short leave' : 'Full leave') + '</span>');
+    if (isShort) chips.push('<span class="mchip n">' + escapeHtml(leaveSelectedHalfDay) + '</span>');
+  }
+  if (leaveSelectedDates.length) {
+    const start = leaveSelectedDates[0];
+    const end = leaveSelectedDates[leaveSelectedDates.length - 1];
+    if (leaveDateMode === 'range' && leaveSelectedDates.length > 1) {
+      const days = Math.round((end - start) / 86400000) + 1;
+      chips.push('<span class="mchip n">' + fmtDateLocal_(start) + ' – ' + fmtDateLocal_(end) + '</span>');
+      chips.push('<span class="mchip n">' + days + (days === 1 ? ' day' : ' days') + '</span>');
+    } else {
+      chips.push('<span class="mchip n">' + fmtDateLocal_(start) + '</span>');
+      chips.push('<span class="mchip n">' + escapeHtml(weekLabelFromDate_(start)) + '</span>');
+    }
+  }
+  if (leaveAttachmentFiles.length) {
+    chips.push('<span class="mchip n">' + leaveAttachmentFiles.length + (leaveAttachmentFiles.length === 1 ? ' file' : ' files') + '</span>');
+  }
+  leaveSummaryChips.innerHTML = chips.join('');
+}
+
+// The ".picked" strip under the inline calendar - the plain-language readout
+// of whatever's currently selected (mirrors part of the summary chips, but
+// sits right where the user is looking while picking dates).
+function updateLeaveDatePickedSummary_() {
+  if (!leaveSelectedDates.length) {
+    leaveDatePicked.classList.add('hidden');
+    return;
+  }
+  leaveDatePicked.classList.remove('hidden');
+  const start = leaveSelectedDates[0];
+  const end = leaveSelectedDates[leaveSelectedDates.length - 1];
+  if (leaveDateMode === 'range' && leaveSelectedDates.length > 1) {
+    const days = Math.round((end - start) / 86400000) + 1;
+    leaveDatePickedLabel.textContent = fmtDateLocal_(start) + ' – ' + fmtDateLocal_(end);
+    leaveDatePickedMeta.textContent = days + (days === 1 ? ' day' : ' days');
+  } else {
+    leaveDatePickedLabel.textContent = fmtDateLocal_(start);
+    leaveDatePickedMeta.textContent = weekLabelFromDate_(start);
+  }
 }
 
 function updateFullLeaveCooldownUI_() {
@@ -971,6 +1138,7 @@ function resetLeaveAttachment_() {
   leaveAttachmentList.classList.add('hidden');
   leaveAttachmentDrop.classList.remove('hidden');
   leaveAttachmentError.classList.add('hidden');
+  leaveAttachmentCountNote.classList.add('hidden');
 }
 
 // Flatpickr (date-range calendar for the leave drawer) - lazy-loaded like
@@ -1007,9 +1175,12 @@ async function ensureLeaveDatePicker_() {
     mode: leaveDateMode,
     dateFormat: 'd M Y',
     minDate: 'today',
+    inline: true,
     onChange: function (selectedDates) {
       leaveSelectedDates = selectedDates;
       leaveDateRangeError.classList.add('hidden');
+      updateLeaveDatePickedSummary_();
+      updateLeaveDrawerSummaryChips_();
     }
   });
   return leaveDateRangePicker;
@@ -1031,6 +1202,8 @@ function selectLeaveDateMode_(mode) {
   }
   leaveSelectedDates = [];
   leaveDateRangeError.classList.add('hidden');
+  updateLeaveDatePickedSummary_();
+  updateLeaveDrawerSummaryChips_();
 }
 
 async function openLeaveDrawer() {
@@ -1040,6 +1213,7 @@ async function openLeaveDrawer() {
   resetLeaveAttachment_();
   await ensureLeaveDatePicker_();
   selectLeaveDateMode_('single');
+  selectLeaveHalfDay_('AM');
   selectLeaveCategory_('casual');
   leaveDrawer.classList.add('open');
   leaveBackdrop.classList.add('open');
@@ -1065,6 +1239,9 @@ async function openMyLeavesDrawer() {
   if (!currentUserContext) return;
   myLeavesDrawer.classList.add('open');
   myLeavesBackdrop.classList.add('open');
+  // Start from a clean filter state each time the drawer is opened.
+  myLeavesHistoryFilter = 'all';
+  myLeavesSelectedQuarter = null;
   await refreshApplyLeaveButton();
   await loadMyLeavesData_();
 }
@@ -1081,11 +1258,36 @@ async function loadMyLeavesData_() {
   // only acknowledges it (see fetchLeaveStatus_), it must stay visible here
   // so an employee can always track everything they've ever applied for.
   const records = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
+  renderMyLeavesBanner_(records);
   renderMyLeavesKpis_(records);
   renderMyLeavesYearChips_(records);
   renderMyLeavesQuarterTiles_(records);
   renderMyLeavesTrendChart_(records);
-  renderMyLeavesList_(records);
+  renderMyLeavesHistorySection_(records);
+  updateNavStatBadges_();
+}
+
+// Pending-request banner (mockup .banner) - the most recently requested
+// still-pending record, with a "View" button that jumps to it below.
+function renderMyLeavesBanner_(records) {
+  const pending = records
+    .filter(function (r) { return r.status === 'requested'; })
+    .sort(function (a, b) { return new Date(b.requestedAt) - new Date(a.requestedAt); });
+  const rec = pending[0];
+  if (!rec) {
+    myLeavesBanner.classList.add('hidden');
+    myLeavesBanner.dataset.requestId = '';
+    return;
+  }
+  myLeavesBanner.classList.remove('hidden');
+  myLeavesBanner.dataset.requestId = rec.requestId;
+  myLeavesBannerTitle.textContent = 'Awaiting approval' + (rec.weekLabel ? ' — ' + rec.weekLabel : '');
+  const bits = [leaveTypeLabel_(rec.type)];
+  if (rec.startDate) { const d = new Date(rec.startDate); if (!isNaN(d.getTime())) bits.push(fmtDateLocal_(d)); }
+  if (rec.requestedAt) bits.push('sent ' + formatTimestamp(rec.requestedAt));
+  const approver = (currentUserContext && currentUserContext.reportedTo) || '';
+  if (approver) bits.push('with ' + approver);
+  myLeavesBannerMeta.textContent = bits.join(' · ');
 }
 
 function renderMyLeavesKpis_(records) {
@@ -1110,18 +1312,23 @@ function renderMyLeavesYearChips_(records) {
     btn.textContent = String(year);
     btn.addEventListener('click', () => {
       myLeavesSelectedYear = year;
+      myLeavesSelectedQuarter = null;
       const recs = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
       renderMyLeavesYearChips_(recs);
       renderMyLeavesQuarterTiles_(recs);
       renderMyLeavesTrendChart_(recs);
+      renderMyLeavesHistorySection_(recs);
     });
     myLeavesYearChips.appendChild(btn);
   });
 }
 
+// Quarter tiles (mockup .q/.qbar) - an approve/reject/pending stacked
+// progress bar per quarter, and clicking one filters the history list below
+// to that quarter (click again to clear the filter).
 function renderMyLeavesQuarterTiles_(records) {
   const year = myLeavesSelectedYear;
-  const quarters = [1, 2, 3, 4].map((q) => ({ q: q, total: 0, approved: 0, rejected: 0 }));
+  const quarters = [1, 2, 3, 4].map((q) => ({ q: q, total: 0, approved: 0, rejected: 0, pending: 0 }));
   records.forEach((r) => {
     const d = leaveRecordDate_(r);
     if (!d || d.getFullYear() !== year) return;
@@ -1129,14 +1336,26 @@ function renderMyLeavesQuarterTiles_(records) {
     q.total++;
     if (r.status === 'approved') q.approved++;
     else if (r.status === 'rejected') q.rejected++;
+    else if (r.status === 'requested') q.pending++;
   });
-  myLeavesQuarterTiles.innerHTML = quarters.map((q) =>
-    '<div class="rounded-lg border border-slate-200 bg-slate-50 p-2 text-center">' +
-      '<div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Q' + q.q + '</div>' +
-      '<div class="text-sm font-bold text-slate-800 mt-0.5">' + q.total + '</div>' +
-      '<div class="text-[10px] text-slate-400 mt-0.5">' + q.approved + 'A &middot; ' + q.rejected + 'R</div>' +
-    '</div>'
-  ).join('');
+  myLeavesQuarterTiles.innerHTML = quarters.map(function (q) {
+    const pct = function (n) { return q.total ? Math.round((n / q.total) * 100) : 0; };
+    const bar = '<div class="qbar">' +
+      (q.approved ? '<i style="background:var(--ok-600);width:' + pct(q.approved) + '%"></i>' : '') +
+      (q.rejected ? '<i style="background:var(--no-600);width:' + pct(q.rejected) + '%"></i>' : '') +
+      (q.pending ? '<i style="background:var(--wait-600);width:' + pct(q.pending) + '%"></i>' : '') +
+    '</div>';
+    const metaParts = [];
+    if (q.approved) metaParts.push(q.approved + ' ok');
+    if (q.rejected) metaParts.push(q.rejected + ' rejected');
+    if (q.pending) metaParts.push(q.pending + ' pending');
+    const meta = metaParts.length ? metaParts.join(' &middot; ') : '<span class="mut" style="color:var(--ink-400)">No leaves</span>';
+    return '<button type="button" class="q' + (q.q === myLeavesSelectedQuarter ? ' is-selected' : '') + '" data-quarter="' + q.q + '">' +
+      '<div class="qh"><span class="qn">Q' + q.q + '</span><span class="qv">' + q.total + '</span></div>' +
+      bar +
+      '<div class="qm">' + meta + '</div>' +
+    '</button>';
+  }).join('');
 }
 
 async function renderMyLeavesTrendChart_(records) {
@@ -1160,9 +1379,11 @@ async function renderMyLeavesTrendChart_(records) {
       data: {
         labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
         datasets: [
-          { label: 'Approved', data: approved, backgroundColor: '#22c55e', stack: 's' },
-          { label: 'Rejected', data: rejected, backgroundColor: '#ef4444', stack: 's' },
-          { label: 'Pending', data: pending, backgroundColor: '#f59e0b', stack: 's' }
+          // Same hex values as the --ok-600/--no-600/--wait-600 tokens -
+          // Chart.js needs a literal string, it can't read a CSS var().
+          { label: 'Approved', data: approved, backgroundColor: '#12996B', stack: 's' },
+          { label: 'Rejected', data: rejected, backgroundColor: '#D64545', stack: 's' },
+          { label: 'Pending', data: pending, backgroundColor: '#C77A08', stack: 's' }
         ]
       },
       options: {
@@ -1177,10 +1398,69 @@ async function renderMyLeavesTrendChart_(records) {
   } catch (_e) { /* chart library unavailable - trend chart just stays empty */ }
 }
 
-function leaveStatusBadgeClasses_(status) {
-  if (status === 'approved') return 'bg-green-100 text-green-700';
-  if (status === 'rejected') return 'bg-red-100 text-red-700';
-  return 'bg-amber-100 text-amber-700';
+function leaveStatusTone_(status) {
+  if (status === 'approved') return 'ok';
+  if (status === 'rejected') return 'no';
+  if (status === 'requested') return 'wait';
+  return 'neutral'; // withdrawn, or anything else
+}
+function leaveStatusLabel_(status) {
+  if (status === 'approved') return 'Approved';
+  if (status === 'rejected') return 'Rejected';
+  if (status === 'requested') return 'Pending';
+  if (status === 'withdrawn') return 'Withdrawn';
+  return status || '';
+}
+
+// Records scoped to the currently-selected quarter tile (if any) - shared by
+// the history filter-chip counts and the list itself so they always agree.
+function quarterScopedLeaveRecords_(records) {
+  if (!myLeavesSelectedQuarter) return records;
+  return records.filter(function (r) {
+    const d = leaveRecordDate_(r);
+    return d && d.getFullYear() === myLeavesSelectedYear && (Math.floor(d.getMonth() / 3) + 1) === myLeavesSelectedQuarter;
+  });
+}
+
+// Renders the All/Pending/Resolved filter chips (mockup .hfilter) together
+// with the history list they filter, so the two never fall out of sync.
+function renderMyLeavesHistorySection_(records) {
+  const scoped = quarterScopedLeaveRecords_(records);
+  const pendingCount = scoped.filter(function (r) { return r.status === 'requested'; }).length;
+  const counts = { all: scoped.length, pending: pendingCount, resolved: scoped.length - pendingCount };
+  const filters = [
+    { key: 'all', label: 'All' },
+    { key: 'pending', label: 'Pending' },
+    { key: 'resolved', label: 'Resolved' }
+  ];
+  myLeavesHistoryFilters.innerHTML = '<span class="t">HISTORY</span>' + filters.map(function (f) {
+    return '<button type="button" class="fchip' + (f.key === myLeavesHistoryFilter ? ' is-selected' : '') + '" data-filter="' + f.key + '">' +
+      escapeHtml(f.label) + '<span class="n">' + counts[f.key] + '</span></button>';
+  }).join('');
+
+  let listRecords = scoped;
+  if (myLeavesHistoryFilter === 'pending') listRecords = scoped.filter(function (r) { return r.status === 'requested'; });
+  else if (myLeavesHistoryFilter === 'resolved') listRecords = scoped.filter(function (r) { return r.status !== 'requested'; });
+  renderMyLeavesList_(listRecords);
+}
+
+// Resets filters to show everything, expands the given card's reason, and
+// scrolls it into view - used by the pending banner's "View" button.
+function viewLeaveRequestInHistory_(requestId) {
+  if (!requestId) return;
+  myLeavesHistoryFilter = 'all';
+  myLeavesSelectedQuarter = null;
+  myLeavesExpandedReasons.add(requestId);
+  const recs = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
+  renderMyLeavesQuarterTiles_(recs);
+  renderMyLeavesHistorySection_(recs);
+  requestAnimationFrame(function () {
+    const el = document.getElementById('leave-card-' + requestId);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('is-flash');
+    setTimeout(function () { el.classList.remove('is-flash'); }, 1600);
+  });
 }
 
 function renderMyLeavesList_(records) {
@@ -1189,49 +1469,75 @@ function renderMyLeavesList_(records) {
       '<div class="text-center py-10 text-slate-500 text-sm">No leave requests yet.<br><span class="text-xs text-slate-400">Applied leaves will appear here.</span></div>';
     return;
   }
-  myLeavesList.innerHTML = '';
-  records.forEach((rec) => {
-    const card = document.createElement('div');
-    card.className = 'bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm';
-    const typeLabel = leaveTypeLabel_(rec.type);
-    const statusLabel = rec.status === 'approved' ? 'Approved' : rec.status === 'rejected' ? 'Rejected' : 'Requested';
-    const reasonHtml = rec.reasonHtml && rec.reasonHtml.trim() ? rec.reasonHtml : '<i class="text-slate-400">No reason provided.</i>';
+  myLeavesList.innerHTML = records.map(renderMyLeaveCard_).join('');
+}
 
-    let html =
-      '<div class="flex items-start justify-between gap-2">' +
-        '<div class="min-w-0">' +
-          '<div class="text-sm font-semibold text-slate-800 truncate">' + escapeHtml(rec.weekLabel) + '</div>' +
-          '<div class="text-xs text-slate-500 mt-0.5">' + escapeHtml(typeLabel) + ' &middot; ' + escapeHtml(formatTimestamp(rec.requestedAt)) + '</div>' +
-        '</div>' +
-        '<span class="shrink-0 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full ' + leaveStatusBadgeClasses_(rec.status) + '">' + statusLabel + '</span>' +
-      '</div>' +
-      '<div class="rich-text text-xs text-slate-600 leading-relaxed mt-2">' + reasonHtml + '</div>';
+// One history card (mockup .lv). Meta chips (type/duration/day-count/file-
+// count), a 2-line reason clamp with an in-place expand/collapse "View"
+// toggle, colour file-type badges on attachments, and a Withdraw action on
+// the requester's own still-pending requests.
+function renderMyLeaveCard_(rec) {
+  const isShort = normalizeLeaveType_(rec.type) === 'casualShort';
+  const expanded = myLeavesExpandedReasons.has(rec.requestId);
+  const dateLabel = rec.startDate && !isNaN(new Date(rec.startDate).getTime()) ? fmtDateLocal_(new Date(rec.startDate)) : '';
+  const appliedLabel = rec.requestedAt ? 'applied ' + new Date(rec.requestedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+  const dtLine = [dateLabel, appliedLabel].filter(Boolean).join(' · ');
 
-    (rec.attachments || []).forEach(function (att) {
-      html +=
-        '<a href="' + escapeHtml(att.url) + '" target="_blank" rel="noopener" ' +
-          'class="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-orange-700 hover:text-orange-800 hover:underline mr-3">' +
-          '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>' +
-          escapeHtml(att.name || 'View attachment') +
-        '</a>';
-    });
-
-    if (rec.status === 'approved' || rec.status === 'rejected') {
-      html +=
-        '<div class="mt-2.5 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">' +
-          '<span class="text-xs text-slate-500">' + statusLabel +
-            (rec.resolvedBy ? ' by <b class="font-semibold text-slate-700">' + escapeHtml(rec.resolvedBy) + '</b>' : '') +
-            (rec.resolvedAt ? ' &middot; ' + escapeHtml(formatTimestamp(rec.resolvedAt)) : '') +
-          '</span>' +
-          (rec.dismissed
-            ? ''
-            : '<button type="button" class="my-leave-dismiss-btn shrink-0 text-xs font-semibold text-slate-500 hover:text-slate-800 underline underline-offset-2" data-request-id="' + escapeHtml(rec.requestId) + '">Ok, got it</button>') +
-        '</div>';
+  let durationChip, dayCountChip;
+  if (isShort) {
+    durationChip = '<span class="mchip dur-short">Short leave</span>';
+    dayCountChip = '<span class="mchip n">Half day' + (rec.halfDayPeriod ? ' (' + escapeHtml(rec.halfDayPeriod) + ')' : '') + '</span>';
+  } else {
+    durationChip = '<span class="mchip dur-full">Full leave</span>';
+    let days = 1;
+    if (rec.startDate && rec.endDate) {
+      const s = new Date(rec.startDate), e = new Date(rec.endDate);
+      if (!isNaN(s.getTime()) && !isNaN(e.getTime())) days = Math.round((e - s) / 86400000) + 1;
     }
+    dayCountChip = '<span class="mchip n">' + days + (days === 1 ? ' day' : ' days') + '</span>';
+  }
+  const fileCountChip = (rec.attachments && rec.attachments.length)
+    ? '<span class="mchip n">' + rec.attachments.length + (rec.attachments.length === 1 ? ' file' : ' files') + '</span>'
+    : '';
 
-    card.innerHTML = html;
-    myLeavesList.appendChild(card);
-  });
+  const reasonHtml = rec.reasonHtml && rec.reasonHtml.trim() ? rec.reasonHtml : '<i class="text-slate-400">No reason provided.</i>';
+
+  let filesHtml = '';
+  if (rec.attachments && rec.attachments.length) {
+    filesHtml = '<div class="files">' + rec.attachments.map(function (att) {
+      return '<a class="file" href="' + escapeHtml(att.url) + '" target="_blank" rel="noopener">' +
+        fileTypeBadgeHtml_(att.name) +
+        '<div class="fname"><b>' + escapeHtml(att.name || 'Attachment') + '</b></div>' +
+      '</a>';
+    }).join('') + '</div>';
+  }
+
+  const viewBtn = '<button type="button" class="mini brand lv-view-btn" data-request-id="' + escapeHtml(rec.requestId) + '">' + (expanded ? 'Close' : 'View') + '</button>';
+  let byText, actions;
+  if (rec.status === 'requested') {
+    const approver = (currentUserContext && currentUserContext.reportedTo) || '';
+    byText = approver ? 'With <b>' + escapeHtml(approver) + '</b>' : 'Awaiting a decision';
+    actions = '<button type="button" class="mini lv-withdraw-btn" data-request-id="' + escapeHtml(rec.requestId) + '">Withdraw</button>' + viewBtn;
+  } else if (rec.status === 'approved' || rec.status === 'rejected') {
+    byText = leaveStatusLabel_(rec.status) +
+      (rec.resolvedBy ? ' by <b>' + escapeHtml(rec.resolvedBy) + '</b>' : '') +
+      (rec.resolvedAt && !isNaN(new Date(rec.resolvedAt).getTime()) ? ' · ' + escapeHtml(fmtDateLocal_(new Date(rec.resolvedAt))) : '');
+    actions = (rec.dismissed
+      ? ''
+      : '<button type="button" class="mini my-leave-dismiss-btn" data-request-id="' + escapeHtml(rec.requestId) + '">Ok, got it</button>') + viewBtn;
+  } else {
+    byText = leaveStatusLabel_(rec.status);
+    actions = viewBtn;
+  }
+
+  return '<div class="lv" id="leave-card-' + escapeHtml(rec.requestId) + '">' +
+    '<div class="lv-h"><div><div class="wk">' + escapeHtml(rec.weekLabel) + '</div><div class="dt">' + escapeHtml(dtLine) + '</div></div>' +
+      '<span class="status ' + leaveStatusTone_(rec.status) + '"><i></i>' + escapeHtml(leaveStatusLabel_(rec.status).toUpperCase()) + '</span></div>' +
+    '<div class="meta"><span class="mchip ' + leaveTypeChipClass_(rec.type) + '">' + escapeHtml(leaveTypeLabel_(rec.type)) + '</span>' + durationChip + dayCountChip + fileCountChip + '</div>' +
+    '<div class="lv-r rich-text' + (expanded ? ' is-expanded' : '') + '">' + reasonHtml + '</div>' +
+    filesHtml +
+    '<div class="lv-f"><span class="by">' + byText + '</span><span class="act">' + actions + '</span></div>' +
+  '</div>';
 }
 
 async function dismissLeaveRequest_(requestId, buttonEl) {
@@ -1242,6 +1548,23 @@ async function dismissLeaveRequest_(requestId, buttonEl) {
   }
   try {
     await updateDoc(doc(db, 'leaveRequests', requestId), { dismissed: true });
+  } catch (_e) { /* best-effort */ }
+  await refreshApplyLeaveButton();
+  await loadMyLeavesData_();
+}
+
+// Requester-initiated withdraw of their own still-pending request - mirrors
+// dismissLeaveRequest_ above. Firestore rules only allow this transition
+// (requested -> withdrawn, that field alone) for the request's own owner.
+async function withdrawLeaveRequest_(requestId, buttonEl) {
+  if (!currentUserContext || !requestId) return;
+  if (!confirm('Withdraw this leave request?')) return;
+  if (buttonEl) {
+    buttonEl.disabled = true;
+    buttonEl.innerHTML = '<span class="loader loader-sm" style="vertical-align: middle; margin-right: 4px;"></span>Working...';
+  }
+  try {
+    await updateDoc(doc(db, 'leaveRequests', requestId), { status: 'withdrawn' });
   } catch (_e) { /* best-effort */ }
   await refreshApplyLeaveButton();
   await loadMyLeavesData_();
@@ -1280,13 +1603,43 @@ leaveTypeShortBtn.addEventListener('click', () => selectLeaveType_('casualShort'
 leaveTypeFullBtn.addEventListener('click', () => selectLeaveType_('casualFull'));
 leaveDateModeSingleBtn.addEventListener('click', () => selectLeaveDateMode_('single'));
 leaveDateModeRangeBtn.addEventListener('click', () => selectLeaveDateMode_('range'));
+leaveHalfDayAmBtn.addEventListener('click', () => selectLeaveHalfDay_('AM'));
+leaveHalfDayPmBtn.addEventListener('click', () => selectLeaveHalfDay_('PM'));
 
 viewMyLeavesBtn.addEventListener('click', openMyLeavesDrawer);
 closeMyLeavesDrawerBtn.addEventListener('click', closeMyLeavesDrawer);
 myLeavesBackdrop.addEventListener('click', closeMyLeavesDrawer);
 myLeavesList.addEventListener('click', (e) => {
-  const btn = e.target.closest('.my-leave-dismiss-btn');
-  if (btn) dismissLeaveRequest_(btn.dataset.requestId, btn);
+  const dismissBtn = e.target.closest('.my-leave-dismiss-btn');
+  if (dismissBtn) { dismissLeaveRequest_(dismissBtn.dataset.requestId, dismissBtn); return; }
+  const withdrawBtn = e.target.closest('.lv-withdraw-btn');
+  if (withdrawBtn) { withdrawLeaveRequest_(withdrawBtn.dataset.requestId, withdrawBtn); return; }
+  const viewBtn = e.target.closest('.lv-view-btn');
+  if (viewBtn) {
+    const id = viewBtn.dataset.requestId;
+    if (myLeavesExpandedReasons.has(id)) myLeavesExpandedReasons.delete(id); else myLeavesExpandedReasons.add(id);
+    const recs = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
+    renderMyLeavesHistorySection_(recs);
+  }
+});
+myLeavesBannerViewBtn.addEventListener('click', () => {
+  viewLeaveRequestInHistory_(myLeavesBanner.dataset.requestId);
+});
+myLeavesQuarterTiles.addEventListener('click', (e) => {
+  const btn = e.target.closest('.q');
+  if (!btn) return;
+  const q = parseInt(btn.dataset.quarter, 10);
+  myLeavesSelectedQuarter = (myLeavesSelectedQuarter === q) ? null : q;
+  const recs = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
+  renderMyLeavesQuarterTiles_(recs);
+  renderMyLeavesHistorySection_(recs);
+});
+myLeavesHistoryFilters.addEventListener('click', (e) => {
+  const btn = e.target.closest('.fchip');
+  if (!btn) return;
+  myLeavesHistoryFilter = btn.dataset.filter;
+  const recs = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
+  renderMyLeavesHistorySection_(recs);
 });
 
 function renderLeaveAttachmentList_() {
@@ -1294,16 +1647,23 @@ function renderLeaveAttachmentList_() {
     leaveAttachmentList.classList.add('hidden');
     leaveAttachmentList.innerHTML = '';
     leaveAttachmentDrop.classList.remove('hidden');
+    leaveAttachmentCountNote.classList.add('hidden');
+    updateLeaveDrawerSummaryChips_();
     return;
   }
   leaveAttachmentList.classList.remove('hidden');
   leaveAttachmentDrop.classList.toggle('hidden', leaveAttachmentFiles.length >= LEAVE_ATTACHMENT_MAX_FILES);
   leaveAttachmentList.innerHTML = leaveAttachmentFiles.map(function (file, i) {
-    return '<div class="lv-attachment-chip">' +
-      '<span class="truncate">' + escapeHtml(file.name) + '</span>' +
-      '<button type="button" class="lv-attachment-remove" data-index="' + i + '" aria-label="Remove attachment">&times;</button>' +
+    return '<div class="file">' +
+      fileTypeBadgeHtml_(file.name) +
+      '<div class="fname"><b>' + escapeHtml(file.name) + '</b><span>' + escapeHtml(formatBytes_(file.size)) + '</span></div>' +
+      '<button type="button" class="rm lv-attachment-remove" data-index="' + i + '" aria-label="Remove attachment">&times;</button>' +
     '</div>';
   }).join('');
+  const totalBytes = leaveAttachmentFiles.reduce(function (sum, f) { return sum + (f.size || 0); }, 0);
+  leaveAttachmentCountNote.textContent = leaveAttachmentFiles.length + ' of ' + LEAVE_ATTACHMENT_MAX_FILES + ' files added · ' + formatBytes_(totalBytes) + ' total';
+  leaveAttachmentCountNote.classList.remove('hidden');
+  updateLeaveDrawerSummaryChips_();
 }
 
 leaveAttachmentInput.addEventListener('change', () => {
@@ -1427,7 +1787,7 @@ leaveSendBtn.addEventListener('click', async () => {
       }
     }
 
-    const docRef = await addDoc(collection(db, 'leaveRequests'), {
+    const leaveDocPayload = {
       email: email,
       name: currentUserContext.displayName,
       weekLabel: weekLabel,
@@ -1441,7 +1801,13 @@ leaveSendBtn.addEventListener('click', async () => {
       resolvedBy: null,
       attachments: [],
       dismissed: false
-    });
+    };
+    // Only Short Leave carries a half-day period - omit the field entirely
+    // for Full Leave and every other leave type.
+    if (selectedLeaveType === 'casualShort') {
+      leaveDocPayload.halfDayPeriod = leaveSelectedHalfDay;
+    }
+    const docRef = await addDoc(collection(db, 'leaveRequests'), leaveDocPayload);
 
     if (leaveAttachmentFiles.length) {
       try {
@@ -2001,7 +2367,20 @@ onAuthStateChanged(auth, async (user) => {
   fetchUserSubmissions_()
     .then(function () { if (isTaskTableEmpty()) syncTableToSelectedWeek(); })
     .catch(function () { /* offline - the form still works */ });
+  openMyLeavesDeepLinkOnce_();
 });
+
+// Deep link used by the decision email's "View leave history" CTA
+// (https://arsalanmukhtar.github.io/daily_tasks/#my-leaves) - auto-opens the
+// My Leaves drawer once, the first time this session lands signed-in with
+// that hash. Guarded by deepLinkOpened_ so a later token-refresh re-run of
+// onAuthStateChanged doesn't reopen a drawer the user already closed.
+let deepLinkOpened_ = false;
+function openMyLeavesDeepLinkOnce_() {
+  if (deepLinkOpened_ || location.hash !== '#my-leaves') return;
+  deepLinkOpened_ = true;
+  openMyLeavesDrawer();
+}
 
 signInBtn.addEventListener('click', async () => {
   authError.classList.add('hidden');
@@ -2215,6 +2594,7 @@ async function fetchUserSubmissions_() {
       timestamp: data.updatedAt && data.updatedAt.toDate ? data.updatedAt.toDate().toISOString() : null
     };
   });
+  updateNavStatBadges_();
   return submissionsCache;
 }
 

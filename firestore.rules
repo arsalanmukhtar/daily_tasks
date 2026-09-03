@@ -74,13 +74,20 @@ service cloud.firestore {
           resource.data.status == 'requested' &&
           request.resource.data.status in ['approved', 'rejected'] &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'resolvedAt', 'resolvedBy'])
+            .hasOnly(['status', 'resolvedAt', 'resolvedBy', 'decisionNote'])
         ) || (
           isAllowlisted() &&
           resource.data.email == emailLower() &&
           request.resource.data.dismissed == true &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['dismissed'])
+        ) || (
+          isAllowlisted() &&
+          resource.data.email == emailLower() &&
+          resource.data.status == 'requested' &&
+          request.resource.data.status == 'withdrawn' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status'])
         ) || (
           isAllowlisted() &&
           resource.data.email == emailLower() &&

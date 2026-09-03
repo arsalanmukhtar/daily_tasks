@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -53,7 +52,8 @@ fun RequestListScreen(
 /**
  * Shared by RequestListScreen (activeRecords) and ArchivedRequestsScreen
  * (archivedRecords) - same filter bar, list, and detail-sheet mechanics,
- * differing only in which derived list is passed in.
+ * differing only in which derived list is passed in and (optionally) which
+ * empty state to show when that list comes back empty.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,7 +62,10 @@ internal fun LeaveRequestList(
     records: List<LeaveRequest>,
     emptyMessage: String,
     highlightRequestId: String?,
-    onHighlightHandled: () -> Unit
+    onHighlightHandled: () -> Unit,
+    // When null, falls back to the plain centered message below (Requests
+    // tab). Archived passes ArchivedEmptyState here instead.
+    emptySlot: (@Composable (hasActiveFilters: Boolean, onClearFilters: () -> Unit) -> Unit)? = null
 ) {
     val isLoading by viewModel.isLoading.collectAsState()
     val isDeciding by viewModel.isDeciding.collectAsState()
@@ -71,6 +74,7 @@ internal fun LeaveRequestList(
     val statusFilter by viewModel.statusFilter.collectAsState()
     val emailFilter by viewModel.emailFilter.collectAsState()
     val roster by viewModel.roster.collectAsState()
+    val allRecords by viewModel.records.collectAsState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
@@ -116,32 +120,57 @@ internal fun LeaveRequestList(
             statusFilter = statusFilter,
             emailFilter = emailFilter,
             roster = roster,
+            allRecords = allRecords,
             onTypeChange = viewModel::setTypeFilter,
             onStatusChange = viewModel::setStatusFilter,
             onEmailChange = viewModel::setEmailFilter
         )
         Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
             when {
+                // First load, nothing to show yet - skeleton cards instead of
+                // a bare spinner so the list's eventual shape is already
+                // hinted at.
                 isLoading && records.isEmpty() -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
+                        items(4) { SkeletonCard() }
+                    }
                 }
                 records.isEmpty() -> {
-                    Text(
-                        errorMessage ?: emptyMessage,
-                        modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    val hasActiveFilters = typeFilter != null || statusFilter != null || emailFilter != null
+                    if (emptySlot != null) {
+                        emptySlot(hasActiveFilters) {
+                            viewModel.setTypeFilter(null)
+                            viewModel.setStatusFilter(null)
+                            viewModel.setEmailFilter(null)
+                        }
+                    } else {
+                        Text(
+                            errorMessage ?: emptyMessage,
+                            modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
                 else -> {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)
-                    ) {
-                        items(records, key = { it.requestId }) { request ->
-                            RequestCard(
-                                request = request,
-                                onViewDetails = { selectedRequestId = request.requestId }
-                            )
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Manual refresh with data already on screen - a pill
+                        // above the list rather than replacing it with a
+                        // spinner or skeletons.
+                        if (isLoading) {
+                            Box(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
+                                RefreshingPill()
+                            }
+                        }
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 12.dp)
+                        ) {
+                            items(records, key = { it.requestId }) { request ->
+                                RequestCard(
+                                    request = request,
+                                    onViewDetails = { selectedRequestId = request.requestId }
+                                )
+                            }
                         }
                     }
                 }
@@ -156,8 +185,8 @@ internal fun LeaveRequestList(
             sheetState = sheetState,
             isDeciding = isDeciding,
             onDismiss = { closeSheet() },
-            onDecide = { decision ->
-                viewModel.decide(selectedRequest.requestId, decision)
+            onDecide = { decision, note ->
+                viewModel.decide(selectedRequest.requestId, decision, note)
             }
         )
     }

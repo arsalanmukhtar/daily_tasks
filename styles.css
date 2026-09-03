@@ -1,3 +1,38 @@
+/* ---------- Design tokens ----------
+   Ported from screens/web-redesign.html's :root block (the design-pass
+   mockup) so new/touched markup can reference the same palette it was
+   designed against. Existing untouched sections of this file keep their
+   hardcoded hex literals - only new components below use these vars. */
+:root {
+  --brand-600: #E8590C; --brand-700: #C2410C; --brand-800: #9A3412;
+  --brand-50: #FFF5EE;  --brand-100: #FFE6D5; --brand-200: #FBC9A4;
+
+  --ink-900: #0F172A; --ink-800: #1E293B; --ink-700: #334155;
+  --ink-600: #475569; --ink-500: #64748B; --ink-400: #94A3B8;
+  --line: #E3E8EF; --line-soft: #EEF2F6;
+  --surface: #FFFFFF; --surface-2: #F8FAFC; --canvas: #F2F4F7;
+
+  --ok-600: #12996B; --ok-800: #0A6B4A; --ok-50: #E9F7F1; --ok-200: #B4E3CF;
+  --no-600: #D64545; --no-800: #A32C2C; --no-50: #FCEDED; --no-200: #F2C4C4;
+  --wait-600: #C77A08; --wait-800: #8C5904; --wait-50: #FDF5E6; --wait-200: #F0D8A6;
+
+  /* leave-type secondaries (new) */
+  --t-foreign: #3B5BDB; --t-foreign-bg: #EDF1FE; --t-foreign-bd: #C7D3F7;
+  --t-umrah: #0E8A7D;   --t-umrah-bg: #E4F4F2;   --t-umrah-bd: #B4E0DA;
+  --t-medical: #0B7FA8; --t-medical-bg: #E4F2F9; --t-medical-bd: #B2DAEA;
+  --t-casual: #6C4CC4;  --t-casual-bg: #F0ECFB;  --t-casual-bd: #D3C8F0;
+
+  /* duration / file-meta secondaries (new) */
+  --d-short: #0369A1; --d-short-bg: #E7F1F8;
+  --d-full: #3730A3;  --d-full-bg: #ECEBFA;
+  --meta: #54657A;    --meta-bg: #EDF1F5; --meta-bd: #D9E1E9;
+
+  --r-sm: 8px; --r-md: 10px; --r-lg: 14px; --r-xl: 18px;
+  --sh-1: 0 1px 2px rgba(15, 23, 42, .05);
+  --sh-2: 0 4px 14px rgba(15, 23, 42, .07);
+  --sh-3: -18px 0 48px rgba(15, 23, 42, .16);
+}
+
 html,
 body,
 button,
@@ -1524,3 +1559,261 @@ textarea {
 .toast.is-visible { opacity: 1; transform: translateY(0); }
 .toast.is-success { background: #166534; }
 .toast-icon { width: 1rem; height: 1rem; flex-shrink: 0; }
+
+/* =========================================================
+   Web redesign: nav-card stat badges, two-column Apply-for-
+   Leave drawer, inline calendar retheme, and My Leaves drawer
+   (banner, coloured KPIs, quarter progress bars, history
+   filters/cards). All new component classes below draw from
+   the :root tokens ported from screens/web-redesign.html.
+   ========================================================= */
+
+/* ---------- Nav-card stat badges ---------- */
+.nc-stats { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.tag {
+  display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px;
+  border-radius: 6px; font-size: 11px; font-weight: 600; border: 1px solid transparent; white-space: nowrap;
+}
+.tag .dot { width: 6px; height: 6px; border-radius: 999px; }
+.tag.ok { background: var(--ok-50); color: var(--ok-800); border-color: var(--ok-200); }
+.tag.ok .dot { background: var(--ok-600); }
+.tag.no { background: var(--no-50); color: var(--no-800); border-color: var(--no-200); }
+.tag.no .dot { background: var(--no-600); }
+.tag.wait { background: var(--wait-50); color: var(--wait-800); border-color: var(--wait-200); }
+.tag.wait .dot { background: var(--wait-600); }
+.tag.neutral { background: var(--meta-bg); color: var(--meta); border-color: var(--meta-bd); }
+
+/* ---------- Apply-for-leave: two-column drawer body ---------- */
+.dcols { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 0; }
+.dcol { padding: 1rem 1.1rem; min-width: 0; }
+.dcol.dcol-l { border-right: 1px solid var(--line-soft); background: var(--surface-2); }
+.blk + .blk { margin-top: 1rem; }
+@media (max-width: 639.98px) {
+  .dcols { grid-template-columns: 1fr; }
+  .dcol.dcol-l { border-right: 0; border-bottom: 1px solid var(--line-soft); }
+}
+
+/* Leave-type chips */
+.chips2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tchip {
+  position: relative; display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
+  padding: 9px 10px; border: 1px solid var(--line); border-radius: var(--r-md); background: #fff;
+  cursor: pointer; text-align: left; transition: border-color 140ms, background 140ms, color 140ms;
+}
+.tchip .nm { font-size: 13px; font-weight: 600; color: var(--ink-800); }
+.tchip .hint { font-size: 10.5px; color: var(--ink-400); }
+.tchip .swatch { position: absolute; top: 9px; right: 9px; width: 8px; height: 8px; border-radius: 999px; }
+.tchip:hover:not(:disabled) { border-color: var(--ink-400); }
+.tchip[data-t="foreign"] .swatch { background: var(--t-foreign); }
+.tchip[data-t="umrah"] .swatch { background: var(--t-umrah); }
+.tchip[data-t="medical"] .swatch { background: var(--t-medical); }
+.tchip[data-t="casual"] .swatch { background: var(--t-casual); }
+.tchip.is-selected[data-t="foreign"] { background: var(--t-foreign-bg); border-color: var(--t-foreign-bd); }
+.tchip.is-selected[data-t="foreign"] .nm { color: var(--t-foreign); }
+.tchip.is-selected[data-t="umrah"] { background: var(--t-umrah-bg); border-color: var(--t-umrah-bd); }
+.tchip.is-selected[data-t="umrah"] .nm { color: var(--t-umrah); }
+.tchip.is-selected[data-t="medical"] { background: var(--t-medical-bg); border-color: var(--t-medical-bd); }
+.tchip.is-selected[data-t="medical"] .nm { color: var(--t-medical); }
+.tchip.is-selected[data-t="casual"] { background: var(--t-casual-bg); border-color: var(--t-casual-bd); }
+.tchip.is-selected[data-t="casual"] .nm { color: var(--t-casual); }
+
+/* Nested casual-duration + AM/PM box */
+.nest { margin-top: 9px; padding: 10px 11px 11px; border-radius: var(--r-md); background: var(--t-casual-bg); border: 1px solid var(--t-casual-bd); }
+.nest .cap { font-size: 11px; font-weight: 700; color: var(--t-casual); margin-bottom: 8px; letter-spacing: .02em; }
+.nest .cap2 { font-size: 10.5px; font-weight: 700; color: var(--ink-500); margin: 10px 0 6px; letter-spacing: .04em; }
+.dseg { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.dopt {
+  border: 1px solid #D9D2F0; background: #fff; border-radius: 9px; padding: 8px 9px; text-align: left;
+  cursor: pointer; transition: border-color 140ms, background 140ms;
+}
+.dopt:hover:not(:disabled) { border-color: #B9AEE0; }
+.dopt b { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-800); }
+.dopt span { display: block; font-size: 10.5px; color: var(--ink-500); margin-top: 2px; }
+.dopt[data-d="short"].is-selected { border-color: var(--d-short); background: var(--d-short-bg); }
+.dopt[data-d="short"].is-selected b { color: var(--d-short); }
+.dopt[data-d="full"].is-selected { border-color: var(--d-full); background: var(--d-full-bg); }
+.dopt[data-d="full"].is-selected b { color: var(--d-full); }
+.dopt[data-d="am"].is-selected, .dopt[data-d="pm"].is-selected { border-color: var(--brand-200); background: var(--brand-50); }
+.dopt[data-d="am"].is-selected b, .dopt[data-d="pm"].is-selected b { color: var(--brand-700); }
+.dopt:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Single-date / date-range segmented toggle (also reused for future 2-way segments) */
+.seg { display: flex; border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; background: #fff; }
+.seg button {
+  flex: 1; height: 36px; border: 0; background: transparent; font-size: 12.5px; font-weight: 600;
+  color: var(--ink-600); cursor: pointer; border-right: 1px solid var(--line);
+}
+.seg button:last-child { border-right: 0; }
+.seg button.is-selected { background: var(--brand-50); color: var(--brand-700); }
+
+/* Inline calendar (Flatpickr retheme) */
+.cal-host { margin-top: 9px; }
+#leaveDateRangeInput { display: none; }
+.cal-host .flatpickr-calendar {
+  width: 100% !important; box-shadow: none; border: 1px solid var(--line); border-radius: var(--r-md);
+  background: #fff; padding: 10px 11px 11px; font-family: inherit;
+}
+.cal-host .flatpickr-calendar.inline { margin-top: 0; }
+.cal-host .flatpickr-months { display: flex; align-items: center; margin-bottom: 9px; }
+/* Flatpickr's real DOM order is prev-nav, month, next-nav - reordered via
+   flex `order` (month first/left, nav buttons grouped right) rather than
+   absolute positioning, so the title and the buttons can never overlap. */
+.cal-host .flatpickr-month {
+  order: 1; position: static; height: 26px; display: flex; align-items: center;
+  color: var(--ink-900); fill: var(--ink-900); overflow: visible;
+}
+.cal-host .flatpickr-current-month {
+  font-size: 13.5px; font-weight: 600; letter-spacing: -.01em; display: flex; align-items: center; gap: 6px;
+  position: static; width: auto; left: auto; padding: 0;
+}
+.cal-host .flatpickr-current-month input.cur-year { font-weight: 500; color: var(--ink-500); font-size: 13.5px; background: transparent; padding: 0; }
+.cal-host .flatpickr-current-month .flatpickr-monthDropdown-months { font-weight: 600; color: var(--ink-900); background: transparent; border: 0; padding: 0; }
+.cal-host .flatpickr-prev-month, .cal-host .flatpickr-next-month {
+  position: static; width: 26px; height: 26px; display: inline-flex !important; align-items: center; justify-content: center;
+  border: 1px solid var(--line); border-radius: 7px; background: #fff; padding: 0; margin: 0;
+}
+.cal-host .flatpickr-prev-month { order: 2; margin-left: auto; margin-right: 4px; }
+.cal-host .flatpickr-next-month { order: 3; }
+.cal-host .flatpickr-prev-month:hover, .cal-host .flatpickr-next-month:hover { background: var(--surface-2); }
+.cal-host .flatpickr-prev-month svg, .cal-host .flatpickr-next-month svg { fill: var(--ink-600); width: 12px; height: 12px; }
+.cal-host .flatpickr-weekdays { margin-bottom: 2px; }
+.cal-host span.flatpickr-weekday {
+  font-size: 10px; font-weight: 700; color: var(--ink-400); background: transparent; text-transform: none;
+}
+.cal-host .flatpickr-days { border: 0; width: 100% !important; }
+.cal-host .dayContainer { width: 100% !important; min-width: 0 !important; max-width: none !important; }
+.cal-host .flatpickr-day {
+  height: 31px; line-height: 31px; border-radius: 7px; font-size: 12.5px; color: var(--ink-800);
+  border: 1px solid transparent; max-width: none;
+}
+.cal-host .flatpickr-day:hover { background: var(--surface-2); }
+.cal-host .flatpickr-day.flatpickr-disabled, .cal-host .flatpickr-day.flatpickr-disabled:hover { color: #C4CDD8; cursor: not-allowed; background: transparent; }
+.cal-host .flatpickr-day.prevMonthDay, .cal-host .flatpickr-day.nextMonthDay { color: #C4CDD8; }
+.cal-host .flatpickr-day.today { border-color: var(--brand-600); color: var(--brand-700); font-weight: 700; }
+.cal-host .flatpickr-day.selected, .cal-host .flatpickr-day.startRange, .cal-host .flatpickr-day.endRange {
+  background: var(--brand-600); border-color: var(--brand-600); color: #fff; font-weight: 700;
+}
+.cal-host .flatpickr-day.selected:hover, .cal-host .flatpickr-day.startRange:hover, .cal-host .flatpickr-day.endRange:hover { background: var(--brand-700); }
+.cal-host .flatpickr-day.inRange {
+  background: var(--brand-50); border-color: var(--brand-50); box-shadow: -5px 0 0 var(--brand-50), 5px 0 0 var(--brand-50); color: var(--brand-800);
+}
+.cal-host .flatpickr-day.startRange { border-radius: 7px 0 0 7px; }
+.cal-host .flatpickr-day.endRange { border-radius: 0 7px 7px 0; }
+
+.picked {
+  display: flex; align-items: center; gap: 8px; margin-top: 9px; padding: 9px 10px;
+  border: 1px solid var(--brand-200); background: var(--brand-50); border-radius: var(--r-md);
+}
+.picked svg { flex-shrink: 0; }
+.picked b { font-size: 12.5px; color: var(--brand-800); }
+.picked span { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--brand-700); white-space: nowrap; }
+
+/* Attachments */
+.drop {
+  display: flex; flex-direction: column; align-items: center; border: 1.5px dashed #C3CEDB; border-radius: var(--r-md);
+  background: var(--surface-2); padding: 14px; text-align: center; cursor: pointer; transition: border-color 140ms, background 140ms;
+}
+.drop:hover { border-color: var(--brand-600); background: var(--brand-50); }
+.drop b { font-size: 12.5px; font-weight: 600; color: var(--ink-800); }
+.drop b em { font-style: normal; color: var(--brand-700); text-decoration: underline; }
+.drop p { margin: 4px 0 0; font-size: 11px; color: var(--ink-500); }
+.files { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.file { display: flex; align-items: center; gap: 9px; border: 1px solid var(--line); border-radius: 9px; padding: 7px 8px 7px 9px; background: #fff; }
+.file .fname { min-width: 0; flex: 1; }
+.file b { display: block; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-800); }
+.file span { font-size: 10.5px; color: var(--ink-500); }
+.file .rm {
+  margin-left: auto; flex-shrink: 0; width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--line);
+  background: #fff; color: var(--ink-500); cursor: pointer; font-size: 12px; line-height: 1;
+}
+.file .rm:hover { border-color: var(--no-200); background: var(--no-50); color: var(--no-800); }
+.cap-note { font-size: 10.5px; color: var(--ink-400); margin-top: 7px; }
+
+/* File-type icon badge - shared by the drawer's attachment list and My
+   Leaves history cards (see fileTypeBadgeHtml_ in app.js). */
+.fic { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 6px; font-size: 9px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.fic-pdf { background: #B4342B; }
+.fic-doc { background: #2B5EB4; }
+.fic-txt { background: #5A6B7C; }
+.fic-zip { background: #7C6A2B; }
+.fic-other { background: var(--meta); }
+
+/* Footer live-summary chip strip + generic meta chip (also reused inside
+   My Leaves history cards). */
+.summary { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; min-width: 0; }
+.mchip { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11px; font-weight: 600; border: 1px solid; white-space: nowrap; }
+.mchip.type-foreign { background: var(--t-foreign-bg); color: var(--t-foreign); border-color: var(--t-foreign-bd); }
+.mchip.type-umrah { background: var(--t-umrah-bg); color: var(--t-umrah); border-color: var(--t-umrah-bd); }
+.mchip.type-medical { background: var(--t-medical-bg); color: var(--t-medical); border-color: var(--t-medical-bd); }
+.mchip.type-casual { background: var(--t-casual-bg); color: var(--t-casual); border-color: var(--t-casual-bd); }
+.mchip.dur-short { background: var(--d-short-bg); color: var(--d-short); border-color: #BCD9EC; }
+.mchip.dur-full { background: var(--d-full-bg); color: var(--d-full); border-color: #CBC9F0; }
+.mchip.n { background: var(--meta-bg); color: var(--meta); border-color: var(--meta-bd); }
+
+/* ---------- My Leaves drawer ---------- */
+
+/* Pending-request banner */
+.banner { display: flex; align-items: center; gap: 11px; border-radius: var(--r-lg); padding: 12px 13px; border: 1px solid var(--wait-200); background: var(--wait-50); }
+.banner .bic { width: 34px; height: 34px; border-radius: 9px; background: #fff; border: 1px solid var(--wait-200); display: flex; align-items: center; justify-content: center; color: var(--wait-800); flex-shrink: 0; }
+.banner b { display: block; font-size: 13px; font-weight: 700; color: var(--wait-800); }
+.banner span { display: block; font-size: 11.5px; color: #96703A; margin-top: 2px; }
+.banner .link { margin-left: auto; flex-shrink: 0; font-size: 12px; font-weight: 600; color: var(--wait-800); background: #fff; border: 1px solid var(--wait-200); padding: 7px 11px; border-radius: 8px; cursor: pointer; }
+.banner .link:hover { background: var(--wait-50); }
+
+/* Coloured KPI tiles - layered on top of the existing .an-kpi component */
+.an-kpi.stat-tile { position: relative; }
+.stat-tile .an-kpi-label { display: flex; align-items: center; gap: 5px; }
+.stat-tile .an-kpi-label i { width: 6px; height: 6px; border-radius: 999px; display: inline-block; background: var(--ink-400); }
+.an-kpi.stat-ok { background: var(--ok-50); border-color: var(--ok-200); }
+.an-kpi.stat-ok .an-kpi-value { color: var(--ok-800); }
+.an-kpi.stat-ok .an-kpi-label i { background: var(--ok-600); }
+.an-kpi.stat-no { background: var(--no-50); border-color: var(--no-200); }
+.an-kpi.stat-no .an-kpi-value { color: var(--no-800); }
+.an-kpi.stat-no .an-kpi-label i { background: var(--no-600); }
+.an-kpi.stat-wait { background: var(--wait-50); border-color: var(--wait-200); }
+.an-kpi.stat-wait .an-kpi-value { color: var(--wait-800); }
+.an-kpi.stat-wait .an-kpi-label i { background: var(--wait-600); }
+
+/* Quarter tiles + approve/reject progress bar */
+.qs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.q { border: 1px solid var(--line); border-radius: var(--r-md); padding: 9px 10px 10px; background: #fff; cursor: pointer; text-align: left; transition: border-color 140ms, background 140ms; }
+.q:hover { border-color: var(--ink-400); }
+.q .qh { display: flex; align-items: baseline; justify-content: space-between; }
+.q .qn { font-size: 10.5px; font-weight: 700; color: var(--ink-500); }
+.q .qv { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.qbar { display: flex; height: 5px; border-radius: 999px; overflow: hidden; background: var(--line-soft); margin-top: 7px; }
+.qbar i { display: block; }
+.q .qm { font-size: 10px; color: var(--ink-500); margin-top: 5px; display: flex; gap: 7px; flex-wrap: wrap; }
+.q.is-selected { border-color: var(--brand-600); background: var(--brand-50); }
+
+/* History filter chips */
+.hfilter { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.hfilter .t { font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--ink-400); margin-right: 2px; }
+.fchip { height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: 11.5px; font-weight: 600; color: var(--ink-600); cursor: pointer; }
+.fchip.is-selected { background: var(--ink-900); border-color: var(--ink-900); color: #fff; }
+.fchip .n { opacity: .6; margin-left: 4px; }
+
+/* History cards */
+.lv { background: #fff; border: 1px solid var(--line); border-radius: var(--r-lg); padding: 11px 12px; box-shadow: var(--sh-1); scroll-margin-top: 12px; transition: box-shadow 200ms, border-color 200ms; }
+.lv + .lv { margin-top: 9px; }
+.lv.is-flash { border-color: var(--brand-200); box-shadow: 0 0 0 3px var(--brand-100); }
+.lv-h { display: flex; align-items: flex-start; gap: 9px; }
+.lv-h .wk { font-size: 13.5px; font-weight: 700; letter-spacing: -.01em; color: var(--ink-900); }
+.lv-h .dt { font-size: 11.5px; color: var(--ink-500); margin-top: 2px; }
+.status { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: .05em; border: 1px solid transparent; flex-shrink: 0; white-space: nowrap; }
+.status i { width: 5px; height: 5px; border-radius: 999px; display: inline-block; }
+.status.ok { background: var(--ok-50); color: var(--ok-800); border-color: var(--ok-200); } .status.ok i { background: var(--ok-600); }
+.status.no { background: var(--no-50); color: var(--no-800); border-color: var(--no-200); } .status.no i { background: var(--no-600); }
+.status.wait { background: var(--wait-50); color: var(--wait-800); border-color: var(--wait-200); } .status.wait i { background: var(--wait-600); }
+.status.neutral { background: var(--meta-bg); color: var(--meta); border-color: var(--meta-bd); } .status.neutral i { background: var(--meta); }
+.meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.lv-r { font-size: 12.5px; line-height: 1.5; color: var(--ink-700); margin: 9px 0 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.lv-r.is-expanded { display: block; -webkit-line-clamp: unset; overflow: visible; }
+.lv-f { display: flex; align-items: center; gap: 8px; margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--line-soft); flex-wrap: wrap; }
+.lv-f .by { font-size: 11.5px; color: var(--ink-500); }
+.lv-f .by b { color: var(--ink-800); font-weight: 600; }
+.lv-f .act { margin-left: auto; display: flex; gap: 6px; }
+.mini { height: 26px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: #fff; font-size: 11.5px; font-weight: 600; color: var(--ink-600); cursor: pointer; }
+.mini:hover:not(:disabled) { background: var(--surface-2); }
+.mini.brand { border-color: var(--brand-200); color: var(--brand-700); background: var(--brand-50); }
+.mini:disabled { opacity: .6; cursor: not-allowed; }

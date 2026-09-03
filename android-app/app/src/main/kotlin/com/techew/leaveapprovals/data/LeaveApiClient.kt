@@ -55,9 +55,15 @@ class LeaveApiClient(
     // Apps Script's single-threaded execution used to make the "already
     // resolved" guard safe for free; Firestore doesn't, so this reads the
     // current status and writes the decision inside one transaction.
-    suspend fun decideLeave(requestId: String, decision: String) {
+    //
+    // `note` is the optional decision note typed in RequestDetailSheet's
+    // inline approve/reject step - written as `decisionNote` alongside the
+    // status fields only when non-blank, so a plain approve/reject with no
+    // note leaves the field untouched rather than writing an empty string.
+    suspend fun decideLeave(requestId: String, decision: String, note: String? = null) {
         val status = if (decision == "approved") "approved" else "rejected"
         val resolvedBy = auth.currentUser?.displayName ?: auth.currentUser?.email ?: "Unknown"
+        val trimmedNote = note?.trim()
         val ref = db.collection("leaveRequests").document(requestId)
         try {
             db.runTransaction { transaction ->
@@ -65,14 +71,13 @@ class LeaveApiClient(
                 if (snapshot.getString("status") != "requested") {
                     throw ApiException("This request has already been resolved.")
                 }
-                transaction.update(
-                    ref,
-                    mapOf(
-                        "status" to status,
-                        "resolvedAt" to FieldValue.serverTimestamp(),
-                        "resolvedBy" to resolvedBy
-                    )
+                val updates = mutableMapOf<String, Any>(
+                    "status" to status,
+                    "resolvedAt" to FieldValue.serverTimestamp(),
+                    "resolvedBy" to resolvedBy
                 )
+                if (!trimmedNote.isNullOrBlank()) updates["decisionNote"] = trimmedNote
+                transaction.update(ref, updates)
             }.await()
         } catch (err: ApiException) {
             throw err
@@ -95,7 +100,9 @@ private fun DocumentSnapshot.toLeaveRequest(): LeaveRequest = LeaveRequest(
     status = getString("status") ?: "requested",
     resolvedAt = getTimestamp("resolvedAt").toIsoStringOrEmpty(),
     resolvedBy = getString("resolvedBy") ?: "",
-    attachments = toAttachments()
+    attachments = toAttachments(),
+    halfDayPeriod = getString("halfDayPeriod") ?: "",
+    decisionNote = getString("decisionNote") ?: ""
 )
 
 private fun Timestamp?.toIsoStringOrEmpty(): String = this?.toDate()?.toInstant()?.toString() ?: ""

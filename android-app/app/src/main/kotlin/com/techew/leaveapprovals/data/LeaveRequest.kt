@@ -19,5 +19,10 @@ data class LeaveRequest(
     val status: String = "requested",
     val resolvedAt: String = "",
     val resolvedBy: String = "",
-    val attachments: List<Attachment> = emptyList()
+    val attachments: List<Attachment> = emptyList(),
+    // 'AM' | 'PM', only ever set by the web app at creation, only meaningful
+    // when type normalizes to casualShort.
+    val halfDayPeriod: String = "",
+    // Optional note the approver can attach when approving/rejecting.
+    val decisionNote: String = ""
 )

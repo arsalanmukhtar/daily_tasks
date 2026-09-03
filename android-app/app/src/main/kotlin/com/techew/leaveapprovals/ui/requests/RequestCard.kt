@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -28,12 +29,29 @@ import androidx.compose.ui.unit.sp
 import androidx.core.text.HtmlCompat
 import com.techew.leaveapprovals.data.LeaveRequest
 import com.techew.leaveapprovals.data.LeaveType
+import com.techew.leaveapprovals.ui.common.Avatar
+import com.techew.leaveapprovals.ui.theme.DurationFull
+import com.techew.leaveapprovals.ui.theme.DurationFullBg
+import com.techew.leaveapprovals.ui.theme.DurationShort
+import com.techew.leaveapprovals.ui.theme.DurationShortBg
+import com.techew.leaveapprovals.ui.theme.Meta
+import com.techew.leaveapprovals.ui.theme.MetaBg
 import com.techew.leaveapprovals.ui.theme.StatusApproved
 import com.techew.leaveapprovals.ui.theme.StatusApprovedBg
 import com.techew.leaveapprovals.ui.theme.StatusRejected
 import com.techew.leaveapprovals.ui.theme.StatusRejectedBg
 import com.techew.leaveapprovals.ui.theme.StatusRequested
 import com.techew.leaveapprovals.ui.theme.StatusRequestedBg
+import com.techew.leaveapprovals.ui.theme.StatusWithdrawn
+import com.techew.leaveapprovals.ui.theme.StatusWithdrawnBg
+import com.techew.leaveapprovals.ui.theme.TypeCasual
+import com.techew.leaveapprovals.ui.theme.TypeCasualBg
+import com.techew.leaveapprovals.ui.theme.TypeForeignTrip
+import com.techew.leaveapprovals.ui.theme.TypeForeignTripBg
+import com.techew.leaveapprovals.ui.theme.TypeMedical
+import com.techew.leaveapprovals.ui.theme.TypeMedicalBg
+import com.techew.leaveapprovals.ui.theme.TypeUmrah
+import com.techew.leaveapprovals.ui.theme.TypeUmrahBg
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -68,37 +86,40 @@ fun RequestCard(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
-                Text(
-                    request.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
+                Avatar(name = request.name, email = request.email)
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        request.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        request.email,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
                 Spacer(modifier = Modifier.width(8.dp))
                 StatusBadge(label = request.status.uppercase(), color = statusColor, background = statusBg)
             }
-
-            Text(
-                request.email,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 2.dp)
-            )
 
             Row(
                 modifier = Modifier.padding(top = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                MetaChip(LeaveType.label(request.type))
-                MetaChip(request.weekLabel)
+                MetaChip(LeaveType.familyLabel(request.type), kind = ChipKind.TYPE, type = request.type)
+                MetaChip(LeaveType.durationLabel(request.type), kind = ChipKind.DURATION, type = request.type)
+                MetaChip(request.weekLabel, kind = ChipKind.META)
                 val time = formatTimeHHmm(request.requestedAt)
-                if (time.isNotBlank()) MetaChip(time)
+                if (time.isNotBlank()) MetaChip(time, kind = ChipKind.META)
             }
 
             HorizontalDivider(modifier = Modifier.padding(top = 12.dp, bottom = 10.dp))
@@ -113,7 +134,7 @@ fun RequestCard(
 
             if (request.status != "requested") {
                 Text(
-                    "${if (request.status == "approved") "Approved" else "Rejected"} by ${request.resolvedBy}",
+                    resolvedSummaryText(request),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp)
@@ -128,15 +149,27 @@ fun RequestCard(
     }
 }
 
+// Shared by the card's plain resolved-by line and could grow further if the
+// detail sheet's footer text ever needs the exact same phrasing - kept
+// status-exhaustive so a request stuck in an unexpected/withdrawn state
+// never falls through to a wrong "Rejected by" label.
+internal fun resolvedSummaryText(request: LeaveRequest): String = when (request.status) {
+    "approved" -> "Approved by ${request.resolvedBy}"
+    "rejected" -> "Rejected by ${request.resolvedBy}"
+    "withdrawn" -> "Withdrawn by requester"
+    else -> request.status.replaceFirstChar { it.uppercase() }
+}
+
 @Composable
-internal fun statusColors(status: String): Pair<androidx.compose.ui.graphics.Color, androidx.compose.ui.graphics.Color> = when (status) {
+internal fun statusColors(status: String): Pair<Color, Color> = when (status) {
     "approved" -> StatusApproved to StatusApprovedBg
     "rejected" -> StatusRejected to StatusRejectedBg
+    "withdrawn" -> StatusWithdrawn to StatusWithdrawnBg
     else -> StatusRequested to StatusRequestedBg
 }
 
 @Composable
-internal fun StatusBadge(label: String, color: androidx.compose.ui.graphics.Color, background: androidx.compose.ui.graphics.Color) {
+internal fun StatusBadge(label: String, color: Color, background: Color) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
@@ -165,20 +198,41 @@ internal fun formatTimeHHmm(iso: String): String {
     }.getOrDefault("")
 }
 
+/** Which color pair (and lookup) a [MetaChip] should use. */
+internal enum class ChipKind { TYPE, DURATION, META }
+
 @Composable
-internal fun MetaChip(label: String) {
+internal fun MetaChip(label: String, kind: ChipKind = ChipKind.META, type: String = "") {
+    val (color, background) = when (kind) {
+        ChipKind.TYPE -> typeColors(type)
+        ChipKind.DURATION -> durationColors(type)
+        ChipKind.META -> Meta to MetaBg
+    }
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(background)
             .padding(horizontal = 10.dp, vertical = 5.dp)
     ) {
         Text(
             label,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = color,
             maxLines = 1,
             softWrap = false
         )
     }
 }
+
+// Leave-type family color - casualShort/casualFull share the "Casual" color,
+// matching LeaveType.familyLabel() collapsing them into one chip label.
+internal fun typeColors(type: String): Pair<Color, Color> = when (LeaveType.normalize(type)) {
+    LeaveType.FOREIGN_TRIP -> TypeForeignTrip to TypeForeignTripBg
+    LeaveType.UMRAH -> TypeUmrah to TypeUmrahBg
+    LeaveType.MEDICAL -> TypeMedical to TypeMedicalBg
+    else -> TypeCasual to TypeCasualBg
+}
+
+// Every type has an inherent duration - only casualShort is ever "short".
+internal fun durationColors(type: String): Pair<Color, Color> =
+    if (LeaveType.isShort(type)) DurationShort to DurationShortBg else DurationFull to DurationFullBg

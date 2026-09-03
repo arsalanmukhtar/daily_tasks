@@ -137,7 +137,8 @@ fun ManagerHomeScreen(
                 ManagerTab.Archived -> ArchivedRequestsScreen(
                     viewModel = requestListViewModel,
                     highlightRequestId = highlightRequestId,
-                    onHighlightHandled = onHighlightHandled
+                    onHighlightHandled = onHighlightHandled,
+                    onGoToRequests = { selectedTab = ManagerTab.Requests }
                 )
                 ManagerTab.Summary -> LeaveSummaryScreen(viewModel = summaryViewModel)
             }
