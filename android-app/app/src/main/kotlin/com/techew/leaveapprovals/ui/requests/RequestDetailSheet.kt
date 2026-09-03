@@ -103,7 +103,7 @@ fun RequestDetailSheet(
 
             if (request.attachmentUrl.isNotBlank()) {
                 OutlinedButton(
-                    onClick = { openAttachment(context, request.attachmentUrl, request.attachmentName) },
+                    onClick = { openAttachment(context, request.attachmentUrl) },
                     modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
                 ) {
                     Icon(Icons.Outlined.AttachFile, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
@@ -147,33 +147,28 @@ fun RequestDetailSheet(
 }
 
 /**
- * Opens the attachment with the phone's own document viewers (Drive, Adobe
- * Acrobat, Word, a browser's built-in PDF viewer, etc.) rather than always
- * falling back to a plain browser tab - setting the mime type inferred from
- * the file extension is what lets those apps' intent filters match an
- * https:// link alongside a plain ACTION_VIEW.
+ * Opens the attachment's Drive link directly, with no forced mime type.
+ *
+ * Drive attachments are uploaded via the API but a viewer's Drive account
+ * may auto-convert Office files (.doc/.docx/etc.) to native Google Docs on
+ * ingestion, in which case the "attachment" is really a live
+ * docs.google.com editor page, not the original file - a real Word/Office
+ * viewer has nothing to match there. Forcing a guessed mime type (from the
+ * original filename) onto the intent doesn't help either way: it makes
+ * Intent.createChooser() look for an app whose intent-filter matches that
+ * exact (scheme, mimeType) pair, and if nothing does,
+ * createChooser()'s own chooser activity is always resolvable, so
+ * startActivity() never throws ActivityNotFoundException - it just shows an
+ * empty "no app can perform this action" chooser instead of ever reaching
+ * our catch block/fallback. A plain, type-less ACTION_VIEW on the URL lets
+ * any browser (or Drive/Docs app, if installed) open it correctly either
+ * way, and still lets the OS show its own chooser if more than one app
+ * actually matches.
  */
-private fun openAttachment(context: android.content.Context, url: String, fileName: String) {
-    val mimeType = mimeTypeForFileName(fileName)
+private fun openAttachment(context: android.content.Context, url: String) {
     try {
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(Uri.parse(url), mimeType)
-        }
-        context.startActivity(Intent.createChooser(intent, "Open attachment"))
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
     } catch (_: ActivityNotFoundException) {
-        try {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-        } catch (_: ActivityNotFoundException) {
-            // No app can handle it at all - nothing more we can do here.
-        }
+        // No browser at all - nothing more we can do here.
     }
-}
-
-private fun mimeTypeForFileName(fileName: String): String = when {
-    fileName.endsWith(".pdf", ignoreCase = true) -> "application/pdf"
-    fileName.endsWith(".doc", ignoreCase = true) -> "application/msword"
-    fileName.endsWith(".docx", ignoreCase = true) ->
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    fileName.endsWith(".txt", ignoreCase = true) -> "text/plain"
-    else -> "*/*"
 }
