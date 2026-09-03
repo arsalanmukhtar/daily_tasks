@@ -1,0 +1,16 @@
+{
+  "name": "leaveapprovals-push-daemon",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Long-running Firestore listener that pushes an FCM notification to the leave-approvals owner(s) whenever a new leave request is created.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.3.0"
+  }
+}

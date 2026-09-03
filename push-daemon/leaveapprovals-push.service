@@ -1,0 +1,16 @@
+[Unit]
+Description=Leave Approvals push notification daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gtechapp
+WorkingDirectory=/home/gtechapp/push-daemon
+Environment=GOOGLE_APPLICATION_CREDENTIALS=/home/gtechapp/push-daemon/service-account.json
+ExecStart=/usr/bin/node index.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
