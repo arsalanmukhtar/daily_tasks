@@ -1,12 +1,15 @@
 package com.techew.leaveapprovals.ui.summary
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -31,11 +34,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.techew.leaveapprovals.data.LeaveRequest
 import com.techew.leaveapprovals.data.LeaveType
 import com.techew.leaveapprovals.ui.charts.MonthlyTrendChart
 import com.techew.leaveapprovals.ui.common.Avatar
+import com.techew.leaveapprovals.ui.requests.durationColors
+import com.techew.leaveapprovals.ui.theme.StatusApproved
+import com.techew.leaveapprovals.ui.theme.StatusApprovedBg
+import com.techew.leaveapprovals.ui.theme.StatusRejected
+import com.techew.leaveapprovals.ui.theme.StatusRejectedBg
+import com.techew.leaveapprovals.ui.theme.StatusRequested
+import com.techew.leaveapprovals.ui.theme.StatusRequestedBg
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.TextStyle
@@ -125,7 +136,12 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                             .verticalScroll(rememberScrollState())
                             .padding(16.dp)
                     ) {
-                        SectionLabel("Developers")
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        SectionLabel("Developers", topPadding = 0.dp)
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             item {
                                 FilterChip(
@@ -204,6 +220,8 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                 }
                             }
                         }
+                    }
+                    }
 
                         // Drill-down breadcrumb - only meaningful once the manager
                         // has actually narrowed past Year, mirroring the mockup's
@@ -231,21 +249,33 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             KpiTile("Total", finalRecords.size.toString(), Modifier.weight(1f))
-                            KpiTile("Approved", finalRecords.count { it.status == "approved" }.toString(), Modifier.weight(1f))
-                            KpiTile("Rejected", finalRecords.count { it.status == "rejected" }.toString(), Modifier.weight(1f))
-                            KpiTile("Pending", finalRecords.count { it.status == "requested" }.toString(), Modifier.weight(1f))
+                            KpiTile(
+                                "Approved", finalRecords.count { it.status == "approved" }.toString(),
+                                Modifier.weight(1f), StatusApproved, StatusApprovedBg
+                            )
+                            KpiTile(
+                                "Rejected", finalRecords.count { it.status == "rejected" }.toString(),
+                                Modifier.weight(1f), StatusRejected, StatusRejectedBg
+                            )
+                            KpiTile(
+                                "Pending", finalRecords.count { it.status == "requested" }.toString(),
+                                Modifier.weight(1f), StatusRequested, StatusRequestedBg
+                            )
                         }
 
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(top = 8.dp)
+                        SectionLabel("By leave type", topPadding = 20.dp)
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                         ) {
-                            items(LeaveType.ALL) { type ->
-                                KpiTile(
-                                    LeaveType.label(type),
-                                    finalRecords.count { it.type == type }.toString(),
-                                    Modifier.width(110.dp)
-                                )
+                            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                                val maxTypeCount = LeaveType.ALL.maxOf { t -> finalRecords.count { it.type == t } }.coerceAtLeast(1)
+                                LeaveType.ALL.forEachIndexed { index, type ->
+                                    if (index > 0) Box(Modifier.height(10.dp))
+                                    val count = finalRecords.count { it.type == type }
+                                    val (barColor, _) = durationColors(type)
+                                    TypeBarRow(LeaveType.label(type), count, maxTypeCount, barColor)
+                                }
                             }
                         }
 
@@ -271,7 +301,16 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 quarterCounts.forEachIndexed { index, count ->
-                                    QuarterTile("Q${index + 1}", count, Modifier.weight(1f))
+                                    QuarterTile(
+                                        label = "Q${index + 1}",
+                                        count = count,
+                                        selected = granularity == Granularity.QUARTER && selectedQuarter == index + 1,
+                                        modifier = Modifier.weight(1f),
+                                        onClick = {
+                                            granularity = Granularity.QUARTER
+                                            selectedQuarter = index + 1
+                                        }
+                                    )
                                 }
                             }
 
@@ -453,19 +492,29 @@ private fun SectionLabel(text: String, topPadding: androidx.compose.ui.unit.Dp =
 }
 
 @Composable
-private fun KpiTile(label: String, value: String, modifier: Modifier = Modifier) {
-    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+private fun KpiTile(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    valueColor: Color? = null,
+    containerColor: Color? = null
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = containerColor ?: MaterialTheme.colorScheme.surface)
+    ) {
         Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)) {
             Text(
                 label.uppercase(),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = valueColor ?: MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
             Text(
                 value,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                color = valueColor ?: MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(top = 2.dp)
             )
         }
@@ -473,17 +522,80 @@ private fun KpiTile(label: String, value: String, modifier: Modifier = Modifier)
 }
 
 @Composable
-private fun QuarterTile(label: String, count: Int, modifier: Modifier = Modifier) {
+private fun TypeBarRow(label: String, count: Int, maxCount: Int, barColor: Color) {
+    val fraction = if (maxCount == 0) 0f else count.toFloat() / maxCount.toFloat()
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(90.dp)
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(8.dp)
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            if (fraction > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(fraction)
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(barColor)
+                )
+            }
+        }
+        Text(
+            count.toString(),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            color = if (count == 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.width(28.dp).padding(start = 6.dp)
+        )
+    }
+}
+
+@Composable
+private fun QuarterTile(
+    label: String,
+    count: Int,
+    selected: Boolean = false,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
+) {
+    val containerColor = when {
+        selected -> MaterialTheme.colorScheme.primaryContainer
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val contentColor = when {
+        selected -> MaterialTheme.colorScheme.onPrimaryContainer
+        count == 0 -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(containerColor)
+            .then(
+                if (selected) Modifier.border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
+                else Modifier
+            )
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-            Text(count.toString(), style = MaterialTheme.typography.titleSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
+            Text(label, style = MaterialTheme.typography.labelSmall, color = contentColor, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+            Text(
+                count.toString(),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(top = 2.dp)
+            )
         }
     }
 }
