@@ -943,6 +943,13 @@ textarea {
 .loader-sm::after {
   content: none;
 }
+/* White variant for a spinner sitting on a solid brand-colored button (e.g.
+   the orange Send/Submit buttons) - the default dark-grey ring is invisible
+   against that background. */
+.loader-sm.on-brand {
+  border-color: rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+}
 
 /* Tick stays solid for ~4s, then fades over the last second. */
 @keyframes status-tick-fade {

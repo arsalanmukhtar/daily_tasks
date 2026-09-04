@@ -1413,10 +1413,11 @@ function clearOutPassManualEditState_() {
 // Afternoon are fixed halves of the office day; the others extend the
 // duration from whatever check-out is already set.
 function applyOutPassQuickDuration_(q, btnEl) {
-  const MIDDAY_ = 750; // 12:30 PM
+  const MIDDAY_ = 750; // 12:30 PM - lunch break starts here
+  const LUNCH_END_ = 810; // 1:30 PM - lunch break ends here
   let outMin, inMin;
   if (q === 'morning') { outMin = LEAVE_TIME_WINDOW_MIN_; inMin = MIDDAY_; }
-  else if (q === 'afternoon') { outMin = MIDDAY_; inMin = LEAVE_TIME_WINDOW_MAX_; }
+  else if (q === 'afternoon') { outMin = LUNCH_END_; inMin = LEAVE_TIME_WINDOW_MAX_; }
   else {
     outMin = leaveTimeTo24_(leaveOutPassCheckOutTime);
     inMin = Math.min(LEAVE_TIME_WINDOW_MAX_, outMin + Number(q));
@@ -1983,7 +1984,7 @@ async function submitUninformedResolution_() {
   }
   uninformedResolveSubmitBtn.disabled = true;
   const originalLabel = uninformedResolveSubmitBtn.textContent;
-  uninformedResolveSubmitBtn.textContent = 'Submitting…';
+  uninformedResolveSubmitBtn.innerHTML = '<span class="loader loader-sm on-brand" style="vertical-align: middle; margin-right: 6px;"></span>Submitting…';
   try {
     await updateDoc(doc(db, 'uninformedLeaves', currentUninformedReport.reportId), {
       status: 'resolved',
@@ -2646,7 +2647,7 @@ leaveSendBtn.addEventListener('click', async () => {
   leaveSendBtn.disabled = true;
   leaveCancelBtn.disabled = true;
   const originalLabel = leaveSendBtn.textContent;
-  leaveSendBtn.textContent = 'Sending...';
+  leaveSendBtn.innerHTML = '<span class="loader loader-sm on-brand" style="vertical-align: middle; margin-right: 6px;"></span>Sending...';
 
   try {
     // Obtain the Drive access token BEFORE creating the request doc, while

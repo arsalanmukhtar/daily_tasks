@@ -2,6 +2,7 @@ package com.techew.leaveapprovals.ui.requests
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -127,8 +129,14 @@ fun RequestCard(
                 StatusBadge(label = request.status.uppercase(), color = statusColor, background = statusBg)
             }
 
+            // A type/duration/week/time chip can add up to more than the
+            // card's width (e.g. "Uninformed Leave" + "Full Leave" + a long
+            // week label) - scrolls horizontally instead of clipping/
+            // wrapping so every chip stays fully readable.
             Row(
-                modifier = Modifier.padding(top = 10.dp),
+                modifier = Modifier
+                    .padding(top = 10.dp)
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 MetaChip(LeaveType.familyLabel(request.type), kind = ChipKind.TYPE, type = request.type)

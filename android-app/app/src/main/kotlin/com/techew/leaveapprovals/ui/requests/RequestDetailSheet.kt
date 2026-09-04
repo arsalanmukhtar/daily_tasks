@@ -7,6 +7,7 @@ import android.text.method.LinkMovementMethod
 import android.widget.TextView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -145,8 +146,13 @@ private fun DetailHeader(request: LeaveRequest) {
         StatusBadge(label = request.status.uppercase(), color = statusColor, background = statusBg)
     }
 
+    // Scrolls horizontally instead of clipping - a type/duration/week chip
+    // trio can add up to more than the sheet's width (see the matching fix
+    // on RequestCard's chip row).
     Row(
-        modifier = Modifier.padding(top = 12.dp),
+        modifier = Modifier
+            .padding(top = 12.dp)
+            .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         MetaChip(LeaveType.familyLabel(request.type), kind = ChipKind.TYPE, type = request.type)
