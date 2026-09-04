@@ -22,6 +22,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -34,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.techew.leaveapprovals.data.AllowlistEntry
 import com.techew.leaveapprovals.data.UninformedLeave
@@ -69,6 +74,10 @@ fun ReportScreen(viewModel: ReportViewModel) {
 
     var showNewReportForm by remember { mutableStateOf(false) }
     var resolvingReportId by remember { mutableStateOf<String?>(null) }
+    var filterEmail by remember { mutableStateOf<String?>(null) }
+
+    val visibleOpenReports = if (filterEmail == null) openReports else openReports.filter { it.email == filterEmail }
+    val visibleResolvedReports = if (filterEmail == null) resolvedReports else resolvedReports.filter { it.email == filterEmail }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (isLoading && openReports.isEmpty() && resolvedReports.isEmpty()) {
@@ -100,6 +109,15 @@ fun ReportScreen(viewModel: ReportViewModel) {
                     )
                 }
 
+                if (roster.isNotEmpty()) {
+                    ReportDeveloperFilterDropdown(
+                        roster = roster,
+                        selectedEmail = filterEmail,
+                        onSelect = { filterEmail = it },
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+                    )
+                }
+
                 if (showNewReportForm) {
                     NewReportCard(
                         roster = roster,
@@ -113,15 +131,15 @@ fun ReportScreen(viewModel: ReportViewModel) {
                     )
                 }
 
-                if (openReports.isEmpty()) {
+                if (visibleOpenReports.isEmpty()) {
                     Text(
-                        "No open reports.",
+                        if (filterEmail == null) "No open reports." else "No open reports for this developer.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 12.dp)
                     )
                 } else {
-                    openReports.forEach { report ->
+                    visibleOpenReports.forEach { report ->
                         OpenReportCard(
                             report = report,
                             isResolving = resolvingReportId == report.reportId,
@@ -141,14 +159,14 @@ fun ReportScreen(viewModel: ReportViewModel) {
                     "Resolutions", style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 24.dp, bottom = 4.dp)
                 )
-                if (resolvedReports.isEmpty()) {
+                if (visibleResolvedReports.isEmpty()) {
                     Text(
-                        "Nothing resolved yet.",
+                        if (filterEmail == null) "Nothing resolved yet." else "Nothing resolved yet for this developer.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                    resolvedReports.forEach { ResolvedReportCard(it) }
+                    visibleResolvedReports.forEach { ResolvedReportCard(it) }
                 }
             }
         }
@@ -278,8 +296,51 @@ private fun ResolvedReportCard(report: UninformedLeave) {
                 )
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+            Text("Reported reason", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            HtmlText(report.reasonHtml, modifier = Modifier.padding(top = 2.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
             Text("Resolved by ${report.resolvedBy}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
             HtmlText(report.resolutionHtml, modifier = Modifier.padding(top = 4.dp))
+        }
+    }
+}
+
+/**
+ * Single-select "which developer's reports/resolutions to show" filter, with
+ * an "All developers" option (unlike DeveloperPickerDropdown, which is
+ * required and used only to pick who a new report is against).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReportDeveloperFilterDropdown(
+    roster: List<AllowlistEntry>,
+    selectedEmail: String?,
+    onSelect: (String?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val sortedRoster = remember(roster) { roster.sortedBy { it.name.ifBlank { it.email } } }
+    val label = sortedRoster.find { it.email == selectedEmail }?.name?.ifBlank { selectedEmail } ?: "All developers"
+
+    Box(modifier = modifier) {
+        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                label, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f)
+            )
+            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text("All developers") },
+                onClick = { onSelect(null); expanded = false }
+            )
+            sortedRoster.forEach { entry ->
+                DropdownMenuItem(
+                    text = { Text(entry.name.ifBlank { entry.email }) },
+                    onClick = { onSelect(entry.email); expanded = false }
+                )
+            }
         }
     }
 }

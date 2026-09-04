@@ -30,9 +30,22 @@ object LeaveType {
         UNINFORMED_ABSENCE to "Uninformed Leave"
     )
 
+    // Short forms for tight spaces (the Summary screen's "By leave type" bar
+    // labels) - the full LABELS above stay unabbreviated everywhere else.
+    private val SHORT_LABELS = mapOf(
+        FOREIGN_TRIP to "Foreign",
+        UMRAH to "Umrah",
+        MEDICAL to "Medical",
+        CASUAL_SHORT to "Short",
+        CASUAL_FULL to "Full",
+        UNINFORMED_ABSENCE to "Uninformed"
+    )
+
     fun normalize(type: String): String = ALIASES[type] ?: type.ifBlank { CASUAL_SHORT }
 
     fun label(type: String): String = LABELS[normalize(type)] ?: "Leave"
+
+    fun shortLabel(type: String): String = SHORT_LABELS[normalize(type)] ?: "Leave"
 
     // Collapses casualShort/casualFull into one "Casual" family label, for
     // UI that shows the leave-type chip and the short/full duration chip

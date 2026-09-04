@@ -381,164 +381,18 @@
     <div id="submissionsList" class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5"></div>
   </aside>
 
-  <!-- ============ APPLY FOR LEAVE DRAWER ============ -->
-  <div id="leaveBackdrop" class="drawer-backdrop fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"></div>
-  <aside id="leaveDrawer" class="drawer-panel fixed top-0 right-0 h-full w-full sm:w-[36rem] lg:w-[44rem] max-w-full bg-white shadow-2xl ring-1 ring-slate-200 z-50 flex flex-col">
-    <header class="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-slate-200 flex items-start justify-between gap-3 shrink-0 bg-gradient-to-r from-slate-50 to-orange-50/60">
-      <div class="min-w-0">
-        <h2 class="text-base font-semibold text-slate-800">Apply for Leave</h2>
-        <p id="leaveDrawerWeekLabel" class="text-xs text-slate-500 mt-0.5">Pick a type, date(s), and reason</p>
-      </div>
-      <div class="flex items-center gap-1 shrink-0">
-        <button type="button" id="closeLeaveDrawerBtn"
-          class="text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition p-1.5 rounded-md"
-          aria-label="Close">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>
-      </div>
-    </header>
-
-    <div class="flex-1 overflow-y-auto">
-      <div class="dcols">
-        <div class="dcol dcol-l">
-          <div class="blk">
-            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Leave type</div>
-            <div class="chips2">
-              <button type="button" id="leaveCategoryForeignTripBtn" data-category="foreignTrip" data-t="foreign" class="tchip">
-                <span class="swatch"></span><span class="nm">Foreign Trip</span><span class="hint">Travel abroad</span>
-              </button>
-              <button type="button" id="leaveCategoryUmrahBtn" data-category="umrah" data-t="umrah" class="tchip">
-                <span class="swatch"></span><span class="nm">Umrah</span><span class="hint">Pilgrimage</span>
-              </button>
-              <button type="button" id="leaveCategoryMedicalBtn" data-category="medical" data-t="medical" class="tchip">
-                <span class="swatch"></span><span class="nm">Medical</span><span class="hint">Health related</span>
-              </button>
-              <button type="button" id="leaveCategoryCasualBtn" data-category="casual" data-t="casual" class="tchip">
-                <span class="swatch"></span><span class="nm">Casual</span><span class="hint">Personal time</span>
-              </button>
-            </div>
-            <div id="leaveCasualSubRow" class="hidden nest">
-              <div class="cap">CASUAL LEAVE DURATION <span class="text-red-500">*</span></div>
-              <div class="dseg">
-                <button type="button" id="leaveTypeShortBtn" data-type="casualShort" data-d="short" class="dopt"><b>Short Leave</b><span>Part of the day</span></button>
-                <button type="button" id="leaveTypeFullBtn" data-type="casualFull" data-d="full" class="dopt"><b>Full Leave</b><span>Whole day off</span></button>
-              </div>
-            </div>
-            <p id="leaveFullCooldownNote" class="hidden mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5"></p>
-          </div>
-
-          <div class="blk">
-            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Date(s)</div>
-            <div class="seg">
-              <button type="button" id="leaveDateModeSingleBtn" data-mode="single">Single Date</button>
-              <button type="button" id="leaveDateModeRangeBtn" data-mode="range">Date Range</button>
-              <button type="button" id="leaveDateModeCustomBtn" data-mode="multiple">Custom</button>
-            </div>
-            <div class="cal-host">
-              <input type="text" id="leaveDateRangeInput" readonly placeholder="Select a date" />
-              <div id="leaveShortTimePicker" class="time-picker hidden">
-                <div class="tp-label">Half-day starts at</div>
-                <div class="tp-slider" id="leaveTimeSlider">
-                  <div class="tp-track"><div class="tp-ticks" id="leaveTimeTicks"></div></div>
-                  <div class="tp-handle" id="leaveTimeHandle"><span id="leaveTimeHandleLabel">7:00</span></div>
-                </div>
-                <div class="tp-controls">
-                  <button type="button" class="tp-step" id="leaveTimeMinusBtn" aria-label="5 minutes earlier">&minus;</button>
-                  <input type="text" id="leaveTimeInput" class="tp-input" inputmode="numeric" aria-label="Time" value="7:00 AM" />
-                  <button type="button" class="tp-step" id="leaveTimePlusBtn" aria-label="5 minutes later">+</button>
-                  <div class="tp-ampm-seg">
-                    <button type="button" id="leaveTimeAmBtn" class="tp-ampm-btn is-selected">AM</button>
-                    <button type="button" id="leaveTimePmBtn" class="tp-ampm-btn">PM</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div id="leaveDatePicked" class="picked hidden">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C2410C" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
-              <b id="leaveDatePickedLabel"></b><span id="leaveDatePickedMeta"></span>
-            </div>
-            <p id="leaveDateRangeError" class="hidden mt-1 text-xs text-red-600"></p>
-          </div>
-        </div>
-
-        <div class="dcol dcol-r">
-          <div class="blk">
-            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Attachments <span class="text-slate-400 normal-case font-medium">&middot; optional</span></div>
-            <input type="file" id="leaveAttachmentInput" class="hidden" multiple
-              accept=".pdf,.txt,.doc,.docx,.zip,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/zip,application/x-zip-compressed" />
-            <label for="leaveAttachmentInput" id="leaveAttachmentDrop" class="drop">
-              <b>Drop files here or <em>browse</em></b>
-              <p>PDF, DOC, DOCX, TXT, or ZIP &middot; max 8MB each, up to 5 files</p>
-            </label>
-            <div id="leaveAttachmentList" class="hidden files"></div>
-            <p id="leaveAttachmentCountNote" class="hidden cap-note"></p>
-            <p id="leaveAttachmentError" class="hidden mt-1 text-xs text-red-600"></p>
-          </div>
-
-          <div class="blk blk-fill">
-            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Reason</div>
-            <div id="leaveToolbar" class="flex flex-wrap items-center gap-0.5 px-2 py-1.5 rounded-t-lg border border-slate-300 border-b-0 bg-slate-50">
-              <button type="button" data-cmd="bold"          class="tb-btn" title="Bold (Ctrl+B)"><b>B</b></button>
-              <button type="button" data-cmd="italic"        class="tb-btn" title="Italic (Ctrl+I)"><i>I</i></button>
-              <button type="button" data-cmd="underline"     class="tb-btn" title="Underline (Ctrl+U)"><u>U</u></button>
-              <button type="button" data-cmd="strikethrough" class="tb-btn" title="Strikethrough"><s>S</s></button>
-              <span class="w-px h-5 bg-slate-300 mx-1 sm:mx-1.5" aria-hidden="true"></span>
-              <button type="button" data-color-action="foreColor" class="tb-btn tb-color-btn" title="Text colour" aria-label="Text colour">
-                <span class="tb-color-letter">A</span>
-                <span class="tb-color-bar" style="background-color: #1e293b;"></span>
-              </button>
-              <button type="button" data-color-action="hiliteColor" class="tb-btn tb-color-btn" title="Highlight" aria-label="Highlight">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M12 20h9"/>
-                  <path d="M16.5 3.5l4 4-10 10H6.5v-4l10-10z"/>
-                </svg>
-                <span class="tb-color-bar" style="background-color: #fde047;"></span>
-              </button>
-              <span class="w-px h-5 bg-slate-300 mx-1 sm:mx-1.5" aria-hidden="true"></span>
-              <button type="button" data-cmd="insertUnorderedList" class="tb-btn" title="Bulleted list" aria-label="Bulleted list">
-                <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><circle cx="3" cy="5" r="1.5"/><circle cx="3" cy="10" r="1.5"/><circle cx="3" cy="15" r="1.5"/><rect x="7" y="4" width="11" height="2" rx="1"/><rect x="7" y="9" width="11" height="2" rx="1"/><rect x="7" y="14" width="11" height="2" rx="1"/></svg>
-              </button>
-              <button type="button" data-cmd="insertOrderedList" class="tb-btn" title="Numbered list" aria-label="Numbered list">
-                <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><text x="0" y="7" font-size="6" font-weight="700">1.</text><text x="0" y="13" font-size="6" font-weight="700">2.</text><text x="0" y="19" font-size="6" font-weight="700">3.</text><rect x="7" y="4" width="11" height="2" rx="1"/><rect x="7" y="9" width="11" height="2" rx="1"/><rect x="7" y="14" width="11" height="2" rx="1"/></svg>
-              </button>
-            </div>
-            <div id="leaveReasonEditor" class="cell-editor lv-reason-editor rich-text border border-t-0 border-slate-300 rounded-b-lg" contenteditable="true" data-placeholder="Describe your reason for leave..."></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <footer class="px-4 sm:px-5 py-3 border-t border-slate-100 bg-slate-50/60 flex items-center gap-3 shrink-0">
-      <div id="leaveSummaryChips" class="summary"></div>
-      <button type="button" id="leaveBackBtn"
-        class="shrink-0 px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-400 transition"
-        title="Back to My Leaves">
-        &larr; Back
-      </button>
-      <button type="button" id="leaveCancelBtn"
-        class="shrink-0 px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-400 transition">
-        Cancel
-      </button>
-      <button type="button" id="leaveSendBtn"
-        class="shrink-0 px-4 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold shadow-sm hover:bg-orange-700 active:bg-orange-800 transition">
-        Send
-      </button>
-    </footer>
-  </aside>
-
-  <!-- ============ MY LEAVES DRAWER ============
-       Apply-for-leave state button + a personal stats summary (KPIs, year/
-       quarter breakdown, monthly trend chart) + the full request history
-       with details and attachments. All data comes from leaveStatus_, which
-       already scopes to the calling user's own rows server-side. -->
+  <!-- ============ LEAVES PANEL ============
+       One drawer, three tabs switched by the right-edge icon rail: My Leaves
+       (apply-for-leave state button + banners + KPI/quarter/chart stats),
+       History (the full request list), and Apply for Leave (the form that
+       used to be a wholly separate drawer reached via a "Back" round trip -
+       applyLeaveBtn below now just switches to this tab in place). -->
   <div id="myLeavesBackdrop" class="drawer-backdrop fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"></div>
-  <aside id="myLeavesDrawer" class="drawer-panel fixed top-0 right-0 h-full w-full sm:w-[30rem] lg:w-[34rem] max-w-full bg-white shadow-2xl ring-1 ring-slate-200 z-50 flex flex-col">
+  <aside id="myLeavesDrawer" class="drawer-panel fixed top-0 right-0 h-full w-full sm:w-[36rem] lg:w-[44rem] max-w-full bg-white shadow-2xl ring-1 ring-slate-200 z-50 flex flex-col">
     <header class="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-slate-200 flex items-start justify-between gap-3 shrink-0 bg-gradient-to-r from-slate-50 to-orange-50/60">
       <div class="min-w-0">
-        <h2 class="text-base font-semibold text-slate-800">My Leaves</h2>
-        <p class="text-xs text-slate-500 mt-0.5">Apply, track approvals, and review your leave history.</p>
+        <h2 id="myLeavesDrawerTitle" class="text-base font-semibold text-slate-800">My Leaves</h2>
+        <p id="myLeavesDrawerSubtitle" class="text-xs text-slate-500 mt-0.5">Apply, track approvals, and review your leave history.</p>
       </div>
       <button type="button" id="closeMyLeavesDrawerBtn"
         class="text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition p-1.5 rounded-md shrink-0"
@@ -549,102 +403,241 @@
       </button>
     </header>
 
-    <div class="flex-1 overflow-y-auto p-4 sm:p-5">
-
-      <!-- Shown only while the initial fetch in openMyLeavesDrawer() is in
-           flight - without this, the stats/quarter/chart panel is briefly
-           just blank white space, which reads as broken rather than busy. -->
-      <div id="myLeavesLoading" class="my-leaves-loading hidden">
-        <span class="loader"></span>
-        <p>Loading your leave activity&hellip;</p>
-      </div>
-
-      <div id="myLeavesContent" class="hidden space-y-5">
-
-      <!-- Apply for Leave - state-aware button, tied to the week picked on
-           the main form (applyLeaveBtn/applyLeaveBtnLabel ids are read by
-           app.js's refreshApplyLeaveButton(), unchanged from before). -->
-      <div class="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
-        <div id="myLeavesApplyWeekLabel" class="text-xs text-slate-500 mb-2">-</div>
-        <button type="button" id="applyLeaveBtn" class="hidden lv-btn font-semibold rounded-lg border transition !w-full">
-          <span id="applyLeaveBtnLabel">Apply for Leave</span>
+    <div class="flex-1 flex overflow-hidden">
+      <nav id="leavesTabRail" class="leaves-rail" aria-label="Leaves panel sections">
+        <button type="button" class="leaves-rail-btn is-active" data-tab="overview" title="My Leaves" aria-label="My Leaves">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg>
         </button>
-        <p id="myLeavesNoWeekNote" class="hidden text-xs text-slate-400 text-center py-1.5">Pick a week on the left to apply for leave.</p>
-      </div>
+        <button type="button" class="leaves-rail-btn" data-tab="history" title="History" aria-label="History">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        </button>
+        <button type="button" class="leaves-rail-btn" data-tab="apply" title="Apply for Leave" aria-label="Apply for Leave">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </nav>
 
-      <!-- Pending-request banner - shows the most recently requested still-
-           pending record; "View" scrolls to + expands it below. -->
-      <div id="myLeavesBanner" class="banner hidden">
-        <div class="bic">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-        </div>
-        <div class="min-w-0">
-          <b id="myLeavesBannerTitle">Awaiting approval</b>
-          <span id="myLeavesBannerMeta"></span>
-        </div>
-        <button type="button" id="myLeavesBannerViewBtn" class="link">View</button>
-      </div>
+      <div class="flex-1 min-w-0 flex flex-col overflow-hidden">
+        <div id="myLeavesOverviewHistoryWrap" class="flex-1 overflow-y-auto p-4 sm:p-5">
 
-      <!-- Uninformed-leave banner - the signed-in user's own most recently
-           reported still-open uninformedLeaves doc; "Resolve" opens the
-           resolution drawer, same as the emailed "Resolve the Issue" link. -->
-      <div id="uninformedBanner" class="banner hidden">
-        <div class="bic">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
-        </div>
-        <div class="min-w-0">
-          <b id="uninformedBannerTitle">Uninformed absence flagged</b>
-          <span id="uninformedBannerMeta"></span>
-        </div>
-        <button type="button" id="uninformedBannerViewBtn" class="link">Resolve</button>
-      </div>
-
-      <!-- Stats summary -->
-      <div class="rounded-xl border border-slate-200 bg-white p-3.5">
-        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2.5">Leave activity</div>
-        <div class="grid grid-cols-3 gap-2 mb-2">
-          <div class="an-kpi stat-tile stat-all">
-            <div class="an-kpi-label"><i></i>Total</div>
-            <div id="myLeavesKpiTotal" class="an-kpi-value">0</div>
+          <!-- Shown only while the initial fetch in openMyLeavesDrawer() is in
+               flight - without this, the stats/quarter/chart panel is briefly
+               just blank white space, which reads as broken rather than busy. -->
+          <div id="myLeavesLoading" class="my-leaves-loading hidden">
+            <span class="loader"></span>
+            <p>Loading your leave activity&hellip;</p>
           </div>
-          <div class="an-kpi stat-tile stat-ok">
-            <div class="an-kpi-label"><i></i>Approved</div>
-            <div id="myLeavesKpiApproved" class="an-kpi-value">0</div>
+
+          <div id="myLeavesContent" class="hidden space-y-5">
+
+          <div id="myLeavesOverviewSection" class="space-y-5">
+            <!-- Apply for Leave - state-aware button, tied to the week picked on
+                 the main form (applyLeaveBtn/applyLeaveBtnLabel ids are read by
+                 app.js's refreshApplyLeaveButton(), unchanged from before). -->
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+              <div id="myLeavesApplyWeekLabel" class="text-xs text-slate-500 mb-2">-</div>
+              <button type="button" id="applyLeaveBtn" class="hidden lv-btn font-semibold rounded-lg border transition !w-full">
+                <span id="applyLeaveBtnLabel">Apply for Leave</span>
+              </button>
+              <p id="myLeavesNoWeekNote" class="hidden text-xs text-slate-400 text-center py-1.5">Pick a week on the left to apply for leave.</p>
+            </div>
+
+            <!-- Pending-request banner - shows the most recently requested still-
+                 pending record; "View" scrolls to + expands it below. -->
+            <div id="myLeavesBanner" class="banner hidden">
+              <div class="bic">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              </div>
+              <div class="min-w-0">
+                <b id="myLeavesBannerTitle">Awaiting approval</b>
+                <span id="myLeavesBannerMeta"></span>
+              </div>
+              <button type="button" id="myLeavesBannerViewBtn" class="link">View</button>
+            </div>
+
+            <!-- Uninformed-leave banner - the signed-in user's own most recently
+                 reported still-open uninformedLeaves doc; "Resolve" opens the
+                 resolution drawer, same as the emailed "Resolve the Issue" link. -->
+            <div id="uninformedBanner" class="banner hidden">
+              <div class="bic">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+              </div>
+              <div class="min-w-0">
+                <b id="uninformedBannerTitle">Uninformed absence flagged</b>
+                <span id="uninformedBannerMeta"></span>
+              </div>
+              <button type="button" id="uninformedBannerViewBtn" class="link">Resolve</button>
+            </div>
+
+            <!-- Stats summary -->
+            <div class="rounded-xl border border-slate-200 bg-white p-3.5">
+              <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2.5">Leave activity</div>
+              <div class="grid grid-cols-3 gap-2 mb-2">
+                <div class="an-kpi stat-tile stat-all">
+                  <div class="an-kpi-label"><i></i>Total</div>
+                  <div id="myLeavesKpiTotal" class="an-kpi-value">0</div>
+                </div>
+                <div class="an-kpi stat-tile stat-ok">
+                  <div class="an-kpi-label"><i></i>Approved</div>
+                  <div id="myLeavesKpiApproved" class="an-kpi-value">0</div>
+                </div>
+                <div class="an-kpi stat-tile stat-no">
+                  <div class="an-kpi-label"><i></i>Rejected</div>
+                  <div id="myLeavesKpiRejected" class="an-kpi-value">0</div>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2 mb-4">
+                <div class="an-kpi stat-tile stat-wait">
+                  <div class="an-kpi-label"><i></i>Pending</div>
+                  <div id="myLeavesKpiPending" class="an-kpi-value">0</div>
+                </div>
+                <div class="an-kpi stat-tile stat-neutral">
+                  <div class="an-kpi-label"><i></i>Withdrawn</div>
+                  <div id="myLeavesKpiWithdrawn" class="an-kpi-value">0</div>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
+                <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">By quarter <span class="text-slate-400 normal-case font-medium">&middot; tap to filter history</span></div>
+                <div id="myLeavesYearChips" class="flex gap-1.5 flex-wrap"></div>
+              </div>
+              <div id="myLeavesQuarterTiles" class="qs mb-4"></div>
+
+              <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Monthly trend</div>
+              <div class="lv-chart-wrap"><canvas id="myLeavesTrendChart"></canvas></div>
+            </div>
           </div>
-          <div class="an-kpi stat-tile stat-no">
-            <div class="an-kpi-label"><i></i>Rejected</div>
-            <div id="myLeavesKpiRejected" class="an-kpi-value">0</div>
+
+          <!-- Full history -->
+          <div id="myLeavesHistorySection" class="hidden">
+            <div id="myLeavesHistoryFilters" class="hfilter mb-2.5"></div>
+            <div id="myLeavesList"></div>
+          </div>
+
           </div>
         </div>
-        <div class="grid grid-cols-2 gap-2 mb-4">
-          <div class="an-kpi stat-tile stat-wait">
-            <div class="an-kpi-label"><i></i>Pending</div>
-            <div id="myLeavesKpiPending" class="an-kpi-value">0</div>
-          </div>
-          <div class="an-kpi stat-tile stat-neutral">
-            <div class="an-kpi-label"><i></i>Withdrawn</div>
-            <div id="myLeavesKpiWithdrawn" class="an-kpi-value">0</div>
+
+        <div id="myLeavesApplyWrap" class="flex-1 min-w-0 overflow-y-auto hidden">
+          <div class="dcols">
+            <div class="dcol dcol-l">
+              <div class="blk">
+                <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Leave type</div>
+                <div class="chips2">
+                  <button type="button" id="leaveCategoryForeignTripBtn" data-category="foreignTrip" data-t="foreign" class="tchip">
+                    <span class="swatch"></span><span class="nm">Foreign Trip</span><span class="hint">Travel abroad</span>
+                  </button>
+                  <button type="button" id="leaveCategoryUmrahBtn" data-category="umrah" data-t="umrah" class="tchip">
+                    <span class="swatch"></span><span class="nm">Umrah</span><span class="hint">Pilgrimage</span>
+                  </button>
+                  <button type="button" id="leaveCategoryMedicalBtn" data-category="medical" data-t="medical" class="tchip">
+                    <span class="swatch"></span><span class="nm">Medical</span><span class="hint">Health related</span>
+                  </button>
+                  <button type="button" id="leaveCategoryCasualBtn" data-category="casual" data-t="casual" class="tchip">
+                    <span class="swatch"></span><span class="nm">Casual</span><span class="hint">Personal time</span>
+                  </button>
+                </div>
+                <div id="leaveCasualSubRow" class="hidden nest">
+                  <div class="cap">CASUAL LEAVE DURATION <span class="text-red-500">*</span></div>
+                  <div class="dseg">
+                    <button type="button" id="leaveTypeShortBtn" data-type="casualShort" data-d="short" class="dopt"><b>Short Leave</b><span>Part of the day</span></button>
+                    <button type="button" id="leaveTypeFullBtn" data-type="casualFull" data-d="full" class="dopt"><b>Full Leave</b><span>Whole day off</span></button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="blk">
+                <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Date(s)</div>
+                <div class="seg">
+                  <button type="button" id="leaveDateModeSingleBtn" data-mode="single">Single Date</button>
+                  <button type="button" id="leaveDateModeRangeBtn" data-mode="range">Date Range</button>
+                  <button type="button" id="leaveDateModeCustomBtn" data-mode="multiple">Custom</button>
+                </div>
+                <div class="cal-host">
+                  <input type="text" id="leaveDateRangeInput" readonly placeholder="Select a date" />
+                  <div id="leaveShortTimePicker" class="time-picker hidden">
+                    <div class="tp-label">Half-day starts at</div>
+                    <div class="tp-slider" id="leaveTimeSlider">
+                      <div class="tp-track"><div class="tp-ticks" id="leaveTimeTicks"></div></div>
+                      <div class="tp-handle" id="leaveTimeHandle"><span id="leaveTimeHandleLabel">7:00</span></div>
+                    </div>
+                    <div class="tp-controls">
+                      <button type="button" class="tp-step" id="leaveTimeMinusBtn" aria-label="5 minutes earlier">&minus;</button>
+                      <input type="text" id="leaveTimeInput" class="tp-input" inputmode="numeric" aria-label="Time" value="7:00 AM" />
+                      <button type="button" class="tp-step" id="leaveTimePlusBtn" aria-label="5 minutes later">+</button>
+                      <div class="tp-ampm-seg">
+                        <button type="button" id="leaveTimeAmBtn" class="tp-ampm-btn is-selected">AM</button>
+                        <button type="button" id="leaveTimePmBtn" class="tp-ampm-btn">PM</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div id="leaveDatePicked" class="picked hidden">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C2410C" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+                  <b id="leaveDatePickedLabel"></b><span id="leaveDatePickedMeta"></span>
+                </div>
+                <p id="leaveDateRangeError" class="hidden mt-1 text-xs text-red-600"></p>
+              </div>
+            </div>
+
+            <div class="dcol dcol-r">
+              <div class="blk">
+                <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Attachments <span class="text-slate-400 normal-case font-medium">&middot; optional</span></div>
+                <input type="file" id="leaveAttachmentInput" class="hidden" multiple
+                  accept=".pdf,.txt,.doc,.docx,.zip,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/zip,application/x-zip-compressed" />
+                <label for="leaveAttachmentInput" id="leaveAttachmentDrop" class="drop">
+                  <b>Drop files here or <em>browse</em></b>
+                  <p>PDF, DOC, DOCX, TXT, or ZIP &middot; max 8MB each, up to 5 files</p>
+                </label>
+                <div id="leaveAttachmentList" class="hidden files"></div>
+                <p id="leaveAttachmentCountNote" class="hidden cap-note"></p>
+                <p id="leaveAttachmentError" class="hidden mt-1 text-xs text-red-600"></p>
+              </div>
+
+              <div class="blk blk-fill">
+                <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Reason</div>
+                <div id="leaveToolbar" class="flex flex-wrap items-center gap-0.5 px-2 py-1.5 rounded-t-lg border border-slate-300 border-b-0 bg-slate-50">
+                  <button type="button" data-cmd="bold"          class="tb-btn" title="Bold (Ctrl+B)"><b>B</b></button>
+                  <button type="button" data-cmd="italic"        class="tb-btn" title="Italic (Ctrl+I)"><i>I</i></button>
+                  <button type="button" data-cmd="underline"     class="tb-btn" title="Underline (Ctrl+U)"><u>U</u></button>
+                  <button type="button" data-cmd="strikethrough" class="tb-btn" title="Strikethrough"><s>S</s></button>
+                  <span class="w-px h-5 bg-slate-300 mx-1 sm:mx-1.5" aria-hidden="true"></span>
+                  <button type="button" data-color-action="foreColor" class="tb-btn tb-color-btn" title="Text colour" aria-label="Text colour">
+                    <span class="tb-color-letter">A</span>
+                    <span class="tb-color-bar" style="background-color: #1e293b;"></span>
+                  </button>
+                  <button type="button" data-color-action="hiliteColor" class="tb-btn tb-color-btn" title="Highlight" aria-label="Highlight">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M12 20h9"/>
+                      <path d="M16.5 3.5l4 4-10 10H6.5v-4l10-10z"/>
+                    </svg>
+                    <span class="tb-color-bar" style="background-color: #fde047;"></span>
+                  </button>
+                  <span class="w-px h-5 bg-slate-300 mx-1 sm:mx-1.5" aria-hidden="true"></span>
+                  <button type="button" data-cmd="insertUnorderedList" class="tb-btn" title="Bulleted list" aria-label="Bulleted list">
+                    <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><circle cx="3" cy="5" r="1.5"/><circle cx="3" cy="10" r="1.5"/><circle cx="3" cy="15" r="1.5"/><rect x="7" y="4" width="11" height="2" rx="1"/><rect x="7" y="9" width="11" height="2" rx="1"/><rect x="7" y="14" width="11" height="2" rx="1"/></svg>
+                  </button>
+                  <button type="button" data-cmd="insertOrderedList" class="tb-btn" title="Numbered list" aria-label="Numbered list">
+                    <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><text x="0" y="7" font-size="6" font-weight="700">1.</text><text x="0" y="13" font-size="6" font-weight="700">2.</text><text x="0" y="19" font-size="6" font-weight="700">3.</text><rect x="7" y="4" width="11" height="2" rx="1"/><rect x="7" y="9" width="11" height="2" rx="1"/><rect x="7" y="14" width="11" height="2" rx="1"/></svg>
+                  </button>
+                </div>
+                <div id="leaveReasonEditor" class="cell-editor lv-reason-editor rich-text border border-t-0 border-slate-300 rounded-b-lg" contenteditable="true" data-placeholder="Describe your reason for leave..."></div>
+              </div>
+            </div>
           </div>
         </div>
-
-        <div class="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
-          <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">By quarter <span class="text-slate-400 normal-case font-medium">&middot; tap to filter history</span></div>
-          <div id="myLeavesYearChips" class="flex gap-1.5 flex-wrap"></div>
-        </div>
-        <div id="myLeavesQuarterTiles" class="qs mb-4"></div>
-
-        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Monthly trend</div>
-        <div class="lv-chart-wrap"><canvas id="myLeavesTrendChart"></canvas></div>
-      </div>
-
-      <!-- Full history -->
-      <div>
-        <div id="myLeavesHistoryFilters" class="hfilter mb-2.5"></div>
-        <div id="myLeavesList"></div>
-      </div>
-
       </div>
     </div>
+
+    <footer id="myLeavesApplyFooter" class="hidden px-4 sm:px-5 py-3 border-t border-slate-100 bg-slate-50/60 flex items-center gap-3 shrink-0">
+      <div id="leaveSummaryChips" class="summary"></div>
+      <button type="button" id="leaveCancelBtn"
+        class="shrink-0 px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-400 transition">
+        Cancel
+      </button>
+      <button type="button" id="leaveSendBtn"
+        class="shrink-0 px-4 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold shadow-sm hover:bg-orange-700 active:bg-orange-800 transition">
+        Send
+      </button>
+    </footer>
   </aside>
 
   <!-- ============ RESOLVE UNINFORMED LEAVE DRAWER ============

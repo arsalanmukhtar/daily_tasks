@@ -109,10 +109,6 @@ const closeDrawerBtn     = document.getElementById('closeDrawerBtn');
 const submissionsList    = document.getElementById('submissionsList');
 const applyLeaveBtn      = document.getElementById('applyLeaveBtn');
 const applyLeaveBtnLabel = document.getElementById('applyLeaveBtnLabel');
-const leaveBackdrop      = document.getElementById('leaveBackdrop');
-const leaveDrawer        = document.getElementById('leaveDrawer');
-const leaveDrawerWeekLabel = document.getElementById('leaveDrawerWeekLabel');
-const closeLeaveDrawerBtn = document.getElementById('closeLeaveDrawerBtn');
 const leaveCategoryForeignTripBtn = document.getElementById('leaveCategoryForeignTripBtn');
 const leaveCategoryUmrahBtn       = document.getElementById('leaveCategoryUmrahBtn');
 const leaveCategoryMedicalBtn     = document.getElementById('leaveCategoryMedicalBtn');
@@ -120,7 +116,6 @@ const leaveCategoryCasualBtn      = document.getElementById('leaveCategoryCasual
 const leaveCasualSubRow  = document.getElementById('leaveCasualSubRow');
 const leaveTypeShortBtn  = document.getElementById('leaveTypeShortBtn');
 const leaveTypeFullBtn   = document.getElementById('leaveTypeFullBtn');
-const leaveFullCooldownNote = document.getElementById('leaveFullCooldownNote');
 const leaveDateModeSingleBtn = document.getElementById('leaveDateModeSingleBtn');
 const leaveDateModeRangeBtn  = document.getElementById('leaveDateModeRangeBtn');
 const leaveDateModeCustomBtn = document.getElementById('leaveDateModeCustomBtn');
@@ -128,7 +123,6 @@ const leaveDateRangeInput = document.getElementById('leaveDateRangeInput');
 const leaveDateRangeError = document.getElementById('leaveDateRangeError');
 const leaveToolbar       = document.getElementById('leaveToolbar');
 const leaveReasonEditor  = document.getElementById('leaveReasonEditor');
-const leaveBackBtn       = document.getElementById('leaveBackBtn');
 const leaveCancelBtn     = document.getElementById('leaveCancelBtn');
 const leaveSendBtn       = document.getElementById('leaveSendBtn');
 const leaveAttachmentInput  = document.getElementById('leaveAttachmentInput');
@@ -138,6 +132,14 @@ const leaveAttachmentError  = document.getElementById('leaveAttachmentError');
 const viewMyLeavesBtn      = document.getElementById('viewMyLeavesBtn');
 const myLeavesBackdrop     = document.getElementById('myLeavesBackdrop');
 const myLeavesDrawer       = document.getElementById('myLeavesDrawer');
+const myLeavesDrawerTitle    = document.getElementById('myLeavesDrawerTitle');
+const myLeavesDrawerSubtitle = document.getElementById('myLeavesDrawerSubtitle');
+const leavesTabRail        = document.getElementById('leavesTabRail');
+const myLeavesOverviewHistoryWrap = document.getElementById('myLeavesOverviewHistoryWrap');
+const myLeavesOverviewSection = document.getElementById('myLeavesOverviewSection');
+const myLeavesHistorySection  = document.getElementById('myLeavesHistorySection');
+const myLeavesApplyWrap    = document.getElementById('myLeavesApplyWrap');
+const myLeavesApplyFooter  = document.getElementById('myLeavesApplyFooter');
 const myLeavesLoading      = document.getElementById('myLeavesLoading');
 const myLeavesContent      = document.getElementById('myLeavesContent');
 const closeMyLeavesDrawerBtn = document.getElementById('closeMyLeavesDrawerBtn');
@@ -811,7 +813,6 @@ function refreshWeekSummary() {
 // Backed directly by Firestore's leaveRequests collection - the manager
 // approves/rejects from the native Android app. The button/panel only ever
 // reflects what Firestore says - no local state to fall out of sync.
-const LEAVE_FULL_COOLDOWN_DAYS = 7;
 const LEAVE_ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024;
 const LEAVE_ATTACHMENT_MAX_FILES = 5;
 const LEAVE_ATTACHMENT_EXTS = ['.pdf', '.txt', '.doc', '.docx', '.zip'];
@@ -838,9 +839,6 @@ function normalizeLeaveType_(type) {
 }
 function leaveTypeLabel_(type) {
   return LEAVE_TYPES[normalizeLeaveType_(type)] || 'Leave';
-}
-function isFullLeaveType_(type) {
-  return normalizeLeaveType_(type) === 'casualFull';
 }
 // Which mchip colour family a given leave `type` belongs to (mockup
 // .mchip.type-foreign/umrah/medical/casual) - both Casual sub-types share
@@ -940,15 +938,6 @@ async function fetchLeaveStatus_() {
     const snap = await getDocs(query(collection(db, 'leaveRequests'), where('email', '==', email)));
     const allDocs = snap.docs.map(function (d) { return { id: d.id, data: d.data() }; });
 
-    // Cooldown scan includes dismissed rows (matches prior server behavior).
-    let lastFullAt = null;
-    allDocs.forEach(function (entry) {
-      if (isFullLeaveType_(entry.data.type) && entry.data.requestedAt) {
-        const ts = entry.data.requestedAt.toDate ? entry.data.requestedAt.toDate() : new Date(entry.data.requestedAt);
-        if (!lastFullAt || ts > lastFullAt) lastFullAt = ts;
-      }
-    });
-
     function toRecord(entry) {
       const data = entry.data;
       return {
@@ -982,12 +971,10 @@ async function fetchLeaveStatus_() {
       .sort(byNewest);
     const allRecords = allDocs.map(toRecord).sort(byNewest);
 
-    const cooldownUntil = lastFullAt ? new Date(lastFullAt.getTime() + LEAVE_FULL_COOLDOWN_DAYS * 86400000) : null;
     return {
       status: 'ok',
       records: records,
-      allRecords: allRecords,
-      fullLeaveCooldownUntil: cooldownUntil ? cooldownUntil.toISOString() : null
+      allRecords: allRecords
     };
   } catch (_e) { /* offline or backend error - caller keeps the button's prior state */ }
   return null;
@@ -1108,7 +1095,6 @@ function selectLeaveCategory_(category) {
 }
 
 function selectLeaveType_(type) {
-  if (leaveTypeFullBtn.disabled && type === 'casualFull') return;
   selectedLeaveType = type;
   leaveTypeShortBtn.classList.toggle('is-selected', type === 'casualShort');
   leaveTypeFullBtn.classList.toggle('is-selected', type === 'casualFull');
@@ -1294,21 +1280,6 @@ function updateLeaveDatePickedSummary_() {
   }
 }
 
-function updateFullLeaveCooldownUI_() {
-  const untilStr = latestLeaveStatusData && latestLeaveStatusData.fullLeaveCooldownUntil;
-  const until = untilStr ? new Date(untilStr) : null;
-  const active = until && !isNaN(until.getTime()) && until.getTime() > Date.now();
-  leaveTypeFullBtn.disabled = !!active;
-  leaveTypeFullBtn.classList.toggle('is-disabled', !!active);
-  if (active) {
-    leaveFullCooldownNote.textContent = 'Full Leave is unavailable until ' + fmtFull(until) + ' (once every ' + LEAVE_FULL_COOLDOWN_DAYS + ' days).';
-    leaveFullCooldownNote.classList.remove('hidden');
-    if (selectedLeaveType === 'casualFull') selectLeaveType_('casualShort');
-  } else {
-    leaveFullCooldownNote.classList.add('hidden');
-  }
-}
-
 function resetLeaveAttachment_() {
   leaveAttachmentFiles = [];
   leaveAttachmentInput.value = '';
@@ -1396,39 +1367,56 @@ function selectLeaveDateMode_(mode) {
   updateLeaveDrawerSummaryChips_();
 }
 
-async function openLeaveDrawer() {
+// ---------- My Leaves drawer: My Leaves / History / Apply for Leave tabs ----------
+// One drawer, one backdrop - the three sections used to be a "My Leaves"
+// drawer plus a wholly separate "Apply for Leave" drawer you reached via a
+// Back-and-forth round trip. They're now three tabs of the same panel,
+// switched by the icon rail; applyLeaveBtn lives inside the My Leaves tab
+// and just switches tabs instead of closing one drawer to open another.
+const LEAVES_TAB_COPY = {
+  overview: ['My Leaves', 'Apply, track approvals, and review your leave history.'],
+  history: ['Leave History', 'Every request you have ever submitted.'],
+  apply: ['Apply for Leave', 'Pick a type, date(s), and reason.']
+};
+let leavesActiveTab_ = 'overview';
+
+function switchLeavesTab_(tab) {
+  leavesActiveTab_ = tab;
+  leavesTabRail.querySelectorAll('.leaves-rail-btn').forEach(function (btn) {
+    btn.classList.toggle('is-active', btn.dataset.tab === tab);
+  });
+  myLeavesOverviewHistoryWrap.classList.toggle('hidden', tab === 'apply');
+  myLeavesApplyWrap.classList.toggle('hidden', tab !== 'apply');
+  myLeavesOverviewSection.classList.toggle('hidden', tab === 'history');
+  myLeavesHistorySection.classList.toggle('hidden', tab !== 'history');
+  myLeavesApplyFooter.classList.toggle('hidden', tab !== 'apply');
+  const copy = LEAVES_TAB_COPY[tab];
+  myLeavesDrawerTitle.textContent = copy[0];
+  myLeavesDrawerSubtitle.textContent = copy[1];
+  if (tab !== 'apply' && activeCell === leaveReasonEditor) activeCell = null;
+}
+
+async function openApplyLeaveTab_() {
   if (!currentUserContext || !weekInput.value) return;
-  closeMyLeavesDrawer();
   leaveReasonEditor.innerHTML = '';
   resetLeaveAttachment_();
   await ensureLeaveDatePicker_();
   selectLeaveDateMode_('single');
   setLeaveTime_(7, 0, 'AM');
   selectLeaveCategory_('casual');
-  leaveDrawer.classList.add('open');
-  leaveBackdrop.classList.add('open');
+  switchLeavesTab_('apply');
   // Focus immediately so activeCell/activeToolbarEl point at this editor
   // before the user can touch the toolbar - otherwise a stale activeCell
   // from the task table would silently take the formatting instead.
   leaveReasonEditor.focus();
-  // Cooldown check should reflect the very latest state, not whatever the
-  // last periodic poll happened to catch.
   await refreshApplyLeaveButton();
-  updateFullLeaveCooldownUI_();
 }
-
-function closeLeaveDrawer() {
-  leaveDrawer.classList.remove('open');
-  leaveBackdrop.classList.remove('open');
-  if (activeCell === leaveReasonEditor) activeCell = null;
-}
-
-// ---------- My Leaves drawer: stats summary + full history ----------
 
 async function openMyLeavesDrawer() {
   if (!currentUserContext) return;
   myLeavesDrawer.classList.add('open');
   myLeavesBackdrop.classList.add('open');
+  switchLeavesTab_('overview');
   // Start from a clean filter state each time the drawer is opened.
   myLeavesHistoryFilter = 'all';
   myLeavesSelectedQuarter = null;
@@ -1514,8 +1502,7 @@ function renderUninformedBanner_(report) {
 let currentUninformedReport = null;
 
 function openUninformedResolveDrawer_(report) {
-  // Only one drawer open at a time, same convention as openLeaveDrawer()
-  // closing My Leaves before opening on top of it.
+  // Only one drawer open at a time - close My Leaves before opening on top of it.
   closeMyLeavesDrawer();
   currentUninformedReport = report;
   const d = report.date && report.date.toDate ? report.date.toDate() : null;
@@ -1869,7 +1856,7 @@ function renderMyLeaveCard_(rec) {
   if (rec.status === 'withdrawn') {
     const daysLeft = daysUntilPermanentDeletion_(rec);
     if (daysLeft !== null) {
-      expiryNoticeHtml = '<div class="lv-expiry-notice">This withdrawn request will be permanently deleted after ' +
+      expiryNoticeHtml = '<div class="lv-expiry-notice">Deletes permanently in ' +
         daysLeft + (daysLeft === 1 ? ' day' : ' days') + '.</div>';
     }
   }
@@ -1944,17 +1931,20 @@ function showToast_(message, tone) {
   }, 3000);
 }
 
-applyLeaveBtn.addEventListener('click', openLeaveDrawer);
-closeLeaveDrawerBtn.addEventListener('click', closeLeaveDrawer);
-leaveBackdrop.addEventListener('click', closeLeaveDrawer);
-leaveCancelBtn.addEventListener('click', closeLeaveDrawer);
-leaveBackBtn.addEventListener('click', () => {
-  closeLeaveDrawer();
-  openMyLeavesDrawer();
+applyLeaveBtn.addEventListener('click', openApplyLeaveTab_);
+leaveCancelBtn.addEventListener('click', () => switchLeavesTab_('overview'));
+leavesTabRail.addEventListener('click', (e) => {
+  const btn = e.target.closest('.leaves-rail-btn');
+  if (!btn || btn.dataset.tab === leavesActiveTab_) return;
+  if (btn.dataset.tab === 'apply') openApplyLeaveTab_();
+  else switchLeavesTab_(btn.dataset.tab);
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && leaveDrawer.classList.contains('open')) closeLeaveDrawer();
-  if (e.key === 'Escape' && myLeavesDrawer.classList.contains('open')) closeMyLeavesDrawer();
+  if (e.key === 'Escape' && myLeavesDrawer.classList.contains('open')) {
+    // Back out one level at a time - out of the form first, then the panel.
+    if (leavesActiveTab_ === 'apply') switchLeavesTab_('overview');
+    else closeMyLeavesDrawer();
+  }
   if (e.key === 'Escape' && uninformedResolveDrawer.classList.contains('open')) closeUninformedResolveDrawer_();
 });
 
@@ -2209,9 +2199,10 @@ leaveSendBtn.addEventListener('click', async () => {
       }
     }
 
-    closeLeaveDrawer();
+    switchLeavesTab_('overview');
     showToast_('Leave Request Sent', 'success');
     refreshApplyLeaveButton();
+    loadMyLeavesData_();
   } catch (err) {
     showToast_('Could not send leave request: ' + err.message, 'error');
   } finally {
@@ -2559,7 +2550,6 @@ function showLoading()  {
   closeExportModal();
   closeAnalyticsPanel();
   submissionsDrawer.classList.remove('open'); submissionsBackdrop.classList.remove('open');
-  leaveDrawer.classList.remove('open'); leaveBackdrop.classList.remove('open');
   myLeavesDrawer.classList.remove('open'); myLeavesBackdrop.classList.remove('open');
   applyLeaveBtn.classList.add('hidden');
 }
@@ -2574,7 +2564,6 @@ function showAuthGate(errMsg) {
   closeExportModal();
   closeAnalyticsPanel();
   submissionsDrawer.classList.remove('open'); submissionsBackdrop.classList.remove('open');
-  leaveDrawer.classList.remove('open'); leaveBackdrop.classList.remove('open');
   myLeavesDrawer.classList.remove('open'); myLeavesBackdrop.classList.remove('open');
   applyLeaveBtn.classList.add('hidden');
   if (errMsg) { authError.textContent = errMsg; authError.classList.remove('hidden'); }

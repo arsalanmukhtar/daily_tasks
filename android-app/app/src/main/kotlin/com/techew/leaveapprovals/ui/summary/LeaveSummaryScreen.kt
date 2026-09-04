@@ -311,7 +311,7 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                     if (index > 0) Box(Modifier.height(10.dp))
                                     val count = typeCounts[type] ?: 0
                                     val (barColor, _) = durationColors(type)
-                                    TypeBarRow(LeaveType.label(type), count, maxTypeCount, barColor)
+                                    TypeBarRow(LeaveType.shortLabel(type), count, maxTypeCount, barColor)
                                 }
                             }
                         }
@@ -625,6 +625,7 @@ private fun TypeBarRow(label: String, count: Int, maxCount: Int, barColor: Color
         Text(
             label,
             style = MaterialTheme.typography.bodySmall,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(90.dp)
         )
