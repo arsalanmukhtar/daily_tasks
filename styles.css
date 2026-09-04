@@ -33,6 +33,17 @@
   --sh-3: -18px 0 48px rgba(15, 23, 42, .16);
 }
 
+/* Global thin scrollbars - 2px everywhere, no end-arrow buttons. Overrides
+   the browser default rather than any one element, so every scrollable
+   panel in the app (drawers, dropdowns, tables) picks it up automatically. */
+* { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+*::-webkit-scrollbar { width: 2px; height: 2px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 2px; }
+*::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+*::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+*::-webkit-scrollbar-corner { background: transparent; }
+
 html,
 body,
 button,
@@ -643,15 +654,6 @@ textarea {
 .leaves-rail-btn:hover { background: #fff; color: var(--ink-600); }
 .leaves-rail-btn.is-active { background: var(--brand-600); color: #fff; box-shadow: 0 2px 6px rgba(194, 65, 12, .3); }
 
-/* Match Quill's scrollbar tint inside the drawer list */
-#submissionsList::-webkit-scrollbar { width: 5px; }
-#submissionsList::-webkit-scrollbar-track { background: transparent; }
-#submissionsList::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 4px;
-}
-#submissionsList::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
-
 /* ---------- Custom designation dropdown ---------- */
 .select-pro-trigger {
   cursor: pointer;
@@ -822,14 +824,6 @@ textarea {
 }
 .ew-option.is-selected .ew-option-check { opacity: 1; }
 
-.ew-panel::-webkit-scrollbar { width: 5px; }
-.ew-panel::-webkit-scrollbar-track { background: transparent; }
-.ew-panel::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border: 2px solid #ffffff;
-  border-radius: 5px;
-}
-.ew-panel::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
 
 /* ---------- Export modal: in-progress status ----------
    While an export runs, the status area is a centred column - a line of text
@@ -1177,13 +1171,6 @@ textarea {
   overflow-x: hidden;
   padding: 0.55rem 0.4rem 0.4rem;
 }
-.an-custom-list::-webkit-scrollbar { width: 5px; }
-.an-custom-list::-webkit-scrollbar-track { background: transparent; }
-.an-custom-list::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 999px; }
-.an-custom-list::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
-/* Firefox */
-.an-custom-list { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
-
 .an-custom-divider {
   height: 1px;
   background: #f1f5f9;
@@ -1217,6 +1204,9 @@ textarea {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .an-kpi-value {
   /* Archivo Narrow only ships up to weight 700 (no 800/900 cut), so the
@@ -1546,7 +1536,7 @@ textarea {
   box-shadow: inset 0 0 0 1.5px #94a3b8;
 }
 
-.lv-chart-wrap { height: 11rem; }
+.lv-chart-wrap { position: relative; min-height: 11rem; }
 
 .lv-metrics-filter { display: flex; gap: 0.4rem; margin-bottom: 0.65rem; }
 .lv-filter-btn {
@@ -1836,6 +1826,23 @@ textarea {
 .picked svg { flex-shrink: 0; }
 .picked b { font-size: 12.5px; color: var(--brand-800); }
 .picked span { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--brand-700); white-space: nowrap; }
+.picked:has(#leaveDatePickedChips:not(.hidden)) { cursor: pointer; }
+.picked:has(#leaveDatePickedChips:not(.hidden)):hover { border-color: var(--brand-600); }
+
+/* Custom-mode picked-dates chips - a fixed-height, never-wrapping strip
+   (horizontally scrollable if it overflows) so the Date(s) card's height
+   never grows no matter how many dates are selected. */
+.date-chip-row { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; overflow-x: auto; }
+.date-chip {
+  flex-shrink: 0; white-space: nowrap; font-size: 10.5px; font-weight: 700; color: var(--brand-800);
+  background: #fff; border: 1px solid var(--brand-200); border-radius: 999px; padding: 2px 8px;
+}
+.date-chip.more { color: #fff; background: var(--brand-600); border-color: var(--brand-600); }
+
+.custom-date-row {
+  font-size: 12.5px; font-weight: 600; color: var(--ink-700);
+  padding: 8px 10px; border-radius: var(--r-md); background: var(--surface-2);
+}
 
 /* Attachments */
 .drop {
@@ -1906,6 +1913,14 @@ textarea {
 .an-kpi.stat-neutral { background: var(--meta-bg); border-color: var(--meta-bd); }
 .an-kpi.stat-neutral .an-kpi-value { color: var(--meta); }
 .an-kpi.stat-neutral .an-kpi-label i { background: var(--meta); }
+
+/* Five tiles in one row is tighter than this component was designed for -
+   trim padding/label size/icon-gap here only, so the other .an-kpi users
+   (Analytics panel) keep their original sizing. */
+.lv-kpi-grid .an-kpi { padding: 0.55rem 0.4rem; }
+.lv-kpi-grid .an-kpi-label { font-size: 8.5px; gap: 3px; }
+.lv-kpi-grid .an-kpi-label i { width: 5px; height: 5px; }
+.lv-kpi-grid .an-kpi-value { font-size: 1.05rem; }
 
 /* Quarter tiles + approve/reject progress bar */
 .qs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }

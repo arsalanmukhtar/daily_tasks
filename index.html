@@ -427,9 +427,9 @@
             <p>Loading your leave activity&hellip;</p>
           </div>
 
-          <div id="myLeavesContent" class="hidden space-y-5">
+          <div id="myLeavesContent" class="hidden space-y-5 min-h-full flex flex-col">
 
-          <div id="myLeavesOverviewSection" class="space-y-5">
+          <div id="myLeavesOverviewSection" class="space-y-5 flex flex-col flex-1 min-h-0">
             <!-- Apply for Leave - state-aware button, tied to the week picked on
                  the main form (applyLeaveBtn/applyLeaveBtnLabel ids are read by
                  app.js's refreshApplyLeaveButton(), unchanged from before). -->
@@ -459,7 +459,7 @@
                  resolution drawer, same as the emailed "Resolve the Issue" link. -->
             <div id="uninformedBanner" class="banner hidden">
               <div class="bic">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
               </div>
               <div class="min-w-0">
                 <b id="uninformedBannerTitle">Uninformed absence flagged</b>
@@ -468,10 +468,12 @@
               <button type="button" id="uninformedBannerViewBtn" class="link">Resolve</button>
             </div>
 
-            <!-- Stats summary -->
-            <div class="rounded-xl border border-slate-200 bg-white p-3.5">
+            <!-- Stats summary - flex-1/min-h-0 so it absorbs whatever height
+                 the apply-button block and banners above leave spare, and the
+                 chart (also flex-1) gets the remainder of that. -->
+            <div class="rounded-xl border border-slate-200 bg-white p-3.5 flex flex-col flex-1 min-h-0">
               <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2.5">Leave activity</div>
-              <div class="grid grid-cols-3 gap-2 mb-2">
+              <div class="lv-kpi-grid grid grid-cols-3 sm:grid-cols-5 gap-2 mb-4">
                 <div class="an-kpi stat-tile stat-all">
                   <div class="an-kpi-label"><i></i>Total</div>
                   <div id="myLeavesKpiTotal" class="an-kpi-value">0</div>
@@ -484,8 +486,6 @@
                   <div class="an-kpi-label"><i></i>Rejected</div>
                   <div id="myLeavesKpiRejected" class="an-kpi-value">0</div>
                 </div>
-              </div>
-              <div class="grid grid-cols-2 gap-2 mb-4">
                 <div class="an-kpi stat-tile stat-wait">
                   <div class="an-kpi-label"><i></i>Pending</div>
                   <div id="myLeavesKpiPending" class="an-kpi-value">0</div>
@@ -503,7 +503,7 @@
               <div id="myLeavesQuarterTiles" class="qs mb-4"></div>
 
               <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Monthly trend</div>
-              <div class="lv-chart-wrap"><canvas id="myLeavesTrendChart"></canvas></div>
+              <div class="lv-chart-wrap flex-1 min-h-0"><canvas id="myLeavesTrendChart"></canvas></div>
             </div>
           </div>
 
@@ -570,9 +570,12 @@
                     </div>
                   </div>
                 </div>
-                <div id="leaveDatePicked" class="picked hidden">
+                <div id="leaveDatePicked" class="picked hidden" title="Click to see all selected dates">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C2410C" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
-                  <b id="leaveDatePickedLabel"></b><span id="leaveDatePickedMeta"></span>
+                  <div id="leaveDatePickedSingle" class="min-w-0">
+                    <b id="leaveDatePickedLabel"></b><span id="leaveDatePickedMeta"></span>
+                  </div>
+                  <div id="leaveDatePickedChips" class="hidden date-chip-row"></div>
                 </div>
                 <p id="leaveDateRangeError" class="hidden mt-1 text-xs text-red-600"></p>
               </div>
@@ -713,6 +716,29 @@
         Submit
       </button>
     </footer>
+  </aside>
+
+  <!-- ============ CUSTOM DATES POPUP ============
+       Opened by clicking the picked-dates strip when Custom mode has more
+       dates selected than fit inline - a plain scrollable list, layered
+       above the Apply-for-Leave tab rather than replacing it, so the
+       Date(s) card's own height never has to grow to fit the full list. -->
+  <div id="customDatesBackdrop" class="drawer-backdrop fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60]"></div>
+  <aside id="customDatesPopup" class="drawer-panel fixed top-0 right-0 h-full w-full sm:w-72 max-w-full bg-white shadow-2xl ring-1 ring-slate-200 z-[70] flex flex-col">
+    <header class="px-4 py-3.5 border-b border-slate-200 flex items-start justify-between gap-3 shrink-0 bg-gradient-to-r from-slate-50 to-orange-50/60">
+      <div class="min-w-0">
+        <h2 class="text-sm font-semibold text-slate-800">Selected dates</h2>
+        <p id="customDatesPopupCount" class="text-xs text-slate-500 mt-0.5">-</p>
+      </div>
+      <button type="button" id="closeCustomDatesPopupBtn"
+        class="text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition p-1.5 rounded-md shrink-0"
+        aria-label="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </header>
+    <div id="customDatesPopupList" class="flex-1 overflow-y-auto p-3 space-y-1.5"></div>
   </aside>
 
   <!-- ============ TOAST NOTIFICATIONS ============ -->

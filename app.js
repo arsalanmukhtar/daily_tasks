@@ -192,8 +192,15 @@ const leaveTimePlusBtn     = document.getElementById('leaveTimePlusBtn');
 const leaveTimeAmBtn       = document.getElementById('leaveTimeAmBtn');
 const leaveTimePmBtn       = document.getElementById('leaveTimePmBtn');
 const leaveDatePicked       = document.getElementById('leaveDatePicked');
+const leaveDatePickedSingle = document.getElementById('leaveDatePickedSingle');
 const leaveDatePickedLabel  = document.getElementById('leaveDatePickedLabel');
 const leaveDatePickedMeta   = document.getElementById('leaveDatePickedMeta');
+const leaveDatePickedChips  = document.getElementById('leaveDatePickedChips');
+const customDatesBackdrop      = document.getElementById('customDatesBackdrop');
+const customDatesPopup         = document.getElementById('customDatesPopup');
+const customDatesPopupCount    = document.getElementById('customDatesPopupCount');
+const customDatesPopupList     = document.getElementById('customDatesPopupList');
+const closeCustomDatesPopupBtn = document.getElementById('closeCustomDatesPopupBtn');
 const leaveSummaryChips      = document.getElementById('leaveSummaryChips');
 const leaveAttachmentCountNote = document.getElementById('leaveAttachmentCountNote');
 const toastContainer     = document.getElementById('toastContainer');
@@ -1265,19 +1272,50 @@ function updateLeaveDatePickedSummary_() {
   const start = leaveSelectedDates[0];
   const end = leaveSelectedDates[leaveSelectedDates.length - 1];
   if (leaveDateMode === 'multiple' && leaveSelectedDates.length > 1) {
-    const MAX_LISTED = 4;
-    const listed = leaveSelectedDates.slice(0, MAX_LISTED).map(fmtDateLocal_).join(', ');
-    const extra = leaveSelectedDates.length - MAX_LISTED;
-    leaveDatePickedLabel.textContent = listed + (extra > 0 ? ' +' + extra + ' more' : '');
-    leaveDatePickedMeta.textContent = leaveSelectedDates.length + ' dates';
+    // Chips, not the label/meta pair - a fixed-height, never-wrapping strip
+    // regardless of how many dates are picked (see the "+N more" chip,
+    // clickable to open the full scrollable list in a side popup).
+    leaveDatePickedSingle.classList.add('hidden');
+    leaveDatePickedChips.classList.remove('hidden');
+    const MAX_CHIPS = 4;
+    const shortFmt = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    const extra = leaveSelectedDates.length - MAX_CHIPS;
+    leaveDatePickedChips.innerHTML =
+      leaveSelectedDates.slice(0, MAX_CHIPS).map((d) => '<span class="date-chip">' + escapeHtml(shortFmt(d)) + '</span>').join('') +
+      (extra > 0 ? '<span class="date-chip more">+' + extra + ' more</span>' : '');
   } else if (leaveDateMode === 'range' && leaveSelectedDates.length > 1) {
+    leaveDatePickedChips.classList.add('hidden');
+    leaveDatePickedSingle.classList.remove('hidden');
     const days = Math.round((end - start) / 86400000) + 1;
     leaveDatePickedLabel.textContent = fmtDateLocal_(start) + ' – ' + fmtDateLocal_(end);
     leaveDatePickedMeta.textContent = days + (days === 1 ? ' day' : ' days');
   } else {
+    leaveDatePickedChips.classList.add('hidden');
+    leaveDatePickedSingle.classList.remove('hidden');
     leaveDatePickedLabel.textContent = fmtDateLocal_(start);
     leaveDatePickedMeta.textContent = weekLabelFromDate_(start);
   }
+}
+
+// ---------- Custom dates popup ----------
+// Opened by clicking the picked-dates strip while in Custom mode - a plain
+// scrollable readout of every selected date, kept entirely separate from the
+// Date(s) card so that card's height never depends on how many are picked.
+function openCustomDatesPopup_() {
+  if (leaveDateMode !== 'multiple' || leaveSelectedDates.length < 2) return;
+  customDatesPopupCount.textContent = leaveSelectedDates.length + ' dates selected';
+  customDatesPopupList.innerHTML = leaveSelectedDates
+    .slice()
+    .sort((a, b) => a - b)
+    .map((d) => '<div class="custom-date-row">' + escapeHtml(fmtDateLocal_(d)) + '</div>')
+    .join('');
+  customDatesPopup.classList.add('open');
+  customDatesBackdrop.classList.add('open');
+}
+
+function closeCustomDatesPopup_() {
+  customDatesPopup.classList.remove('open');
+  customDatesBackdrop.classList.remove('open');
 }
 
 function resetLeaveAttachment_() {
@@ -1676,11 +1714,11 @@ async function renderMyLeavesTrendChart_(records) {
           { label: 'Pending', data: pending, backgroundColor: '#C77A08', hoverBackgroundColor: '#A9670A', stack: 's' }
         ].map(function (ds) {
           return Object.assign(ds, {
-            borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 },
+            borderRadius: 0,
             borderSkipped: false,
-            maxBarThickness: 26,
-            categoryPercentage: 0.62,
-            barPercentage: 0.9
+            maxBarThickness: 22,
+            categoryPercentage: 0.7,
+            barPercentage: 0.92
           });
         })
       },
@@ -1958,6 +1996,13 @@ leaveDateModeSingleBtn.addEventListener('click', () => selectLeaveDateMode_('sin
 leaveDateModeRangeBtn.addEventListener('click', () => selectLeaveDateMode_('range'));
 leaveDateModeCustomBtn.addEventListener('click', () => selectLeaveDateMode_('multiple'));
 initLeaveTimePicker_();
+
+leaveDatePicked.addEventListener('click', openCustomDatesPopup_);
+closeCustomDatesPopupBtn.addEventListener('click', closeCustomDatesPopup_);
+customDatesBackdrop.addEventListener('click', closeCustomDatesPopup_);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && customDatesPopup.classList.contains('open')) closeCustomDatesPopup_();
+});
 
 viewMyLeavesBtn.addEventListener('click', openMyLeavesDrawer);
 closeMyLeavesDrawerBtn.addEventListener('click', closeMyLeavesDrawer);
