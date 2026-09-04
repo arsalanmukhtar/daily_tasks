@@ -193,37 +193,42 @@ const navSubWeeksTag      = document.getElementById('navSubWeeksTag');
 const navSubDraftTag      = document.getElementById('navSubDraftTag');
 const navLeavePendingTag  = document.getElementById('navLeavePendingTag');
 const navLeaveApprovedTag = document.getElementById('navLeaveApprovedTag');
-// Leave drawer: Short Leave's + Out Pass's time selectors (manual stepper +
-// typed input + AM/PM, no slider), inline-calendar picked summary, live
-// footer summary chips, attachment count note.
+// Leave drawer: Short Leave's + Out Pass's timer-selection timelines
+// (timebar-3.html-style scaled bar + stepper/typed-input/AM-PM-wheel
+// controls, no drag slider), inline-calendar picked summary, live footer
+// summary chips, attachment count note.
 const leaveShortTimePicker = document.getElementById('leaveShortTimePicker');
-const leaveTimeInput       = document.getElementById('leaveTimeInput');
-const leaveTimeMinusBtn    = document.getElementById('leaveTimeMinusBtn');
-const leaveTimePlusBtn     = document.getElementById('leaveTimePlusBtn');
-const leaveTimeAmBtn       = document.getElementById('leaveTimeAmBtn');
-const leaveTimePmBtn       = document.getElementById('leaveTimePmBtn');
+const leaveTimeAwayLabel  = document.getElementById('leaveTimeAwayLabel');
+const leaveTimeBlock      = document.getElementById('leaveTimeBlock');
+const leaveTimeBlockTx    = document.getElementById('leaveTimeBlockTx');
+const leaveTimeNow        = document.getElementById('leaveTimeNow');
+const leaveTimeInput      = document.getElementById('leaveTimeInput');
+const leaveTimeMinusBtn   = document.getElementById('leaveTimeMinusBtn');
+const leaveTimePlusBtn    = document.getElementById('leaveTimePlusBtn');
+const leaveTimeWheel      = document.getElementById('leaveTimeWheel');
 const leaveOutPassTimePicker  = document.getElementById('leaveOutPassTimePicker');
 const leaveOutPassTimeError   = document.getElementById('leaveOutPassTimeError');
+const leaveOutAwayLabel   = document.getElementById('leaveOutAwayLabel');
+const leaveOutTimeBlock   = document.getElementById('leaveOutTimeBlock');
+const leaveOutTimeBlockTx = document.getElementById('leaveOutTimeBlockTx');
+const leaveOutTimeNow     = document.getElementById('leaveOutTimeNow');
 const leaveOutCheckOutInput   = document.getElementById('leaveOutCheckOutInput');
 const leaveOutCheckOutMinusBtn = document.getElementById('leaveOutCheckOutMinusBtn');
 const leaveOutCheckOutPlusBtn  = document.getElementById('leaveOutCheckOutPlusBtn');
-const leaveOutCheckOutAmBtn    = document.getElementById('leaveOutCheckOutAmBtn');
-const leaveOutCheckOutPmBtn    = document.getElementById('leaveOutCheckOutPmBtn');
+const leaveOutCheckOutWheel    = document.getElementById('leaveOutCheckOutWheel');
 const leaveOutCheckInInput    = document.getElementById('leaveOutCheckInInput');
 const leaveOutCheckInMinusBtn = document.getElementById('leaveOutCheckInMinusBtn');
 const leaveOutCheckInPlusBtn  = document.getElementById('leaveOutCheckInPlusBtn');
-const leaveOutCheckInAmBtn    = document.getElementById('leaveOutCheckInAmBtn');
-const leaveOutCheckInPmBtn    = document.getElementById('leaveOutCheckInPmBtn');
+const leaveOutCheckInWheel    = document.getElementById('leaveOutCheckInWheel');
+const leaveOutQuick       = document.getElementById('leaveOutQuick');
 const leaveDatePicked       = document.getElementById('leaveDatePicked');
 const leaveDatePickedSingle = document.getElementById('leaveDatePickedSingle');
 const leaveDatePickedLabel  = document.getElementById('leaveDatePickedLabel');
 const leaveDatePickedMeta   = document.getElementById('leaveDatePickedMeta');
-const leaveDatePickedChips  = document.getElementById('leaveDatePickedChips');
-const customDatesBackdrop      = document.getElementById('customDatesBackdrop');
-const customDatesPopup         = document.getElementById('customDatesPopup');
-const customDatesPopupCount    = document.getElementById('customDatesPopupCount');
-const customDatesPopupList     = document.getElementById('customDatesPopupList');
-const closeCustomDatesPopupBtn = document.getElementById('closeCustomDatesPopupBtn');
+const leaveDatesStrip       = document.getElementById('leaveDatesStrip');
+const leaveDatesStripCount  = document.getElementById('leaveDatesStripCount');
+const leaveDatesStripList   = document.getElementById('leaveDatesStripList');
+const leaveDatesStripClearBtn = document.getElementById('leaveDatesStripClearBtn');
 const leaveSummaryChips      = document.getElementById('leaveSummaryChips');
 const leaveAttachmentCountNote = document.getElementById('leaveAttachmentCountNote');
 const toastContainer     = document.getElementById('toastContainer');
@@ -1146,6 +1151,45 @@ function selectLeaveType_(type) {
   leaveShortTimePicker.classList.toggle('hidden', type !== 'casualShort');
   leaveOutPassTimePicker.classList.toggle('hidden', type !== 'casualOutPass');
   leaveOutPassTimeError.classList.add('hidden');
+  // The AM/PM wheel's scroll position doesn't reliably stick while its
+  // picker sits display:none - re-assert it now that the picker being
+  // switched to is actually visible again.
+  if (type === 'casualShort' && leaveShortTimeCtl_) leaveShortTimeCtl_.refresh();
+  if (type === 'casualOutPass') {
+    if (leaveOutCheckOutCtl_) leaveOutCheckOutCtl_.refresh();
+    if (leaveOutCheckInCtl_) leaveOutCheckInCtl_.refresh();
+  }
+  updateLeaveDrawerSummaryChips_();
+}
+
+// Re-applies the current category/type/dates selection's visual state
+// (chip highlights, sub-row visibility, timer visibility, picked-dates
+// summary) without resetting any of it - unlike resetLeaveApplyForm_, which
+// deliberately blanks everything for a fresh request. Needed because the
+// rail can bring the Apply tab into view without ever having painted it
+// before (see switchLeavesTab_) - the state defaults exist from module
+// load, but nothing has reflected them in the DOM yet on that first visit.
+function paintLeaveApplyForm_() {
+  Object.keys(LEAVE_CATEGORY_BTNS).forEach(function (key) {
+    LEAVE_CATEGORY_BTNS[key].classList.toggle('is-selected', key === selectedLeaveCategory);
+  });
+  leaveCasualSubRow.classList.toggle('hidden', selectedLeaveCategory !== 'casual');
+  if (selectedLeaveCategory === 'casual') {
+    leaveTypeShortBtn.classList.toggle('is-selected', selectedLeaveType === 'casualShort');
+    leaveTypeFullBtn.classList.toggle('is-selected', selectedLeaveType === 'casualFull');
+    leaveTypeOutPassBtn.classList.toggle('is-selected', selectedLeaveType === 'casualOutPass');
+    leaveShortTimePicker.classList.toggle('hidden', selectedLeaveType !== 'casualShort');
+    leaveOutPassTimePicker.classList.toggle('hidden', selectedLeaveType !== 'casualOutPass');
+    if (selectedLeaveType === 'casualShort' && leaveShortTimeCtl_) leaveShortTimeCtl_.refresh();
+    if (selectedLeaveType === 'casualOutPass') {
+      if (leaveOutCheckOutCtl_) leaveOutCheckOutCtl_.refresh();
+      if (leaveOutCheckInCtl_) leaveOutCheckInCtl_.refresh();
+    }
+  } else {
+    leaveShortTimePicker.classList.add('hidden');
+    leaveOutPassTimePicker.classList.add('hidden');
+  }
+  updateLeaveDatePickedSummary_();
   updateLeaveDrawerSummaryChips_();
 }
 
@@ -1170,21 +1214,84 @@ function leaveClampTimeToWindow_(t) {
   return leaveTime24ToParts_(total);
 }
 
-// Wires one manual time selector - stepper -/+, typed input, AM/PM toggle,
-// no drag slider. `get`/`set` read and write whichever module-level time
-// value this instance owns, so the same wiring serves Short Leave's single
-// field and Out Pass's independent check-out/check-in fields. Returns
-// { refresh } so callers can force the displayed value back in sync after
-// resetting the underlying state (e.g. reopening the Apply tab).
+// Draws one timer-selection's scaled timeline (timebar-3.html's own visual
+// centerpiece) - the "away" block sized/positioned within the 8:30 AM-
+// 4:30 PM window, a live duration label, and a today's-current-time tick
+// (hidden whenever "now" falls outside office hours).
+function renderLeaveTimeline_(tlCfg) {
+  const startMin = leaveTimeTo24_(tlCfg.getStart());
+  const endMin = leaveTimeTo24_(tlCfg.getEnd());
+  const span = LEAVE_TIME_WINDOW_MAX_ - LEAVE_TIME_WINDOW_MIN_;
+  const pct = function (m) { return Math.max(0, Math.min(1, (m - LEAVE_TIME_WINDOW_MIN_) / span)) * 100; };
+  const bad = endMin <= startMin;
+  const a = pct(startMin), b = pct(endMin);
+  tlCfg.blockEl.style.left = Math.min(a, b) + '%';
+  tlCfg.blockEl.style.width = Math.max(1.2, Math.abs(b - a)) + '%';
+  tlCfg.blockEl.classList.toggle('bad', bad);
+
+  const durMin = endMin - startMin;
+  let durTxt = '';
+  if (durMin > 0) {
+    const h = Math.floor(durMin / 60), m = durMin % 60;
+    durTxt = (h ? h + (h === 1 ? ' hour' : ' hours') : '') + (h && m ? ' ' : '') + (m ? m + ' min' : '');
+  }
+  tlCfg.blockTxEl.textContent = Math.abs(b - a) < 16
+    ? ''
+    : leaveTimeLabel_(tlCfg.getStart()) + ' ' + tlCfg.getStart().period + ' – ' + leaveTimeLabel_(tlCfg.getEnd()) + ' ' + tlCfg.getEnd().period;
+  tlCfg.awayLabelEl.textContent = bad ? (tlCfg.badMessage || 'Times need adjusting') : 'Away ' + (durTxt || '0 min');
+  tlCfg.awayLabelEl.classList.toggle('bad', bad);
+
+  if (tlCfg.nowEl) {
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    if (nowMin >= LEAVE_TIME_WINDOW_MIN_ && nowMin <= LEAVE_TIME_WINDOW_MAX_) {
+      tlCfg.nowEl.style.left = pct(nowMin) + '%';
+      tlCfg.nowEl.style.display = '';
+    } else {
+      tlCfg.nowEl.style.display = 'none';
+    }
+  }
+  return bad;
+}
+
+const LEAVE_SHORT_TL_CFG_ = {
+  getStart: function () { return leaveSelectedTime; },
+  getEnd: function () { return { hour12: 4, minute: 30, period: 'PM' }; }, // fixed at 4:30 PM - office close
+  blockEl: leaveTimeBlock, blockTxEl: leaveTimeBlockTx, awayLabelEl: leaveTimeAwayLabel, nowEl: leaveTimeNow
+};
+const LEAVE_OUT_TL_CFG_ = {
+  getStart: function () { return leaveOutPassCheckOutTime; },
+  getEnd: function () { return leaveOutPassCheckInTime; },
+  blockEl: leaveOutTimeBlock, blockTxEl: leaveOutTimeBlockTx, awayLabelEl: leaveOutAwayLabel, nowEl: leaveOutTimeNow,
+  badMessage: 'Check-in is before check-out'
+};
+
+// Wires one timer-selection field - stepper -/+ (15-minute steps, matching
+// timebar-3.html), typed input, and an AM/PM scroll-snap wheel in place of
+// the old toggle buttons. `get`/`set` read and write whichever module-level
+// time value this instance owns, so the same wiring serves Short Leave's
+// single field and Out Pass's independent check-out/check-in fields.
+// Returns { refresh } so callers can force the displayed value (and its
+// timeline) back in sync after resetting the underlying state.
 function initLeaveTimeControl_(cfg) {
+  let wheelLocked = false;
+  function setWheel(period) {
+    const pm = period === 'PM';
+    wheelLocked = true;
+    cfg.wheelEl.scrollTop = pm ? 24 : 0;
+    const items = cfg.wheelEl.querySelectorAll('i');
+    items[0].classList.toggle('on', !pm);
+    items[1].classList.toggle('on', pm);
+    setTimeout(function () { wheelLocked = false; }, 60);
+  }
   function refresh() {
     const t = leaveClampTimeToWindow_(cfg.get());
-    // No " AM"/"PM" suffix here - the adjacent toggle buttons already show
-    // the period, and repeating it in the input just gets clipped in this
+    // No " AM"/"PM" suffix here - the wheel beside it already shows the
+    // period, and repeating it in the input just gets clipped in this
     // compact a box.
     cfg.input.value = leaveTimeLabel_(t);
-    cfg.amBtn.classList.toggle('is-selected', t.period === 'AM');
-    cfg.pmBtn.classList.toggle('is-selected', t.period === 'PM');
+    setWheel(t.period);
+    if (cfg.tlCfg) renderLeaveTimeline_(cfg.tlCfg);
   }
   function commit(t) {
     cfg.set(leaveClampTimeToWindow_(t));
@@ -1193,12 +1300,29 @@ function initLeaveTimeControl_(cfg) {
     if (cfg.onChange) cfg.onChange();
   }
   function step(direction) {
-    commit(leaveTime24ToParts_(leaveTimeTo24_(cfg.get()) + (direction === 'increase' ? 5 : -5)));
+    commit(leaveTime24ToParts_(leaveTimeTo24_(cfg.get()) + (direction === 'increase' ? 15 : -15)));
   }
   cfg.minusBtn.addEventListener('click', function () { step('decrease'); });
   cfg.plusBtn.addEventListener('click', function () { step('increase'); });
-  cfg.amBtn.addEventListener('click', function () { const t = cfg.get(); commit({ hour12: t.hour12, minute: t.minute, period: 'AM' }); });
-  cfg.pmBtn.addEventListener('click', function () { const t = cfg.get(); commit({ hour12: t.hour12, minute: t.minute, period: 'PM' }); });
+
+  function flipPeriod() {
+    const t = cfg.get();
+    commit({ hour12: t.hour12, minute: t.minute, period: t.period === 'AM' ? 'PM' : 'AM' });
+  }
+  let wheelScrollTimer = null;
+  cfg.wheelEl.addEventListener('scroll', function () {
+    if (wheelLocked) return;
+    clearTimeout(wheelScrollTimer);
+    wheelScrollTimer = setTimeout(function () {
+      const pmNow = Math.round(cfg.wheelEl.scrollTop / 24) === 1;
+      const t = cfg.get();
+      if (pmNow !== (t.period === 'PM')) commit({ hour12: t.hour12, minute: t.minute, period: pmNow ? 'PM' : 'AM' });
+    }, 90);
+  });
+  cfg.wheelEl.addEventListener('click', flipPeriod);
+  cfg.wheelEl.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flipPeriod(); }
+  });
 
   // Lenient parse on commit ("7:25 am", "07:25", "725pm", ...) - anything
   // that doesn't parse just reverts to the last valid value; anything
@@ -1212,7 +1336,7 @@ function initLeaveTimeControl_(cfg) {
     const minute = match[2] ? parseInt(match[2], 10) : 0;
     const period = match[3] ? match[3].toUpperCase() : cfg.get().period;
     if (hour12 < 1 || hour12 > 12 || minute > 59) { refresh(); return; }
-    commit({ hour12: hour12, minute: Math.round(minute / 5) * 5, period: period });
+    commit({ hour12: hour12, minute: Math.round(minute / 15) * 15, period: period });
   }
   cfg.input.addEventListener('keydown', function (e) {
     if (e.key === 'Enter') { e.preventDefault(); cfg.input.blur(); }
@@ -1229,22 +1353,59 @@ let leaveOutCheckInCtl_ = null;
 
 function initLeaveTimePicker_() {
   leaveShortTimeCtl_ = initLeaveTimeControl_({
-    input: leaveTimeInput, minusBtn: leaveTimeMinusBtn, plusBtn: leaveTimePlusBtn, amBtn: leaveTimeAmBtn, pmBtn: leaveTimePmBtn,
+    input: leaveTimeInput, minusBtn: leaveTimeMinusBtn, plusBtn: leaveTimePlusBtn, wheelEl: leaveTimeWheel,
+    tlCfg: LEAVE_SHORT_TL_CFG_,
     get: function () { return leaveSelectedTime; },
     set: function (t) { leaveSelectedTime = t; leaveSelectedHalfDay = t.period; }
   });
   leaveOutCheckOutCtl_ = initLeaveTimeControl_({
-    input: leaveOutCheckOutInput, minusBtn: leaveOutCheckOutMinusBtn, plusBtn: leaveOutCheckOutPlusBtn, amBtn: leaveOutCheckOutAmBtn, pmBtn: leaveOutCheckOutPmBtn,
+    input: leaveOutCheckOutInput, minusBtn: leaveOutCheckOutMinusBtn, plusBtn: leaveOutCheckOutPlusBtn, wheelEl: leaveOutCheckOutWheel,
+    tlCfg: LEAVE_OUT_TL_CFG_,
     get: function () { return leaveOutPassCheckOutTime; },
     set: function (t) { leaveOutPassCheckOutTime = t; },
-    onChange: function () { leaveOutPassTimeError.classList.add('hidden'); }
+    onChange: clearOutPassManualEditState_
   });
   leaveOutCheckInCtl_ = initLeaveTimeControl_({
-    input: leaveOutCheckInInput, minusBtn: leaveOutCheckInMinusBtn, plusBtn: leaveOutCheckInPlusBtn, amBtn: leaveOutCheckInAmBtn, pmBtn: leaveOutCheckInPmBtn,
+    input: leaveOutCheckInInput, minusBtn: leaveOutCheckInMinusBtn, plusBtn: leaveOutCheckInPlusBtn, wheelEl: leaveOutCheckInWheel,
+    tlCfg: LEAVE_OUT_TL_CFG_,
     get: function () { return leaveOutPassCheckInTime; },
     set: function (t) { leaveOutPassCheckInTime = t; },
-    onChange: function () { leaveOutPassTimeError.classList.add('hidden'); }
+    onChange: clearOutPassManualEditState_
   });
+  leaveOutQuick.querySelectorAll('button').forEach(function (btn) {
+    btn.addEventListener('click', function () { applyOutPassQuickDuration_(btn.dataset.q, btn); });
+  });
+}
+
+// A manual edit to either Out Pass field (stepper, typed, or the AM/PM
+// wheel) clears the submit-blocking error and un-highlights whichever quick
+// duration preset was active - it no longer necessarily matches.
+function clearOutPassManualEditState_() {
+  leaveOutPassTimeError.classList.add('hidden');
+  leaveOutQuick.querySelectorAll('button').forEach(function (b) { b.classList.remove('on'); });
+}
+
+// Quick durations (timebar-3.html's "1 hour/2 hours/Half day/Morning/
+// Afternoon") - each sets both check-out and check-in at once. Morning and
+// Afternoon are fixed halves of the office day; the others extend the
+// duration from whatever check-out is already set.
+function applyOutPassQuickDuration_(q, btnEl) {
+  const MIDDAY_ = 750; // 12:30 PM
+  let outMin, inMin;
+  if (q === 'morning') { outMin = LEAVE_TIME_WINDOW_MIN_; inMin = MIDDAY_; }
+  else if (q === 'afternoon') { outMin = MIDDAY_; inMin = LEAVE_TIME_WINDOW_MAX_; }
+  else {
+    outMin = leaveTimeTo24_(leaveOutPassCheckOutTime);
+    inMin = Math.min(LEAVE_TIME_WINDOW_MAX_, outMin + Number(q));
+  }
+  leaveOutPassCheckOutTime = leaveClampTimeToWindow_(leaveTime24ToParts_(outMin));
+  leaveOutPassCheckInTime = leaveClampTimeToWindow_(leaveTime24ToParts_(inMin));
+  if (leaveOutCheckOutCtl_) leaveOutCheckOutCtl_.refresh();
+  if (leaveOutCheckInCtl_) leaveOutCheckInCtl_.refresh();
+  leaveOutPassTimeError.classList.add('hidden');
+  updateLeaveDrawerSummaryChips_();
+  leaveOutQuick.querySelectorAll('button').forEach(function (b) { b.classList.remove('on'); });
+  btnEl.classList.add('on');
 }
 
 // Live footer summary-chip strip (mockup .summary/.mchip) - reflects the
@@ -1293,56 +1454,36 @@ function updateLeaveDrawerSummaryChips_() {
 function updateLeaveDatePickedSummary_() {
   if (!leaveSelectedDates.length) {
     leaveDatePicked.classList.add('hidden');
+    leaveDatesStrip.classList.add('hidden');
     return;
   }
-  leaveDatePicked.classList.remove('hidden');
   const start = leaveSelectedDates[0];
   const end = leaveSelectedDates[leaveSelectedDates.length - 1];
   if (leaveDateMode === 'multiple' && leaveSelectedDates.length > 1) {
-    // Chips, not the label/meta pair - a fixed-height, never-wrapping strip
-    // regardless of how many dates are picked (see the "+N more" chip,
-    // clickable to open the full scrollable list in a side popup).
-    leaveDatePickedSingle.classList.add('hidden');
-    leaveDatePickedChips.classList.remove('hidden');
-    const MAX_CHIPS = 4;
-    const shortFmt = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-    const extra = leaveSelectedDates.length - MAX_CHIPS;
-    leaveDatePickedChips.innerHTML =
-      leaveSelectedDates.slice(0, MAX_CHIPS).map((d) => '<span class="date-chip">' + escapeHtml(shortFmt(d)) + '</span>').join('') +
-      (extra > 0 ? '<span class="date-chip more">+' + extra + ' more</span>' : '');
-  } else if (leaveDateMode === 'range' && leaveSelectedDates.length > 1) {
-    leaveDatePickedChips.classList.add('hidden');
-    leaveDatePickedSingle.classList.remove('hidden');
-    const days = Math.round((end - start) / 86400000) + 1;
-    leaveDatePickedLabel.textContent = fmtDateLocal_(start) + ' – ' + fmtDateLocal_(end);
-    leaveDatePickedMeta.textContent = days + (days === 1 ? ' day' : ' days');
+    // Custom mode: the timebar-3.html-style dates strip - every picked date
+    // gets its own card in a horizontally-scrollable row instead of capping
+    // at a few chips + "N more" behind a popup.
+    leaveDatePicked.classList.add('hidden');
+    leaveDatesStrip.classList.remove('hidden');
+    leaveDatesStripCount.textContent = leaveSelectedDates.length + (leaveSelectedDates.length === 1 ? ' date selected' : ' dates selected');
+    const monthFmt = (d) => d.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase();
+    leaveDatesStripList.innerHTML = leaveSelectedDates
+      .slice()
+      .sort((a, b) => a - b)
+      .map((d) => '<div class="ds-card"><div class="d">' + d.getDate() + '</div><div class="m">' + escapeHtml(monthFmt(d)) + '</div></div>')
+      .join('');
   } else {
-    leaveDatePickedChips.classList.add('hidden');
-    leaveDatePickedSingle.classList.remove('hidden');
-    leaveDatePickedLabel.textContent = fmtDateLocal_(start);
-    leaveDatePickedMeta.textContent = weekLabelFromDate_(start);
+    leaveDatesStrip.classList.add('hidden');
+    leaveDatePicked.classList.remove('hidden');
+    if (leaveDateMode === 'range' && leaveSelectedDates.length > 1) {
+      const days = Math.round((end - start) / 86400000) + 1;
+      leaveDatePickedLabel.textContent = fmtDateLocal_(start) + ' – ' + fmtDateLocal_(end);
+      leaveDatePickedMeta.textContent = days + (days === 1 ? ' day' : ' days');
+    } else {
+      leaveDatePickedLabel.textContent = fmtDateLocal_(start);
+      leaveDatePickedMeta.textContent = weekLabelFromDate_(start);
+    }
   }
-}
-
-// ---------- Custom dates popup ----------
-// Opened by clicking the picked-dates strip while in Custom mode - a plain
-// scrollable readout of every selected date, kept entirely separate from the
-// Date(s) card so that card's height never depends on how many are picked.
-function openCustomDatesPopup_() {
-  if (leaveDateMode !== 'multiple' || leaveSelectedDates.length < 2) return;
-  customDatesPopupCount.textContent = leaveSelectedDates.length + ' dates selected';
-  customDatesPopupList.innerHTML = leaveSelectedDates
-    .slice()
-    .sort((a, b) => a - b)
-    .map((d) => '<div class="custom-date-row">' + escapeHtml(fmtDateLocal_(d)) + '</div>')
-    .join('');
-  customDatesPopup.classList.add('open');
-  customDatesBackdrop.classList.add('open');
-}
-
-function closeCustomDatesPopup_() {
-  customDatesPopup.classList.remove('open');
-  customDatesBackdrop.classList.remove('open');
 }
 
 function resetLeaveAttachment_() {
@@ -1613,16 +1754,21 @@ function lcalInit_() {
     btn.addEventListener('click', function () { lcalApplyPreset_(btn.dataset.preset, btn); });
   });
 
-  lcalClearBtn.addEventListener('click', function () {
-    leaveSelectedDates = [];
-    leaveCalPresets.querySelectorAll('.cal2-preset').forEach(function (b) { b.classList.remove('is-active'); });
-    lcalRenderGrid_();
-    leaveDateRangeError.classList.add('hidden');
-    updateLeaveDatePickedSummary_();
-    updateLeaveDrawerSummaryChips_();
-  });
+  lcalClearBtn.addEventListener('click', lcalClearSelection_);
+  leaveDatesStripClearBtn.addEventListener('click', lcalClearSelection_);
 
   lcalRenderGrid_();
+}
+
+// Shared by the calendar footer's own Clear button and the custom-dates
+// strip's Clear button below the timer - both just empty the selection.
+function lcalClearSelection_() {
+  leaveSelectedDates = [];
+  leaveCalPresets.querySelectorAll('.cal2-preset').forEach(function (b) { b.classList.remove('is-active'); });
+  lcalRenderGrid_();
+  leaveDateRangeError.classList.add('hidden');
+  updateLeaveDatePickedSummary_();
+  updateLeaveDrawerSummaryChips_();
 }
 
 // ---------- My Leaves drawer: My Leaves / History / Apply for Leave tabs ----------
@@ -1652,10 +1798,20 @@ function switchLeavesTab_(tab) {
   myLeavesDrawerTitle.textContent = copy[0];
   myLeavesDrawerSubtitle.textContent = copy[1];
   if (tab !== 'apply' && activeCell === leaveReasonEditor) activeCell = null;
+  // Reaching this tab via the rail (rather than the "Apply for Leave"
+  // button, which already paints via resetLeaveApplyForm_) still needs its
+  // chip highlights/sub-row visibility in sync with whatever category/type
+  // is already selected - on a session that never opened Apply before,
+  // nothing has painted those yet even though the state defaults exist.
+  if (tab === 'apply') paintLeaveApplyForm_();
 }
 
-async function openApplyLeaveTab_() {
-  if (!currentUserContext || !weekInput.value) return;
+// Blanks the Apply form back to its defaults - used both when the user
+// deliberately starts a fresh request (applyLeaveBtn) and right after one
+// is successfully sent, so a later visit to this tab (including via the
+// rail, which no longer resets on its own - see leavesTabRail's click
+// handler) never shows a just-submitted request's leftover values.
+function resetLeaveApplyForm_() {
   leaveReasonEditor.innerHTML = '';
   resetLeaveAttachment_();
   const today = new Date();
@@ -1670,6 +1826,11 @@ async function openApplyLeaveTab_() {
   if (leaveOutCheckOutCtl_) leaveOutCheckOutCtl_.refresh();
   if (leaveOutCheckInCtl_) leaveOutCheckInCtl_.refresh();
   selectLeaveCategory_('casual');
+}
+
+async function openApplyLeaveTab_() {
+  if (!currentUserContext || !weekInput.value) return;
+  resetLeaveApplyForm_();
   switchLeavesTab_('apply');
   // Focus immediately so activeCell/activeToolbarEl point at this editor
   // before the user can touch the toolbar - otherwise a stale activeCell
@@ -2228,8 +2389,11 @@ leaveCancelBtn.addEventListener('click', () => switchLeavesTab_('overview'));
 leavesTabRail.addEventListener('click', (e) => {
   const btn = e.target.closest('.leaves-rail-btn');
   if (!btn || btn.dataset.tab === leavesActiveTab_) return;
-  if (btn.dataset.tab === 'apply') openApplyLeaveTab_();
-  else switchLeavesTab_(btn.dataset.tab);
+  // Only the explicit "Apply for Leave" CTA (applyLeaveBtn) starts a fresh
+  // request via openApplyLeaveTab_ - switching to this tab from the rail is
+  // just navigation and must never discard dates/type/reason already
+  // filled in for a request still in progress.
+  switchLeavesTab_(btn.dataset.tab);
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && myLeavesDrawer.classList.contains('open')) {
@@ -2252,13 +2416,6 @@ leaveDateModeRangeBtn.addEventListener('click', () => selectLeaveDateMode_('rang
 leaveDateModeCustomBtn.addEventListener('click', () => selectLeaveDateMode_('multiple'));
 initLeaveTimePicker_();
 lcalInit_();
-
-leaveDatePicked.addEventListener('click', openCustomDatesPopup_);
-closeCustomDatesPopupBtn.addEventListener('click', closeCustomDatesPopup_);
-customDatesBackdrop.addEventListener('click', closeCustomDatesPopup_);
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && customDatesPopup.classList.contains('open')) closeCustomDatesPopup_();
-});
 
 viewMyLeavesBtn.addEventListener('click', openMyLeavesDrawer);
 closeMyLeavesDrawerBtn.addEventListener('click', closeMyLeavesDrawer);
@@ -2510,6 +2667,7 @@ leaveSendBtn.addEventListener('click', async () => {
       }
     }
 
+    resetLeaveApplyForm_();
     switchLeavesTab_('overview');
     showToast_('Leave Request Sent', 'success');
     refreshApplyLeaveButton();

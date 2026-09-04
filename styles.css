@@ -28,6 +28,13 @@
   --d-outpass: #0F766E; --d-outpass-bg: #E3F4F2;
   --meta: #54657A;    --meta-bg: #EDF1F5; --meta-bd: #D9E1E9;
 
+  /* Second accent (new) - the app leaned entirely on --brand orange before;
+     this gives the calendar and timer selection a place to use a distinct
+     color for secondary emphasis (today marker, quick-duration presets,
+     the custom-dates strip) instead of orange for literally everything. */
+  --indigo-600: #4F46E5; --indigo-700: #4338CA; --indigo-800: #3730A3;
+  --indigo-50: #EEF2FF;  --indigo-100: #E0E7FF; --indigo-200: #C7D2FE;
+
   --r-sm: 8px; --r-md: 10px; --r-lg: 14px; --r-xl: 18px;
   --sh-1: 0 1px 2px rgba(15, 23, 42, .05);
   --sh-2: 0 4px 14px rgba(15, 23, 42, .07);
@@ -1736,7 +1743,7 @@ textarea {
 .cal2-day:disabled { color: #CBD5E1; cursor: not-allowed; }
 .cal2-day.is-adjacent { color: #CBD5E1; font-weight: 400; }
 .cal2-day.is-weekend { color: var(--ink-400); }
-.cal2-day.is-today { border-color: var(--brand-600); color: var(--brand-700); font-weight: 700; }
+.cal2-day.is-today { border-color: var(--indigo-600); color: var(--indigo-700); font-weight: 700; }
 .cal2-day.is-mid { background: var(--brand-50); border-color: var(--brand-50); color: var(--brand-800); }
 .cal2-day.is-edge { background: var(--brand-600); border-color: var(--brand-600); color: #fff; font-weight: 700; }
 .cal2-day.is-edge:hover { background: var(--brand-700); border-color: var(--brand-700); }
@@ -1754,66 +1761,100 @@ textarea {
   .cal2-rail { display: none; }
 }
 
-/* Bottom row under the calendar: whichever time picker applies (Short
-   Leave's single field, or Out Pass's check-out/check-in pair) sits next to
-   the picked-dates summary bar in one row, instead of each stacking full-
-   width - the summary bar flexes to fill whatever's left over. Leave types
-   with no time picker (both hidden) just get the summary bar alone. */
-.dcal-bottom-row { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line-soft); flex-wrap: wrap; }
+/* Bottom area under the calendar - the timer selection (a timeline drawn to
+   scale, styled after timebar-3.html's "T3 Timeline" reference but with our
+   own brand palette plus indigo as a second accent instead of one color
+   doing everything), then the picked-dates summary. Each section is full
+   width and stacks - a scaled timeline plus a 5-point axis needs the room,
+   unlike the old compact single-line controls it replaced. */
+.dcal-bottom { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
+.dcal-bottom > * + * { margin-top: 10px; }
 
-/* Manual stepper + typed input + AM/PM only - no drag slider, so every value
-   is either typed or nudged in 5-minute steps and can be clamped to the
-   8:30 AM-4:30 PM office-hours window. */
-.time-picker { flex: 0 0 auto; max-width: 150px; user-select: none; }
-.time-picker-split { max-width: 200px; }
-.time-picker-split .tp-cols { display: flex; gap: 6px; }
-.time-picker-split .tp-cols .tp-row { flex: 1; min-width: 0; }
-.tp-row + .tp-row { margin-top: 8px; }
-.tp-cols > .tp-row + .tp-row { margin-top: 0; }
-.tp-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--ink-400); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tp-hint { margin-top: 6px; font-size: 9.5px; line-height: 1.3; color: var(--ink-400); }
-.tp-controls { display: flex; align-items: center; gap: 2px; }
-.tp-step {
-  width: 14px; height: 20px; border-radius: 4px; border: 1px solid var(--line); background: #fff;
-  color: var(--ink-600); font-size: 11px; font-weight: 700; cursor: pointer; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center; line-height: 1;
+.tl-card { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-2); padding: 11px 12px; user-select: none; }
+.tl-head { display: flex; align-items: baseline; margin-bottom: 10px; gap: 8px; }
+.tl-lb { font-size: 9.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-400); }
+.tl-away { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--brand-700); white-space: nowrap; }
+.tl-away.bad { color: var(--no-800); }
+
+.tl-line { position: relative; height: 32px; border-radius: 8px; background: #fff; border: 1px solid var(--line); overflow: hidden; }
+.tl-grid { position: absolute; inset: 0; display: flex; }
+.tl-grid span { flex: 1; border-right: 1px dashed var(--line-soft); }
+.tl-grid span:last-child { border-right: 0; }
+.tl-now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--indigo-200); }
+.tl-block {
+  position: absolute; top: 4px; bottom: 4px; background: var(--brand-600); border-radius: 6px;
+  display: flex; align-items: center; justify-content: center; transition: left .12s, width .12s; min-width: 6px; overflow: hidden;
 }
-.tp-step:hover { border-color: var(--ink-400); background: var(--surface-2); }
-.tp-input {
-  flex: 1; min-width: 0; width: 100%; height: 20px; border: 1px solid var(--line); border-radius: 4px;
-  padding: 0 1px; font-size: 9.5px; font-weight: 600; color: var(--ink-900); text-align: center;
+.tl-block span { font-size: 10.5px; font-weight: 600; line-height: 1; color: #fff; white-space: nowrap; padding: 0 7px; }
+.tl-block.bad { background: var(--no-600); }
+.tl-axis { display: flex; justify-content: space-between; margin-top: 6px; font-size: 9px; color: var(--ink-400); }
+
+.tl-ctls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 11px; }
+.tl-ctls-1 { grid-template-columns: 1fr; }
+.tl-fld { min-width: 0; border: 1px solid var(--line); border-radius: var(--r-sm); background: #fff; padding: 7px 8px 8px; }
+.tl-fld-label { font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-400); margin-bottom: 6px; text-align: center; }
+.tl-ctl { display: flex; align-items: center; gap: 5px; }
+.tl-step {
+  width: 22px; height: 24px; flex: none; border: 1px solid var(--line); background: #fff; border-radius: 6px;
+  cursor: pointer; color: var(--ink-600); font-size: 13px; display: flex; align-items: center; justify-content: center;
 }
-.tp-input:focus { outline: none; border-color: var(--brand-600); }
-.tp-ampm-seg { display: flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; flex-shrink: 0; }
-.tp-ampm-btn { padding: 0 1px; height: 20px; font-size: 7.5px; font-weight: 700; color: var(--ink-500); background: #fff; cursor: pointer; }
-.tp-ampm-btn + .tp-ampm-btn { border-left: 1px solid var(--line); }
-.tp-ampm-btn.is-selected { background: var(--brand-600); color: #fff; }
+.tl-step:hover { background: var(--surface-2); border-color: var(--ink-400); color: var(--ink-900); }
+.tl-step:active { transform: translateY(1px); }
+.tl-tv {
+  flex: 1; min-width: 0; height: 24px; border: 1px solid var(--line); border-radius: 6px; background: #fff;
+  font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: center; color: var(--ink-900); padding: 0 2px;
+}
+.tl-tv:focus { outline: none; border-color: var(--brand-600); }
+
+/* AM/PM scroll wheel */
+.tl-wheel-wrap { position: relative; flex: none; }
+.tl-wheel {
+  position: relative; width: 34px; height: 24px; border: 1px solid var(--line); border-radius: 6px; background: #fff;
+  overflow-y: scroll; scroll-snap-type: y mandatory; scrollbar-width: none; -ms-overflow-style: none; cursor: ns-resize;
+}
+.tl-wheel::-webkit-scrollbar { display: none; }
+.tl-wheel:focus-visible { outline: 2px solid var(--indigo-600); outline-offset: 1px; }
+.tl-wheel i {
+  display: flex; align-items: center; justify-content: center; height: 24px; scroll-snap-align: center; scroll-snap-stop: always;
+  font-size: 8.5px; font-weight: 700; font-style: normal; color: var(--ink-400); letter-spacing: .03em; transition: color .14s;
+}
+.tl-wheel i.on { color: var(--brand-700); }
+.tl-wcap { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); pointer-events: none; display: flex; flex-direction: column; gap: 2px; opacity: .5; }
+.tl-wcap span { width: 0; height: 0; border-left: 2.5px solid transparent; border-right: 2.5px solid transparent; }
+.tl-wcap .u { border-bottom: 3px solid var(--ink-400); }
+.tl-wcap .d { border-top: 3px solid var(--ink-400); }
+
+/* Quick durations - the second accent color (indigo) lives here, distinct
+   from the timeline block's orange, so picking a preset reads as a
+   different kind of action (a shortcut) than the time itself. */
+.tl-quick { display: flex; gap: 5px; margin-top: 9px; flex-wrap: wrap; }
+.tl-quick button { flex: 1; min-width: 64px; height: 27px; border: 1px solid var(--line); background: #fff; border-radius: 7px; font-size: 10.5px; font-weight: 500; color: var(--ink-600); cursor: pointer; }
+.tl-quick button:hover { background: var(--surface-2); }
+.tl-quick button.on { background: var(--indigo-50); border-color: var(--indigo-200); color: var(--indigo-700); font-weight: 700; }
 
 .picked {
-  display: flex; align-items: center; gap: 6px; padding: 9px 10px; flex: 1 1 160px; min-width: 0;
+  display: flex; align-items: center; gap: 6px; padding: 9px 10px; min-width: 0;
   border: 1px solid var(--brand-200); background: var(--brand-50); border-radius: var(--r-md);
 }
 .picked svg { flex-shrink: 0; }
 #leaveDatePickedSingle { display: flex; align-items: baseline; gap: 6px; flex: 1; }
 .picked b { font-size: 12.5px; color: var(--brand-800); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .picked span { flex-shrink: 0; margin-left: auto; font-size: 11px; font-weight: 600; color: var(--brand-700); white-space: nowrap; }
-.picked:has(#leaveDatePickedChips:not(.hidden)) { cursor: pointer; }
-.picked:has(#leaveDatePickedChips:not(.hidden)):hover { border-color: var(--brand-600); }
 
-/* Custom-mode picked-dates chips - a fixed-height, never-wrapping strip
-   (horizontally scrollable if it overflows) so the Date(s) card's height
-   never grows no matter how many dates are selected. */
-.date-chip-row { display: flex; align-items: center; gap: 1px; flex: 1; min-width: 0; overflow-x: auto; }
-.date-chip {
-  flex-shrink: 0; white-space: nowrap; font-size: 8.5px; font-weight: 700; color: var(--brand-800);
-  background: #fff; border: 1px solid var(--brand-200); border-radius: 999px; padding: 1px 3px;
-}
-.date-chip.more { color: #fff; background: var(--brand-600); border-color: var(--brand-600); }
-
-.custom-date-row {
-  font-size: 12.5px; font-weight: 600; color: var(--ink-700);
-  padding: 8px 10px; border-radius: var(--r-md); background: var(--surface-2);
-}
+/* Custom-mode dates strip (timebar-3.html's ".dates") - indigo-accented so
+   it reads as a distinct component from the orange timeline/calendar
+   selection above it. Every picked date gets its own card in a horizontal
+   scroll strip rather than capping at a few chips + "N more". */
+.ds-wrap { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-2); padding: 10px 11px 11px; }
+.ds-head { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+.ds-tick { width: 19px; height: 19px; border-radius: 999px; background: var(--indigo-600); display: flex; align-items: center; justify-content: center; flex: none; }
+.ds-tx { font-size: 12px; font-weight: 600; color: var(--indigo-700); }
+.ds-clr { margin-left: auto; height: 25px; padding: 0 11px; border: 1px solid var(--line); background: #fff; border-radius: 7px; font-size: 11px; font-weight: 600; color: var(--ink-600); cursor: pointer; }
+.ds-clr:hover { background: var(--surface-2); }
+.ds-strip { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 3px; }
+.ds-card { flex: none; min-width: 46px; padding: 5px 8px 6px; border-radius: 9px; background: #fff; border: 1px solid var(--indigo-200); text-align: center; }
+.ds-card .d { font-size: 12.5px; font-weight: 700; line-height: 1; color: var(--indigo-700); }
+.ds-card .m { font-size: 9px; font-weight: 600; line-height: 1; color: var(--ink-500); margin-top: 3px; letter-spacing: .03em; }
 
 /* Attachments */
 .drop {
