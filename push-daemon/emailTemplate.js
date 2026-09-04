@@ -410,6 +410,108 @@ function buildDecisionEmail(data) {
   return { subject, html };
 }
 
+const RESOLVE_URL_PREFIX = `${APP_URL}#resolve-uninformed=`;
+
+// Emails the developer when a manager reports them absent without a leave
+// request - the "Resolve the Issue" CTA deep-links into the web app's
+// resolution drawer (see app.js's openResolveUninformedDeepLinkOnce_,
+// mirroring the existing #my-leaves deep link) so they can explain
+// themselves in the same rich-text editor used for a normal leave reason.
+function buildUninformedReportEmail(data, reportId) {
+  const name = data.name || 'there';
+  const firstName = String(name).trim().split(/\s+/)[0] || name;
+  const reportedByName = data.reportedBy || 'your manager';
+  const dateText = formatWeekdayDayMonthYear(data.date) || formatDayMonthYear(data.date);
+  const resolveUrl = RESOLVE_URL_PREFIX + encodeURIComponent(reportId);
+
+  const html = `
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(
+    `Uninformed absence flagged for ${dateText}. Resolve it to explain what happened.`
+  )}</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF0F4;">
+<tr><td align="center" style="padding:32px 12px;">
+
+  <table role="presentation" class="wrap" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;">
+
+    <!-- masthead -->
+    <tr><td style="padding:0 4px 12px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td style="font:700 13px/1.2 ${FONT};color:#0F172A;letter-spacing:-.01em;">
+          <span style="display:inline-block;width:9px;height:9px;background:#E8590C;border-radius:2px;margin-right:8px;"></span>Tech EW
+        </td>
+        <td align="right" style="font:400 12px/1.2 ${FONT};color:#7A8698;">Uninformed leave</td>
+      </tr></table>
+    </td></tr>
+
+    <!-- card -->
+    <tr><td style="background:#FFFFFF;border:1px solid #E3E8EF;border-radius:14px;overflow:hidden;">
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td height="4" style="height:4px;line-height:4px;font-size:0;background:#D97706;">&nbsp;</td>
+      </tr></table>
+
+      <!-- headline -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:26px 32px 0;">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+            <td style="background:#FEF3C7;border:1px solid #FDE68A;color:#92400E;border-radius:999px;padding:5px 12px;
+                       font:700 11px/1 ${FONT};letter-spacing:.06em;">UNINFORMED ABSENCE</td>
+          </tr></table>
+
+          <p style="margin:16px 0 0;font:700 23px/1.3 ${FONT};color:#0F172A;letter-spacing:-.02em;">
+            You were marked absent on ${escapeHtml(dateText)} without a leave request
+          </p>
+          <p style="margin:9px 0 0;font:400 14px/1.6 ${FONT};color:#5A6879;">
+            Hello ${escapeHtml(firstName)} — ${escapeHtml(reportedByName)} flagged this. Let them know what happened by resolving it below.
+          </p>
+        </td>
+      </tr></table>
+
+      <!-- reason -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:22px 32px 0;">
+          <div style="font:700 10px/1 ${FONT};color:#93A0B0;letter-spacing:.07em;">REPORTED REASON</div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
+            <tr><td style="border-left:3px solid #E3E8EF;padding:2px 0 2px 14px;
+                           font:400 14px/1.6 ${FONT};color:#334155;">
+              ${data.reasonHtml || '<i>No reason provided.</i>'}
+            </td></tr>
+          </table>
+        </td>
+      </tr></table>
+
+      <!-- cta -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:22px 32px 26px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" class="btn"><tr>
+            <td style="background:#E8590C;border-radius:9px;">
+              <a href="${escapeAttr(resolveUrl)}" style="display:inline-block;padding:12px 22px;font:600 14px/1 ${FONT};color:#FFFFFF;">Resolve the Issue</a>
+            </td>
+          </tr></table>
+        </td>
+      </tr></table>
+
+    </td></tr>
+
+    <!-- footer -->
+    <tr><td class="gut" style="padding:16px 8px 0;">
+      <p style="margin:0;font:400 11.5px/1.7 ${FONT};color:#8593A5;">
+        Sent by Tech EW because an absence was flagged against you. Internal use only.<br>
+        Replies to this address are not monitored — raise anything else with ${escapeHtml(reportedByName)}.
+      </p>
+    </td></tr>
+
+  </table>
+
+</td></tr>
+</table>`.trim();
+
+  const subject = `Uninformed absence flagged for ${dateText} — resolve when you can`;
+
+  return { subject, html };
+}
+
 function escapeHtml(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;')
@@ -421,4 +523,4 @@ function escapeAttr(s) {
   return escapeHtml(s).replace(/"/g, '&quot;');
 }
 
-module.exports = { buildDecisionEmail };
+module.exports = { buildDecisionEmail, buildUninformedReportEmail };

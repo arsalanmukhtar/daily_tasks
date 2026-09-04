@@ -267,6 +267,9 @@ internal fun typeColors(type: String): Pair<Color, Color> = when (LeaveType.norm
     LeaveType.FOREIGN_TRIP -> TypeForeignTrip to TypeForeignTripBg
     LeaveType.UMRAH -> TypeUmrah to TypeUmrahBg
     LeaveType.MEDICAL -> TypeMedical to TypeMedicalBg
+    // Reuses the "requested/pending" amber rather than a new color pair -
+    // it already reads as "flagged, needs attention" across the app.
+    LeaveType.UNINFORMED_ABSENCE -> StatusRequested to StatusRequestedBg
     else -> TypeCasual to TypeCasualBg
 }
 

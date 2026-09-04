@@ -8,7 +8,7 @@ const { initializeApp, applicationDefault } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 const { leaveTypeLabel } = require('./leaveType');
-const { buildDecisionEmail } = require('./emailTemplate');
+const { buildDecisionEmail, buildUninformedReportEmail } = require('./emailTemplate');
 
 initializeApp({
   credential: applicationDefault()
@@ -122,6 +122,60 @@ async function handleDecidedRequest(doc) {
   log(`Sent decision email for ${doc.id} to ${data.email} (${data.status}).`);
 }
 
+// Emails the developer once a manager files an uninformed-absence report
+// against them - a newly-'reported' doc is exactly "just got filed", same
+// added-change trick as the other two listeners.
+async function handleReportedUninformedLeave(doc) {
+  const data = doc.data();
+  if (!mailer) {
+    log('Uninformed leave', doc.id, 'reported - GMAIL_USER/GMAIL_APP_PASSWORD not set, skipping email.');
+    return;
+  }
+  if (!data.email) {
+    log('Uninformed leave', doc.id, 'reported - no email on the report, skipping.');
+    return;
+  }
+  const { subject, html } = buildUninformedReportEmail(data, doc.id);
+  await mailer.sendMail({
+    from: `"Tech EW - Leave Approvals" <${process.env.GMAIL_USER}>`,
+    to: data.email,
+    subject,
+    html
+  });
+  log(`Sent uninformed-leave report email for ${doc.id} to ${data.email}.`);
+}
+
+// The privileged conversion step: once a developer (or the owner directly)
+// resolves an uninformed-leave report, this is what actually turns it into
+// a real approved leaveRequests doc - firestore.rules deliberately doesn't
+// let any client create a leaveRequests doc with status=='approved'
+// directly, so this has to happen here via the Admin SDK, which bypasses
+// the rules entirely (same reason pushTokens reads bypass them too).
+async function handleResolvedUninformedLeave(doc) {
+  const data = doc.data();
+  if (data.linkedRequestId) {
+    log('Uninformed leave', doc.id, 'already has a linked request, skipping (duplicate snapshot?).');
+    return;
+  }
+  const leaveRequestRef = await db.collection('leaveRequests').add({
+    email: data.email,
+    name: data.name,
+    type: 'uninformedAbsence',
+    status: 'approved',
+    dismissed: false,
+    weekLabel: 'Uninformed absence',
+    requestedAt: data.reportedAt,
+    startDate: data.date,
+    endDate: data.date,
+    reasonHtml: data.reasonHtml || '',
+    decisionNote: data.resolutionHtml || '',
+    resolvedAt: data.resolvedAt,
+    resolvedBy: data.resolvedBy || ''
+  });
+  await db.collection('uninformedLeaves').doc(doc.id).update({ linkedRequestId: leaveRequestRef.id });
+  log(`Uninformed leave ${doc.id} resolved -> created leaveRequests/${leaveRequestRef.id}.`);
+}
+
 log('Starting leave-approvals push daemon...');
 
 // onSnapshot's very first callback always reports every doc already matching
@@ -188,10 +242,67 @@ const unsubscribeDecided = db
 
 log('Listening for decided leave requests.');
 
+// Same baseline-skip guard, this listener's own independent initial snapshot.
+let isInitialReportedSnapshot = true;
+
+const unsubscribeReported = db
+  .collection('uninformedLeaves')
+  .where('status', '==', 'reported')
+  .onSnapshot(
+    (snapshot) => {
+      if (isInitialReportedSnapshot) {
+        isInitialReportedSnapshot = false;
+        log(`Baseline loaded: ${snapshot.size} already-open uninformed-leave report(s), not emailing for these.`);
+        return;
+      }
+      snapshot.docChanges().forEach((change) => {
+        if (change.type !== 'added') return;
+        handleReportedUninformedLeave(change.doc).catch((err) => {
+          logError('Error handling reported uninformed leave', change.doc.id, err);
+        });
+      });
+    },
+    (err) => {
+      logError('Firestore listener error (uninformed reported), exiting for systemd to restart:', err);
+      process.exit(1);
+    }
+  );
+
+log('Listening for reported uninformed leaves.');
+
+let isInitialResolvedUninformedSnapshot = true;
+
+const unsubscribeResolvedUninformed = db
+  .collection('uninformedLeaves')
+  .where('status', '==', 'resolved')
+  .onSnapshot(
+    (snapshot) => {
+      if (isInitialResolvedUninformedSnapshot) {
+        isInitialResolvedUninformedSnapshot = false;
+        log(`Baseline loaded: ${snapshot.size} already-resolved uninformed-leave report(s), not converting these.`);
+        return;
+      }
+      snapshot.docChanges().forEach((change) => {
+        if (change.type !== 'added') return;
+        handleResolvedUninformedLeave(change.doc).catch((err) => {
+          logError('Error handling resolved uninformed leave', change.doc.id, err);
+        });
+      });
+    },
+    (err) => {
+      logError('Firestore listener error (uninformed resolved), exiting for systemd to restart:', err);
+      process.exit(1);
+    }
+  );
+
+log('Listening for resolved uninformed leaves.');
+
 function shutdown() {
   log('Shutting down.');
   unsubscribeNew();
   unsubscribeDecided();
+  unsubscribeReported();
+  unsubscribeResolvedUninformed();
   process.exit(0);
 }
 

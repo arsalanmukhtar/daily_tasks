@@ -25,6 +25,7 @@ import com.techew.leaveapprovals.auth.AuthRepository
 import com.techew.leaveapprovals.auth.AuthState
 import com.techew.leaveapprovals.data.LeaveApiClient
 import com.techew.leaveapprovals.push.NotificationHelper
+import com.techew.leaveapprovals.ui.report.ReportViewModel
 import com.techew.leaveapprovals.ui.requests.RequestListViewModel
 import com.techew.leaveapprovals.ui.restricted.RestrictedScreen
 import com.techew.leaveapprovals.ui.signin.SignInScreen
@@ -114,20 +115,24 @@ fun AppRoot(
         is AuthState.SignedInOwner -> {
             val requestListViewModel = remember(state.user.uid) { RequestListViewModel(apiClient) }
             val summaryViewModel = remember(state.user.uid) { LeaveSummaryViewModel(apiClient) }
-            // Both ViewModels above are plain `remember{}` instances, not
-            // ones obtained from a real ViewModelStore, so ViewModel.onCleared()
-            // never fires for them on its own - stop their live Firestore
-            // listeners explicitly on sign-out or an account switch (a new
-            // uid), or they'd keep running in the background indefinitely.
+            val reportViewModel = remember(state.user.uid) { ReportViewModel(apiClient) }
+            // All three ViewModels above are plain `remember{}` instances,
+            // not ones obtained from a real ViewModelStore, so
+            // ViewModel.onCleared() never fires for them on its own - stop
+            // their live Firestore listeners explicitly on sign-out or an
+            // account switch (a new uid), or they'd keep running in the
+            // background indefinitely.
             DisposableEffect(state.user.uid) {
                 onDispose {
                     requestListViewModel.stopListening()
                     summaryViewModel.stopListening()
+                    reportViewModel.stopListening()
                 }
             }
             ManagerHomeScreen(
                 requestListViewModel = requestListViewModel,
                 summaryViewModel = summaryViewModel,
+                reportViewModel = reportViewModel,
                 highlightRequestId = highlightRequestId,
                 onHighlightHandled = onHighlightHandled,
                 onSignOut = {

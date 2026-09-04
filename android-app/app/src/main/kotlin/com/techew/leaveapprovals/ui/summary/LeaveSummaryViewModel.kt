@@ -8,6 +8,7 @@ import com.techew.leaveapprovals.data.AllowlistEntry
 import com.techew.leaveapprovals.data.AllowlistRepository
 import com.techew.leaveapprovals.data.LeaveApiClient
 import com.techew.leaveapprovals.data.LeaveRequest
+import com.techew.leaveapprovals.data.UninformedLeave
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,10 +36,17 @@ class LeaveSummaryViewModel(
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    // Uninformed-leave reports, both open and resolved - the "Uninformed
+    // Leave" bar counts all of them regardless of status (resolving one
+    // explains the absence, it doesn't erase that it happened).
+    private val _uninformedLeaves = MutableStateFlow<List<UninformedLeave>>(emptyList())
+    val uninformedLeaves: StateFlow<List<UninformedLeave>> = _uninformedLeaves.asStateFlow()
+
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
     private var listenerRegistration: ListenerRegistration? = null
+    private var uninformedListenerRegistration: ListenerRegistration? = null
 
     // Live from construction (same moment as the Requests tab's listener,
     // regardless of which tab is actually showing) rather than lazily on
@@ -54,6 +62,7 @@ class LeaveSummaryViewModel(
 
     private fun startListening(minSpinnerMs: Long = 0L) {
         listenerRegistration?.remove()
+        uninformedListenerRegistration?.remove()
         _isLoading.value = true
         val startedAt = SystemClock.elapsedRealtime()
         listenerRegistration = apiClient.listenLeaveRequests(limit = SUMMARY_LIMIT) { result ->
@@ -73,6 +82,9 @@ class LeaveSummaryViewModel(
                 _isLoading.value = false
             }
         }
+        uninformedListenerRegistration = apiClient.listenUninformedLeaves(limit = SUMMARY_LIMIT) { result ->
+            result.onSuccess { _uninformedLeaves.value = it }
+        }
     }
 
     // The list is already live without this - kept as a manual "force
@@ -85,5 +97,7 @@ class LeaveSummaryViewModel(
     fun stopListening() {
         listenerRegistration?.remove()
         listenerRegistration = null
+        uninformedListenerRegistration?.remove()
+        uninformedListenerRegistration = null
     }
 }

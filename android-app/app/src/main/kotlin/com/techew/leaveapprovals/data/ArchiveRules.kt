@@ -4,6 +4,7 @@ import java.time.DayOfWeek
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.temporal.WeekFields
 
@@ -39,14 +40,25 @@ fun LeaveRequest.effectiveEndDate(): LocalDate? {
 
 // A request stays in "Requests" through the full day of its last leave date,
 // moving to "Archived" starting the next day - independent of status (other
-// than withdrawn, see below), so an undecided-but-stale request still ages
-// out (and stays fully actionable there; RequestDetailSheet only hides
-// Approve/Reject once status != "requested").
+// than withdrawn/uninformedAbsence, see below), so an undecided-but-stale
+// request still ages out (and stays fully actionable there; RequestDetailSheet
+// only hides Approve/Reject once status != "requested").
 //
 // A withdrawn request skips that date check entirely and archives right
 // away, regardless of whether its leave dates are in the past or still
 // upcoming - withdrawing takes it out of play immediately either way.
+//
+// A resolved uninformed-absence leave skips it too, but the other direction:
+// its startDate/endDate are the real (often already-past) absence day, which
+// would otherwise always archive it instantly - the product rule here is
+// deliberately about *when it was resolved*, not when the absence was, so
+// resolving before local noon surfaces it in Requests for the rest of that
+// half-day before the normal date rule would ever have caught up to it.
 fun LeaveRequest.isArchived(today: LocalDate = LocalDate.now()): Boolean {
+    if (type == LeaveType.UNINFORMED_ABSENCE) {
+        val resolvedInstant = runCatching { Instant.parse(resolvedAt) }.getOrNull() ?: return false
+        return !resolvedInstant.atZone(ZoneId.systemDefault()).toLocalTime().isBefore(LocalTime.NOON)
+    }
     if (status == "withdrawn") return true
     val end = effectiveEndDate() ?: return false
     return end.isBefore(today)

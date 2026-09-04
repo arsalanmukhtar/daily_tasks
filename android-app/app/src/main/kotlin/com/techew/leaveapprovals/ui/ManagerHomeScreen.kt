@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Assignment
+import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -38,6 +39,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.font.FontWeight
 import com.techew.leaveapprovals.data.isArchived
+import com.techew.leaveapprovals.ui.report.ReportScreen
+import com.techew.leaveapprovals.ui.report.ReportViewModel
 import com.techew.leaveapprovals.ui.requests.ArchivedRequestsScreen
 import com.techew.leaveapprovals.ui.requests.RequestListScreen
 import com.techew.leaveapprovals.ui.requests.RequestListViewModel
@@ -47,7 +50,8 @@ import com.techew.leaveapprovals.ui.summary.LeaveSummaryViewModel
 private enum class ManagerTab(val title: String) {
     Requests("Leave Requests"),
     Archived("Archived Requests"),
-    Summary("Leave Summary")
+    Summary("Leave Summary"),
+    Report("Uninformed Leave")
 }
 
 /**
@@ -61,6 +65,7 @@ private enum class ManagerTab(val title: String) {
 fun ManagerHomeScreen(
     requestListViewModel: RequestListViewModel,
     summaryViewModel: LeaveSummaryViewModel,
+    reportViewModel: ReportViewModel,
     highlightRequestId: String?,
     onHighlightHandled: () -> Unit,
     onSignOut: () -> Unit
@@ -81,9 +86,11 @@ fun ManagerHomeScreen(
 
     val requestsLoading by requestListViewModel.isLoading.collectAsState()
     val summaryLoading by summaryViewModel.isLoading.collectAsState()
+    val reportLoading by reportViewModel.isLoading.collectAsState()
     val isRefreshing = when (selectedTab) {
         ManagerTab.Requests, ManagerTab.Archived -> requestsLoading
         ManagerTab.Summary -> summaryLoading
+        ManagerTab.Report -> reportLoading
     }
     val rotation by rememberInfiniteTransition(label = "refresh-spin").animateFloat(
         initialValue = 0f,
@@ -101,6 +108,7 @@ fun ManagerHomeScreen(
                         when (selectedTab) {
                             ManagerTab.Requests, ManagerTab.Archived -> requestListViewModel.refresh()
                             ManagerTab.Summary -> summaryViewModel.refresh()
+                            ManagerTab.Report -> reportViewModel.refresh()
                         }
                     }) {
                         Icon(
@@ -162,6 +170,12 @@ fun ManagerHomeScreen(
                     icon = { Icon(Icons.Outlined.Insights, contentDescription = null) },
                     label = { Text("Summary") }
                 )
+                NavigationBarItem(
+                    selected = selectedTab == ManagerTab.Report,
+                    onClick = { selectedTab = ManagerTab.Report },
+                    icon = { Icon(Icons.Outlined.Flag, contentDescription = null) },
+                    label = { Text("Report") }
+                )
             }
         }
     ) { padding ->
@@ -179,6 +193,7 @@ fun ManagerHomeScreen(
                     onGoToRequests = { selectedTab = ManagerTab.Requests }
                 )
                 ManagerTab.Summary -> LeaveSummaryScreen(viewModel = summaryViewModel)
+                ManagerTab.Report -> ReportScreen(viewModel = reportViewModel)
             }
         }
     }

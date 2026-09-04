@@ -14,8 +14,11 @@ object LeaveType {
     const val MEDICAL = "medical"
     const val CASUAL_SHORT = "casualShort"
     const val CASUAL_FULL = "casualFull"
+    // Written only by push-daemon (Admin SDK) once a manager's uninformed-
+    // absence report is resolved - never created directly by a client.
+    const val UNINFORMED_ABSENCE = "uninformedAbsence"
 
-    val ALL = listOf(FOREIGN_TRIP, UMRAH, MEDICAL, CASUAL_SHORT, CASUAL_FULL)
+    val ALL = listOf(FOREIGN_TRIP, UMRAH, MEDICAL, CASUAL_SHORT, CASUAL_FULL, UNINFORMED_ABSENCE)
 
     private val ALIASES = mapOf("short" to CASUAL_SHORT, "full" to CASUAL_FULL)
     private val LABELS = mapOf(
@@ -23,7 +26,8 @@ object LeaveType {
         UMRAH to "Umrah",
         MEDICAL to "Medical",
         CASUAL_SHORT to "Short Leave",
-        CASUAL_FULL to "Full Leave"
+        CASUAL_FULL to "Full Leave",
+        UNINFORMED_ABSENCE to "Uninformed Leave"
     )
 
     fun normalize(type: String): String = ALIASES[type] ?: type.ifBlank { CASUAL_SHORT }

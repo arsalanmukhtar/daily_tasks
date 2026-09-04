@@ -1858,6 +1858,7 @@ textarea {
 .mchip.type-umrah { background: var(--t-umrah-bg); color: var(--t-umrah); border-color: var(--t-umrah-bd); }
 .mchip.type-medical { background: var(--t-medical-bg); color: var(--t-medical); border-color: var(--t-medical-bd); }
 .mchip.type-casual { background: var(--t-casual-bg); color: var(--t-casual); border-color: var(--t-casual-bd); }
+.mchip.type-uninformed { background: var(--wait-50); color: var(--wait-800); border-color: var(--wait-200); }
 .mchip.dur-short { background: var(--d-short-bg); color: var(--d-short); border-color: #BCD9EC; }
 .mchip.dur-full { background: var(--d-full-bg); color: var(--d-full); border-color: #CBC9F0; }
 .mchip.n { background: var(--meta-bg); color: var(--meta); border-color: var(--meta-bd); }

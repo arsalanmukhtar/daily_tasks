@@ -156,6 +156,22 @@ const myLeavesBanner          = document.getElementById('myLeavesBanner');
 const myLeavesBannerTitle     = document.getElementById('myLeavesBannerTitle');
 const myLeavesBannerMeta      = document.getElementById('myLeavesBannerMeta');
 const myLeavesBannerViewBtn   = document.getElementById('myLeavesBannerViewBtn');
+// Uninformed-leave banner + resolution drawer.
+const uninformedBanner         = document.getElementById('uninformedBanner');
+const uninformedBannerTitle    = document.getElementById('uninformedBannerTitle');
+const uninformedBannerMeta     = document.getElementById('uninformedBannerMeta');
+const uninformedBannerViewBtn  = document.getElementById('uninformedBannerViewBtn');
+const uninformedResolveBackdrop      = document.getElementById('uninformedResolveBackdrop');
+const uninformedResolveDrawer        = document.getElementById('uninformedResolveDrawer');
+const uninformedResolveDate          = document.getElementById('uninformedResolveDate');
+const closeUninformedResolveDrawerBtn = document.getElementById('closeUninformedResolveDrawerBtn');
+const uninformedResolveReportedReason = document.getElementById('uninformedResolveReportedReason');
+const uninformedResolveReportedBy    = document.getElementById('uninformedResolveReportedBy');
+const uninformedResolveToolbar       = document.getElementById('uninformedResolveToolbar');
+const uninformedResolveEditor        = document.getElementById('uninformedResolveEditor');
+const uninformedResolveError         = document.getElementById('uninformedResolveError');
+const uninformedResolveCancelBtn     = document.getElementById('uninformedResolveCancelBtn');
+const uninformedResolveSubmitBtn     = document.getElementById('uninformedResolveSubmitBtn');
 // Nav-card stat badges (updateNavStatBadges_)
 const navSubWeeksTag      = document.getElementById('navSubWeeksTag');
 const navSubDraftTag      = document.getElementById('navSubDraftTag');
@@ -629,6 +645,12 @@ wireColorButtons_(leaveToolbar);
 leaveReasonEditor.addEventListener('focus', () => { activeCell = leaveReasonEditor; activeToolbarEl = leaveToolbar; });
 leaveReasonEditor.addEventListener('beforeinput', handleListAutoformat);
 
+// ---------- Uninformed-leave resolution editor: same shared toolbar wiring ----------
+wireFormatToolbar_(uninformedResolveToolbar);
+wireColorButtons_(uninformedResolveToolbar);
+uninformedResolveEditor.addEventListener('focus', () => { activeCell = uninformedResolveEditor; activeToolbarEl = uninformedResolveToolbar; });
+uninformedResolveEditor.addEventListener('beforeinput', handleListAutoformat);
+
 // Seed with a single empty row on startup.
 addTaskRow();
 
@@ -805,7 +827,10 @@ const LEAVE_TYPES = {
   umrah: 'Umrah',
   medical: 'Medical',
   casualShort: 'Short Leave',
-  casualFull: 'Full Leave'
+  casualFull: 'Full Leave',
+  // Written only by push-daemon (Admin SDK) once an uninformed-leave report
+  // is resolved - never created directly by this app.
+  uninformedAbsence: 'Uninformed Leave'
 };
 const LEAVE_TYPE_ALIASES = { short: 'casualShort', full: 'casualFull' };
 function normalizeLeaveType_(type) {
@@ -825,6 +850,7 @@ function leaveTypeChipClass_(type) {
   if (t === 'foreignTrip') return 'type-foreign';
   if (t === 'umrah') return 'type-umrah';
   if (t === 'medical') return 'type-medical';
+  if (t === 'uninformedAbsence') return 'type-uninformed';
   return 'type-casual';
 }
 
@@ -1441,6 +1467,103 @@ async function loadMyLeavesData_() {
   renderMyLeavesHistorySection_(records);
   updateNavStatBadges_();
   cleanupExpiredWithdrawnRequests_(records);
+  loadUninformedBanner_();
+}
+
+// The signed-in user's own still-open uninformed-leave report, if any - a
+// second access path to the same resolution drawer the emailed "Resolve the
+// Issue" link opens, since an email can get lost/deleted but My Leaves is
+// checked regularly anyway.
+async function loadUninformedBanner_() {
+  if (!currentUserContext) return;
+  try {
+    const email = currentUserEmail_();
+    const snap = await getDocs(query(
+      collection(db, 'uninformedLeaves'),
+      where('email', '==', email),
+      where('status', '==', 'reported')
+    ));
+    const reports = snap.docs
+      .map(function (d) { return Object.assign({ reportId: d.id }, d.data()); })
+      .sort(function (a, b) {
+        const at = a.reportedAt && a.reportedAt.toDate ? a.reportedAt.toDate() : 0;
+        const bt = b.reportedAt && b.reportedAt.toDate ? b.reportedAt.toDate() : 0;
+        return bt - at;
+      });
+    renderUninformedBanner_(reports[0] || null);
+  } catch (_e) { /* offline - banner just stays hidden */ }
+}
+
+function renderUninformedBanner_(report) {
+  if (!report) {
+    uninformedBanner.classList.add('hidden');
+    uninformedBanner.dataset.reportId = '';
+    return;
+  }
+  uninformedBanner.classList.remove('hidden');
+  uninformedBanner.dataset.reportId = report.reportId;
+  const d = report.date && report.date.toDate ? report.date.toDate() : null;
+  uninformedBannerTitle.textContent = 'Uninformed absence flagged' + (d ? ' — ' + fmtDateLocal_(d) : '');
+  uninformedBannerMeta.textContent = report.reportedBy ? 'Reported by ' + report.reportedBy : 'Explain what happened';
+}
+
+// ---------- Resolve Uninformed Leave drawer ----------
+// The report currently open in the drawer - set by either the banner's
+// "Resolve" button or the emailed-link deep link, read by the submit
+// handler to know which uninformedLeaves doc to update.
+let currentUninformedReport = null;
+
+function openUninformedResolveDrawer_(report) {
+  // Only one drawer open at a time, same convention as openLeaveDrawer()
+  // closing My Leaves before opening on top of it.
+  closeMyLeavesDrawer();
+  currentUninformedReport = report;
+  const d = report.date && report.date.toDate ? report.date.toDate() : null;
+  uninformedResolveDate.textContent = d ? fmtDateLocal_(d) : '-';
+  uninformedResolveReportedReason.innerHTML = report.reasonHtml || '<i>No reason provided.</i>';
+  uninformedResolveReportedBy.textContent = report.reportedBy ? 'Reported by ' + report.reportedBy : '';
+  uninformedResolveEditor.innerHTML = '';
+  uninformedResolveError.classList.add('hidden');
+  uninformedResolveDrawer.classList.add('open');
+  uninformedResolveBackdrop.classList.add('open');
+  uninformedResolveEditor.focus();
+}
+
+function closeUninformedResolveDrawer_() {
+  uninformedResolveDrawer.classList.remove('open');
+  uninformedResolveBackdrop.classList.remove('open');
+  currentUninformedReport = null;
+  if (activeCell === uninformedResolveEditor) activeCell = null;
+}
+
+async function submitUninformedResolution_() {
+  if (!currentUninformedReport) return;
+  const html = uninformedResolveEditor.innerHTML.trim();
+  if (!html || uninformedResolveEditor.textContent.trim() === '') {
+    uninformedResolveError.textContent = 'Please explain what happened before submitting.';
+    uninformedResolveError.classList.remove('hidden');
+    return;
+  }
+  uninformedResolveSubmitBtn.disabled = true;
+  const originalLabel = uninformedResolveSubmitBtn.textContent;
+  uninformedResolveSubmitBtn.textContent = 'Submitting…';
+  try {
+    await updateDoc(doc(db, 'uninformedLeaves', currentUninformedReport.reportId), {
+      status: 'resolved',
+      resolvedAt: serverTimestamp(),
+      resolvedBy: (currentUserContext && currentUserContext.displayName) || currentUserEmail_(),
+      resolutionHtml: html
+    });
+    closeUninformedResolveDrawer_();
+    showToast_('Resolution submitted.', 'success');
+    loadUninformedBanner_();
+  } catch (_e) {
+    uninformedResolveError.textContent = 'Could not submit - please try again.';
+    uninformedResolveError.classList.remove('hidden');
+  } finally {
+    uninformedResolveSubmitBtn.disabled = false;
+    uninformedResolveSubmitBtn.textContent = originalLabel;
+  }
 }
 
 // Pending-request banner (mockup .banner) - the most recently requested
@@ -1832,6 +1955,7 @@ leaveBackBtn.addEventListener('click', () => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && leaveDrawer.classList.contains('open')) closeLeaveDrawer();
   if (e.key === 'Escape' && myLeavesDrawer.classList.contains('open')) closeMyLeavesDrawer();
+  if (e.key === 'Escape' && uninformedResolveDrawer.classList.contains('open')) closeUninformedResolveDrawer_();
 });
 
 leaveCategoryForeignTripBtn.addEventListener('click', () => selectLeaveCategory_('foreignTrip'));
@@ -1864,6 +1988,18 @@ myLeavesList.addEventListener('click', (e) => {
 myLeavesBannerViewBtn.addEventListener('click', () => {
   viewLeaveRequestInHistory_(myLeavesBanner.dataset.requestId);
 });
+uninformedBannerViewBtn.addEventListener('click', async () => {
+  const reportId = uninformedBanner.dataset.reportId;
+  if (!reportId) return;
+  try {
+    const snap = await getDoc(doc(db, 'uninformedLeaves', reportId));
+    if (snap.exists()) openUninformedResolveDrawer_(Object.assign({ reportId: snap.id }, snap.data()));
+  } catch (_e) { /* best-effort */ }
+});
+closeUninformedResolveDrawerBtn.addEventListener('click', closeUninformedResolveDrawer_);
+uninformedResolveBackdrop.addEventListener('click', closeUninformedResolveDrawer_);
+uninformedResolveCancelBtn.addEventListener('click', closeUninformedResolveDrawer_);
+uninformedResolveSubmitBtn.addEventListener('click', submitUninformedResolution_);
 myLeavesQuarterTiles.addEventListener('click', (e) => {
   const btn = e.target.closest('.q');
   if (!btn) return;
@@ -2614,6 +2750,7 @@ onAuthStateChanged(auth, async (user) => {
     .then(function () { if (isTaskTableEmpty()) syncTableToSelectedWeek(); })
     .catch(function () { /* offline - the form still works */ });
   openMyLeavesDeepLinkOnce_();
+  openResolveUninformedDeepLinkOnce_();
 });
 
 // Deep link used by the decision email's "View leave history" CTA
@@ -2626,6 +2763,28 @@ function openMyLeavesDeepLinkOnce_() {
   if (deepLinkOpened_ || location.hash !== '#my-leaves') return;
   deepLinkOpened_ = true;
   openMyLeavesDrawer();
+}
+
+// Deep link used by the uninformed-leave report email's "Resolve the Issue"
+// button (https://arsalanmukhtar.github.io/daily_tasks/#resolve-uninformed=<id>) -
+// same guarding pattern as openMyLeavesDeepLinkOnce_ above (only fires once,
+// after currentUserContext is fully set). The read rule already restricts
+// this doc to its own reported email or the owner, but this double-checks
+// email match too rather than silently opening the drawer with someone
+// else's report should the two ever disagree.
+let resolveDeepLinkOpened_ = false;
+async function openResolveUninformedDeepLinkOnce_() {
+  const match = /^#resolve-uninformed=(.+)$/.exec(location.hash);
+  if (resolveDeepLinkOpened_ || !match) return;
+  resolveDeepLinkOpened_ = true;
+  const reportId = decodeURIComponent(match[1]);
+  try {
+    const snap = await getDoc(doc(db, 'uninformedLeaves', reportId));
+    if (!snap.exists()) return;
+    const data = snap.data();
+    if ((data.email || '').toLowerCase() !== currentUserEmail_()) return;
+    openUninformedResolveDrawer_(Object.assign({ reportId: snap.id }, data));
+  } catch (_e) { /* offline or permission-denied - nothing to open */ }
 }
 
 signInBtn.addEventListener('click', async () => {

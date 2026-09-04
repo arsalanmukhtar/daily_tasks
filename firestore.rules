@@ -110,6 +110,43 @@ service cloud.firestore {
         request.time > resource.data.withdrawnAt + duration.value(7, 'd');
     }
 
+    // ---------- uninformedLeaves ----------
+    // A manager-filed report that a developer was absent without ever
+    // applying for leave. Resolving it (by the developer explaining
+    // themselves, or the owner overriding directly) is the only client-side
+    // write; the actual conversion into an approved leaveRequests doc (and
+    // stamping linkedRequestId back onto this doc) happens server-side via
+    // push-daemon's Admin SDK, which bypasses these rules entirely - the
+    // existing leaveRequests create rule only allows status=='requested',
+    // and a non-owner developer has no path to create one as 'approved'.
+    match /uninformedLeaves/{reportId} {
+      allow read: if isAllowlisted() &&
+        (resource.data.email == emailLower() || isOwner());
+
+      allow create: if isOwner() && request.resource.data.status == 'reported';
+
+      // Two disjoint resolvers - the reported developer explaining
+      // themselves, or the owner resolving it directly - both touching only
+      // the same specific fields.
+      allow update: if
+        (
+          isAllowlisted() &&
+          resource.data.email == emailLower() &&
+          resource.data.status == 'reported' &&
+          request.resource.data.status == 'resolved' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'resolvedAt', 'resolvedBy', 'resolutionHtml'])
+        ) || (
+          isOwner() &&
+          resource.data.status == 'reported' &&
+          request.resource.data.status == 'resolved' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'resolvedAt', 'resolvedBy', 'resolutionHtml'])
+        );
+
+      allow delete: if false;
+    }
+
     // ---------- pushTokens ----------
     // Doc ID = the FCM token itself. Anyone allowlisted may register their
     // own token (the VM daemon reads this collection via the Admin SDK,

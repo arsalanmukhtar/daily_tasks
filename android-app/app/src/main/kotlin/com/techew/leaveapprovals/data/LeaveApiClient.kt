@@ -96,6 +96,52 @@ class LeaveApiClient(
     suspend fun deleteExpiredRequest(requestId: String) {
         runCatching { db.collection("leaveRequests").document(requestId).delete().await() }
     }
+
+    fun listenUninformedLeaves(limit: Int = 300, onResult: (Result<List<UninformedLeave>>) -> Unit): ListenerRegistration {
+        return db.collection("uninformedLeaves")
+            .orderBy("reportedAt", Query.Direction.DESCENDING)
+            .limit(limit.toLong())
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    onResult(Result.failure(error))
+                } else if (snapshot != null) {
+                    onResult(Result.success(snapshot.documents.map { it.toUninformedLeave() }))
+                }
+            }
+    }
+
+    // `dateMillis` is a UTC-day value from EditableDateField's DatePickerState,
+    // same convention as LeaveDateDialog's read-only picker.
+    suspend fun reportUninformedLeave(email: String, name: String, dateMillis: Long, reasonHtml: String) {
+        val reportedBy = auth.currentUser?.displayName ?: auth.currentUser?.email ?: "Unknown"
+        db.collection("uninformedLeaves").add(
+            mapOf(
+                "email" to email.lowercase(),
+                "name" to name,
+                "date" to Timestamp(java.util.Date(dateMillis)),
+                "reasonHtml" to reasonHtml,
+                "reportedBy" to reportedBy,
+                "reportedAt" to FieldValue.serverTimestamp(),
+                "status" to "reported"
+            )
+        ).await()
+    }
+
+    // Used both by the developer explaining themselves (web) and the owner
+    // overriding directly (Android) - firestore.rules' two update disjuncts
+    // allow either, both writing exactly these fields. push-daemon's Admin
+    // SDK is what actually converts this into an approved leaveRequests doc.
+    suspend fun resolveUninformedLeave(reportId: String, resolutionHtml: String) {
+        val resolvedBy = auth.currentUser?.displayName ?: auth.currentUser?.email ?: "Unknown"
+        db.collection("uninformedLeaves").document(reportId).update(
+            mapOf(
+                "status" to "resolved",
+                "resolvedAt" to FieldValue.serverTimestamp(),
+                "resolvedBy" to resolvedBy,
+                "resolutionHtml" to resolutionHtml
+            )
+        ).await()
+    }
 }
 
 private fun DocumentSnapshot.toLeaveRequest(): LeaveRequest = LeaveRequest(
@@ -116,6 +162,21 @@ private fun DocumentSnapshot.toLeaveRequest(): LeaveRequest = LeaveRequest(
     shortLeaveTime = getString("shortLeaveTime") ?: "",
     decisionNote = getString("decisionNote") ?: "",
     withdrawnAt = getTimestamp("withdrawnAt").toIsoStringOrEmpty()
+)
+
+private fun DocumentSnapshot.toUninformedLeave(): UninformedLeave = UninformedLeave(
+    reportId = id,
+    email = getString("email") ?: "",
+    name = getString("name") ?: "",
+    date = getTimestamp("date").toIsoStringOrEmpty(),
+    reasonHtml = getString("reasonHtml") ?: "",
+    reportedBy = getString("reportedBy") ?: "",
+    reportedAt = getTimestamp("reportedAt").toIsoStringOrEmpty(),
+    status = getString("status") ?: "reported",
+    resolvedAt = getTimestamp("resolvedAt").toIsoStringOrEmpty(),
+    resolvedBy = getString("resolvedBy") ?: "",
+    resolutionHtml = getString("resolutionHtml") ?: "",
+    linkedRequestId = getString("linkedRequestId") ?: ""
 )
 
 private fun Timestamp?.toIsoStringOrEmpty(): String = this?.toDate()?.toInstant()?.toString() ?: ""

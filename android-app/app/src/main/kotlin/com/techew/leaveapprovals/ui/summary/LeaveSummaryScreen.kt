@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import com.techew.leaveapprovals.data.AllowlistEntry
 import com.techew.leaveapprovals.data.LeaveRequest
 import com.techew.leaveapprovals.data.LeaveType
+import com.techew.leaveapprovals.data.UninformedLeave
 import com.techew.leaveapprovals.ui.charts.MonthlyTrendChart
 import com.techew.leaveapprovals.ui.common.Avatar
 import com.techew.leaveapprovals.ui.requests.durationColors
@@ -75,6 +76,15 @@ private fun LeaveRequest.dateOrNull(): java.time.ZonedDateTime? =
 private fun LeaveRequest.isoWeekOrNull(): Int? =
     dateOrNull()?.toLocalDate()?.get(WeekFields.ISO.weekOfWeekBasedYear())
 
+// Uninformed-leave reports live in their own collection (not leaveRequests
+// until resolved), scoped by their own `date` field - same "when did this
+// actually happen" grain as LeaveRequest.dateOrNull() above.
+private fun UninformedLeave.dateOrNull(): java.time.ZonedDateTime? =
+    runCatching { Instant.parse(date).atZone(ZoneId.systemDefault()) }.getOrNull()
+
+private fun UninformedLeave.isoWeekOrNull(): Int? =
+    dateOrNull()?.toLocalDate()?.get(WeekFields.ISO.weekOfWeekBasedYear())
+
 private enum class Granularity(val label: String) { YEAR("Year"), QUARTER("Quarter"), MONTH("Month"), WEEK("Week") }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,6 +92,7 @@ private enum class Granularity(val label: String) { YEAR("Year"), QUARTER("Quart
 fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
     val records by viewModel.records.collectAsState()
     val roster by viewModel.roster.collectAsState()
+    val uninformedLeaves by viewModel.uninformedLeaves.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
 
@@ -127,6 +138,29 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
         val weeks = yearRecords.mapNotNull { it.isoWeekOrNull() }.toMutableSet()
         weeks.add(java.time.LocalDate.now().get(WeekFields.ISO.weekOfWeekBasedYear()))
         weeks.sorted()
+    }
+
+    // Same developer/year/quarter/month/week scoping chain as finalRecords
+    // above, applied to uninformedLeaves instead - counts every report
+    // (reported and resolved both) in scope, since the "Uninformed Leave"
+    // bar is meant to answer "how many days did this happen", not "how many
+    // have been dealt with".
+    val scopedUninformed = remember(uninformedLeaves, selectedEmails) {
+        if (selectedEmails.isEmpty()) uninformedLeaves else uninformedLeaves.filter { it.email in selectedEmails }
+    }
+    val yearUninformed = remember(scopedUninformed, selectedYear) {
+        scopedUninformed.filter { it.dateOrNull()?.year == selectedYear }
+    }
+    val finalUninformed = remember(yearUninformed, granularity, selectedQuarter, selectedMonth, selectedWeek) {
+        when (granularity) {
+            Granularity.YEAR -> yearUninformed
+            Granularity.QUARTER -> yearUninformed.filter { r ->
+                val m = r.dateOrNull()?.monthValue ?: return@filter false
+                (m - 1) / 3 + 1 == selectedQuarter
+            }
+            Granularity.MONTH -> yearUninformed.filter { it.dateOrNull()?.monthValue == selectedMonth }
+            Granularity.WEEK -> yearUninformed.filter { it.isoWeekOrNull() == selectedWeek }
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -264,10 +298,18 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                         ) {
                             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                                val maxTypeCount = LeaveType.ALL.maxOf { t -> finalRecords.count { it.type == t } }.coerceAtLeast(1)
+                                // Uninformed Leave's count comes from the separate
+                                // uninformedLeaves collection (see finalUninformed
+                                // above), not from finalRecords like every other type.
+                                val typeCounts = remember(finalRecords, finalUninformed) {
+                                    LeaveType.ALL.associateWith { t ->
+                                        if (t == LeaveType.UNINFORMED_ABSENCE) finalUninformed.size else finalRecords.count { it.type == t }
+                                    }
+                                }
+                                val maxTypeCount = (typeCounts.values.maxOrNull() ?: 0).coerceAtLeast(1)
                                 LeaveType.ALL.forEachIndexed { index, type ->
                                     if (index > 0) Box(Modifier.height(10.dp))
-                                    val count = finalRecords.count { it.type == type }
+                                    val count = typeCounts[type] ?: 0
                                     val (barColor, _) = durationColors(type)
                                     TypeBarRow(LeaveType.label(type), count, maxTypeCount, barColor)
                                 }
