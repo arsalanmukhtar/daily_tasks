@@ -1179,7 +1179,10 @@ function leaveClampTimeToWindow_(t) {
 function initLeaveTimeControl_(cfg) {
   function refresh() {
     const t = leaveClampTimeToWindow_(cfg.get());
-    cfg.input.value = leaveTimeLabel_(t) + ' ' + t.period;
+    // No " AM"/"PM" suffix here - the adjacent toggle buttons already show
+    // the period, and repeating it in the input just gets clipped in this
+    // compact a box.
+    cfg.input.value = leaveTimeLabel_(t);
     cfg.amBtn.classList.toggle('is-selected', t.period === 'AM');
     cfg.pmBtn.classList.toggle('is-selected', t.period === 'PM');
   }
@@ -1892,7 +1895,14 @@ function renderMyLeavesQuarterTiles_(records) {
     else if (r.status === 'rejected') q.rejected++;
     else if (r.status === 'requested') q.pending++;
   });
+  // A quarter that hasn't started yet can't have any leaves in it - disable
+  // it instead of letting it sit there tappable (and, in the past, visually
+  // indistinguishable once selected) alongside quarters that have actually
+  // happened.
+  const now = new Date();
+  const currentQuarter = Math.floor(now.getMonth() / 3) + 1;
   myLeavesQuarterTiles.innerHTML = quarters.map(function (q) {
+    const isFuture = year > now.getFullYear() || (year === now.getFullYear() && q.q > currentQuarter);
     const pct = function (n) { return q.total ? Math.round((n / q.total) * 100) : 0; };
     const bar = '<div class="qbar">' +
       (q.approved ? '<i style="background:var(--ok-600);width:' + pct(q.approved) + '%"></i>' : '') +
@@ -1903,8 +1913,10 @@ function renderMyLeavesQuarterTiles_(records) {
     if (q.approved) metaParts.push(q.approved + ' ok');
     if (q.rejected) metaParts.push(q.rejected + ' rejected');
     if (q.pending) metaParts.push(q.pending + ' pending');
-    const meta = metaParts.length ? metaParts.join(' &middot; ') : '<span class="mut" style="color:var(--ink-400)">No leaves</span>';
-    return '<button type="button" class="q' + (q.q === myLeavesSelectedQuarter ? ' is-selected' : '') + '" data-quarter="' + q.q + '">' +
+    const meta = metaParts.length ? metaParts.join(' &middot; ')
+      : '<span class="mut" style="color:var(--ink-400)">' + (isFuture ? "Hasn't started" : 'No leaves') + '</span>';
+    return '<button type="button" class="q' + (q.q === myLeavesSelectedQuarter ? ' is-selected' : '') + (isFuture ? ' is-future' : '') + '"' +
+      (isFuture ? ' disabled' : '') + ' data-quarter="' + q.q + '">' +
       '<div class="qh"><span class="qn">Q' + q.q + '</span><span class="qv">' + q.total + '</span></div>' +
       bar +
       '<div class="qm">' + meta + '</div>' +
@@ -1914,10 +1926,14 @@ function renderMyLeavesQuarterTiles_(records) {
 
 async function renderMyLeavesTrendChart_(records) {
   const year = myLeavesSelectedYear;
+  // Scoped to the selected quarter tile, same as the history list below it -
+  // a quarter with zero leaves should render as a genuinely empty chart
+  // rather than continuing to show a different quarter's bars.
+  const scoped = quarterScopedLeaveRecords_(records);
   const approved = new Array(12).fill(0);
   const rejected = new Array(12).fill(0);
   const pending = new Array(12).fill(0);
-  records.forEach((r) => {
+  scoped.forEach((r) => {
     const d = leaveRecordDate_(r);
     if (!d || d.getFullYear() !== year) return;
     const m = d.getMonth();
@@ -2044,6 +2060,7 @@ function viewLeaveRequestInHistory_(requestId) {
   const recs = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
   renderMyLeavesQuarterTiles_(recs);
   renderMyLeavesHistorySection_(recs);
+  renderMyLeavesTrendChart_(recs);
   requestAnimationFrame(function () {
     const el = document.getElementById('leave-card-' + requestId);
     if (!el) return;
@@ -2276,12 +2293,13 @@ uninformedResolveCancelBtn.addEventListener('click', closeUninformedResolveDrawe
 uninformedResolveSubmitBtn.addEventListener('click', submitUninformedResolution_);
 myLeavesQuarterTiles.addEventListener('click', (e) => {
   const btn = e.target.closest('.q');
-  if (!btn) return;
+  if (!btn || btn.disabled) return;
   const q = parseInt(btn.dataset.quarter, 10);
   myLeavesSelectedQuarter = (myLeavesSelectedQuarter === q) ? null : q;
   const recs = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
   renderMyLeavesQuarterTiles_(recs);
   renderMyLeavesHistorySection_(recs);
+  renderMyLeavesTrendChart_(recs);
 });
 myLeavesHistoryFilters.addEventListener('click', (e) => {
   const btn = e.target.closest('.fchip');

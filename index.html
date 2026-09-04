@@ -641,57 +641,61 @@
                 </div>
               </div>
 
-              <div id="leaveShortTimePicker" class="time-picker hidden">
-                <div class="tp-row">
-                  <div class="tp-label">Half-day starts at</div>
-                  <div class="tp-controls">
-                    <button type="button" class="tp-step" id="leaveTimeMinusBtn" aria-label="5 minutes earlier">&minus;</button>
-                    <input type="text" id="leaveTimeInput" class="tp-input" inputmode="numeric" aria-label="Time" value="8:30 AM" />
-                    <button type="button" class="tp-step" id="leaveTimePlusBtn" aria-label="5 minutes later">+</button>
-                    <div class="tp-ampm-seg">
-                      <button type="button" id="leaveTimeAmBtn" class="tp-ampm-btn is-selected">AM</button>
-                      <button type="button" id="leaveTimePmBtn" class="tp-ampm-btn">PM</button>
+              <div class="dcal-bottom-row">
+                <div id="leaveShortTimePicker" class="time-picker hidden">
+                  <div class="tp-row">
+                    <div class="tp-label">Starts at</div>
+                    <div class="tp-controls">
+                      <button type="button" class="tp-step" id="leaveTimeMinusBtn" aria-label="5 minutes earlier">&minus;</button>
+                      <input type="text" id="leaveTimeInput" class="tp-input" inputmode="numeric" aria-label="Time" value="8:30" />
+                      <button type="button" class="tp-step" id="leaveTimePlusBtn" aria-label="5 minutes later">+</button>
+                      <div class="tp-ampm-seg">
+                        <button type="button" id="leaveTimeAmBtn" class="tp-ampm-btn is-selected">AM</button>
+                        <button type="button" id="leaveTimePmBtn" class="tp-ampm-btn">PM</button>
+                      </div>
                     </div>
                   </div>
+                  <p class="tp-hint">8:30 AM &ndash; 4:30 PM</p>
                 </div>
-                <p class="tp-hint">Office hours only &middot; 8:30 AM &ndash; 4:30 PM</p>
-              </div>
 
-              <div id="leaveOutPassTimePicker" class="time-picker hidden">
-                <div class="tp-row">
-                  <div class="tp-label">Check-out time</div>
-                  <div class="tp-controls">
-                    <button type="button" class="tp-step" id="leaveOutCheckOutMinusBtn" aria-label="5 minutes earlier">&minus;</button>
-                    <input type="text" id="leaveOutCheckOutInput" class="tp-input" inputmode="numeric" aria-label="Check-out time" value="9:00 AM" />
-                    <button type="button" class="tp-step" id="leaveOutCheckOutPlusBtn" aria-label="5 minutes later">+</button>
-                    <div class="tp-ampm-seg">
-                      <button type="button" id="leaveOutCheckOutAmBtn" class="tp-ampm-btn is-selected">AM</button>
-                      <button type="button" id="leaveOutCheckOutPmBtn" class="tp-ampm-btn">PM</button>
+                <div id="leaveOutPassTimePicker" class="time-picker time-picker-split hidden">
+                  <div class="tp-cols">
+                    <div class="tp-row">
+                      <div class="tp-label">Check-out</div>
+                      <div class="tp-controls">
+                        <button type="button" class="tp-step" id="leaveOutCheckOutMinusBtn" aria-label="5 minutes earlier">&minus;</button>
+                        <input type="text" id="leaveOutCheckOutInput" class="tp-input" inputmode="numeric" aria-label="Check-out time" value="9:00" />
+                        <button type="button" class="tp-step" id="leaveOutCheckOutPlusBtn" aria-label="5 minutes later">+</button>
+                        <div class="tp-ampm-seg">
+                          <button type="button" id="leaveOutCheckOutAmBtn" class="tp-ampm-btn is-selected">AM</button>
+                          <button type="button" id="leaveOutCheckOutPmBtn" class="tp-ampm-btn">PM</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="tp-row">
+                      <div class="tp-label">Check-in</div>
+                      <div class="tp-controls">
+                        <button type="button" class="tp-step" id="leaveOutCheckInMinusBtn" aria-label="5 minutes earlier">&minus;</button>
+                        <input type="text" id="leaveOutCheckInInput" class="tp-input" inputmode="numeric" aria-label="Check-in time" value="1:00" />
+                        <button type="button" class="tp-step" id="leaveOutCheckInPlusBtn" aria-label="5 minutes later">+</button>
+                        <div class="tp-ampm-seg">
+                          <button type="button" id="leaveOutCheckInAmBtn" class="tp-ampm-btn">AM</button>
+                          <button type="button" id="leaveOutCheckInPmBtn" class="tp-ampm-btn is-selected">PM</button>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                  <p id="leaveOutPassTimeError" class="hidden mt-1 text-xs text-red-600"></p>
+                  <p class="tp-hint">8:30 AM &ndash; 4:30 PM</p>
                 </div>
-                <div class="tp-row">
-                  <div class="tp-label">Check-in time</div>
-                  <div class="tp-controls">
-                    <button type="button" class="tp-step" id="leaveOutCheckInMinusBtn" aria-label="5 minutes earlier">&minus;</button>
-                    <input type="text" id="leaveOutCheckInInput" class="tp-input" inputmode="numeric" aria-label="Check-in time" value="1:00 PM" />
-                    <button type="button" class="tp-step" id="leaveOutCheckInPlusBtn" aria-label="5 minutes later">+</button>
-                    <div class="tp-ampm-seg">
-                      <button type="button" id="leaveOutCheckInAmBtn" class="tp-ampm-btn">AM</button>
-                      <button type="button" id="leaveOutCheckInPmBtn" class="tp-ampm-btn is-selected">PM</button>
-                    </div>
-                  </div>
-                </div>
-                <p id="leaveOutPassTimeError" class="hidden mt-1 text-xs text-red-600"></p>
-                <p class="tp-hint">Office hours only &middot; 8:30 AM &ndash; 4:30 PM</p>
-              </div>
 
-              <div id="leaveDatePicked" class="picked hidden" title="Click to see all selected dates">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C2410C" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
-                <div id="leaveDatePickedSingle" class="min-w-0">
-                  <b id="leaveDatePickedLabel"></b><span id="leaveDatePickedMeta"></span>
+                <div id="leaveDatePicked" class="picked hidden" title="Click to see all selected dates">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C2410C" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+                  <div id="leaveDatePickedSingle" class="min-w-0">
+                    <b id="leaveDatePickedLabel"></b><span id="leaveDatePickedMeta"></span>
+                  </div>
+                  <div id="leaveDatePickedChips" class="hidden date-chip-row"></div>
                 </div>
-                <div id="leaveDatePickedChips" class="hidden date-chip-row"></div>
               </div>
               <p id="leaveDateRangeError" class="hidden mt-1 text-xs text-red-600"></p>
             </div>
