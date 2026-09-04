@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Calendar · C2 Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   C2 — PANEL
+   Presets rail on the left, calendar on the right.
+   Month and year are select controls in the centre, arrows at
+   both ends. Days are circles; the range is drawn as a dotted
+   connector in the gap, so no two circles ever meet.
+   ============================================================ */
+:root{
+  --accent:#9A5B3C;         /* muted clay */
+  --accent-ink:#7B4630;
+  --accent-soft:#F6EDE8;
+  --accent-line:#E4CDC1;
+
+  --ink:#241F1C; --ink-2:#544B45; --ink-3:#7A706A; --ink-4:#A79C95;
+  --line:#E7E1DC; --line-soft:#F2EDE9;
+  --surface:#FFFFFF; --surface-2:#FBF9F7; --rail:#F7F4F1;
+  --cell:42px;
+}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:#EDE8E4;display:grid;place-items:center;padding:44px 16px;
+     font-family:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink)}
+.note{max-width:560px;margin:0 auto 18px;font-size:12.5px;line-height:1.6;color:var(--ink-3);text-align:center}
+.note b{color:var(--ink);font-weight:600}
+
+.cal{width:560px;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;
+     box-shadow:0 1px 2px rgba(36,31,28,.04),0 14px 34px rgba(36,31,28,.09);display:flex}
+
+/* presets ---------------------------------------------------- */
+.side{width:164px;flex:none;background:var(--rail);border-right:1px solid var(--line);padding:14px 12px;
+      display:flex;flex-direction:column;gap:3px}
+.side .lb{font-size:9.5px;font-weight:700;letter-spacing:.09em;color:var(--ink-4);padding:0 6px 8px}
+.side button{text-align:left;border:0;background:transparent;border-radius:8px;padding:8px 9px;cursor:pointer;
+             font:500 12.5px Inter;color:var(--ink-2);transition:.14s}
+.side button:hover{background:#EFEAE5;color:var(--ink)}
+.side button.on{background:var(--surface);color:var(--accent-ink);font-weight:600;
+                box-shadow:0 1px 2px rgba(36,31,28,.06)}
+.side .sp{flex:1}
+.side .hint{font-size:10.5px;line-height:1.5;color:var(--ink-4);padding:0 6px}
+
+/* main ------------------------------------------------------- */
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.hd{display:flex;align-items:center;gap:8px;padding:14px 14px 12px}
+.nav{width:30px;height:30px;flex:none;border:1px solid var(--line);background:var(--surface);border-radius:99px;
+     display:grid;place-items:center;cursor:pointer;color:var(--ink-2);transition:.15s}
+.nav:hover{background:var(--surface-2);border-color:#D9D1CB;color:var(--ink)}
+.nav svg{width:14px;height:14px}
+.pick{flex:1;display:flex;justify-content:center;gap:6px;min-width:0}
+.sl{position:relative}
+.sl select{appearance:none;border:1px solid transparent;background:transparent;border-radius:8px;
+           padding:5px 22px 5px 9px;font:600 14px Inter;color:var(--ink);cursor:pointer;letter-spacing:-.01em}
+.sl select:hover{background:var(--surface-2);border-color:var(--line)}
+.sl select:focus{outline:2px solid var(--accent);outline-offset:1px}
+.sl:after{content:"";position:absolute;right:9px;top:50%;margin-top:-2px;width:0;height:0;pointer-events:none;
+          border-left:3.5px solid transparent;border-right:3.5px solid transparent;border-top:4px solid var(--ink-4)}
+
+.wd{display:grid;grid-template-columns:repeat(7,1fr);padding:2px 12px 4px}
+.wd span{text-align:center;font-size:10px;font-weight:600;letter-spacing:.06em;color:var(--ink-4);padding-bottom:6px}
+
+.grid{display:grid;grid-template-columns:repeat(7,1fr);padding:0 12px 6px}
+.cell{height:var(--cell);position:relative;display:grid;place-items:center}
+/* dotted connector lives in the gutter between two circles */
+.cell .link{position:absolute;top:50%;height:0;border-top:2px dotted var(--accent-line);pointer-events:none;
+            transform:translateY(-1px)}
+.cell .link.l{left:0;right:50%;margin-right:17px}
+.cell .link.r{left:50%;right:0;margin-left:17px}
+.d{width:32px;height:32px;border-radius:99px;border:1.5px solid transparent;background:transparent;
+   display:grid;place-items:center;font:500 13px Inter;color:var(--ink);cursor:pointer;position:relative;z-index:1;
+   font-variant-numeric:tabular-nums;transition:background .12s,border-color .12s,color .12s}
+.d:hover{background:var(--surface-2);border-color:var(--line)}
+.d:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.d.adj{color:#CFC7C1;font-weight:400}
+.d.we{color:var(--ink-4)}
+.d.today{border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.d.mid{background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent-ink)}
+.d.edge{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.d.edge:hover{background:var(--accent-ink);border-color:var(--accent-ink)}
+
+.ft{margin-top:auto;border-top:1px solid var(--line-soft);background:var(--surface-2);padding:11px 14px 13px;
+    display:flex;align-items:center;gap:10px}
+.ft .v{font-size:12.5px;font-weight:600;color:var(--ink)}
+.ft .v em{font-style:normal;color:var(--ink-4);font-weight:400}
+.ft .n{font-size:11px;font-weight:600;color:var(--accent-ink);background:var(--accent-soft);
+       border:1px solid var(--accent-line);border-radius:99px;padding:2px 9px}
+.ft .btns{margin-left:auto;display:flex;gap:7px}
+.ft button{height:34px;padding:0 14px;border-radius:8px;font:600 12.5px Inter;cursor:pointer;
+           border:1px solid var(--line);background:var(--surface);color:var(--ink-2)}
+.ft button:hover{background:#F3EFEC}
+.ft .go{background:var(--accent);border-color:var(--accent);color:#fff}
+.ft .go:hover{background:var(--accent-ink)}
+.ft .go[disabled]{opacity:.45;cursor:not-allowed}
+</style>
+</head>
+<body>
+<div>
+  <p class="note"><b>C2 — Panel.</b> Presets on the left so common picks skip the grid entirely. Month and year are selects between the arrows, which beats clicking forward eleven times. Circles are 32px in a 42px cell, and the range is a dotted connector drawn in the 10px gutter — the circles never meet.</p>
+
+  <div class="cal">
+    <aside class="side">
+      <div class="lb">QUICK PICKS</div>
+      <button data-p="today">Today</button>
+      <button data-p="tomorrow">Tomorrow</button>
+      <button data-p="week">Rest of this week</button>
+      <button data-p="nextweek" class="on">Next week</button>
+      <button data-p="fortnight">Next two weeks</button>
+      <button data-p="month">Rest of this month</button>
+      <div class="sp"></div>
+      <div class="hint">Weekends are dimmed and excluded from the working-day count.</div>
+    </aside>
+
+    <div class="main">
+      <div class="hd">
+        <button class="nav" id="prev" aria-label="Previous month">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+        <div class="pick">
+          <span class="sl"><select id="mSel"></select></span>
+          <span class="sl"><select id="ySel"></select></span>
+        </div>
+        <button class="nav" id="next" aria-label="Next month">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+      </div>
+
+      <div class="wd"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+      <div class="grid" id="grid"></div>
+
+      <div class="ft">
+        <span class="v" id="label"></span>
+        <span class="n" id="count"></span>
+        <span class="btns"><button id="clear">Clear</button><button class="go" id="apply">Apply</button></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const TODAY=new Date(2026,8,4);
+let view=new Date(2026,8,1), start=new Date(2026,8,7), end=new Date(2026,8,11);
+
+const key=d=>d.getFullYear()*10000+d.getMonth()*100+d.getDate();
+const same=(a,b)=>a&&b&&key(a)===key(b);
+const between=(d,a,b)=>a&&b&&key(d)>key(a)&&key(d)<key(b);
+const fmt=d=>d.toLocaleDateString("en-GB",{day:"numeric",month:"short"});
+function workdays(a,b){let n=0,c=new Date(a);while(key(c)<=key(b)){const w=c.getDay();if(w!==0&&w!==6)n++;c.setDate(c.getDate()+1);}return n;}
+
+const mSel=document.getElementById("mSel"), ySel=document.getElementById("ySel");
+MONTHS.forEach((m,i)=>mSel.add(new Option(m,i)));
+for(let y=2024;y<=2030;y++)ySel.add(new Option(y,y));
+
+function render(){
+  mSel.value=view.getMonth(); ySel.value=view.getFullYear();
+  const lead=new Date(view.getFullYear(),view.getMonth(),1).getDay();
+  const grid=document.getElementById("grid");
+  grid.innerHTML="";
+
+  for(let i=0;i<42;i++){
+    const d=new Date(view.getFullYear(),view.getMonth(),1-lead+i);
+    const cell=document.createElement("div"); cell.className="cell";
+
+    const isStart=same(d,start), isEnd=same(d,end), isMid=between(d,start,end);
+    const inRange=isStart||isEnd||isMid;
+    const hasRange=start&&end&&!same(start,end);
+
+    if(inRange&&hasRange){
+      const col=d.getDay();
+      if((isMid||isEnd)&&col!==0){const l=document.createElement("span");l.className="link l";cell.appendChild(l);}
+      if((isMid||isStart)&&col!==6){const r=document.createElement("span");r.className="link r";cell.appendChild(r);}
+    }
+
+    const btn=document.createElement("button");
+    btn.className="d"; btn.type="button"; btn.textContent=d.getDate();
+    if(d.getMonth()!==view.getMonth())btn.classList.add("adj");
+    if(d.getDay()===0||d.getDay()===6)btn.classList.add("we");
+    if(same(d,TODAY))btn.classList.add("today");
+    if(isStart||isEnd)btn.classList.add("edge");
+    else if(isMid)btn.classList.add("mid");
+    btn.addEventListener("click",()=>pick(d));
+
+    cell.appendChild(btn);
+    grid.appendChild(cell);
+  }
+
+  const lab=document.getElementById("label"), cnt=document.getElementById("count");
+  if(!start){lab.innerHTML='<em>No dates selected</em>';cnt.style.display="none";}
+  else if(!end){lab.innerHTML=fmt(start)+' <em>– pick an end</em>';cnt.style.display="none";}
+  else{lab.textContent=fmt(start)+' – '+fmt(end)+' '+end.getFullYear();
+       cnt.style.display="";cnt.textContent=workdays(start,end)+' working days';}
+  document.getElementById("apply").disabled=!(start&&end);
+}
+
+function pick(d){
+  if(!start||(start&&end)){start=d;end=null;}
+  else if(key(d)<key(start)){end=start;start=d;}
+  else{end=d;}
+  document.querySelectorAll(".side button").forEach(b=>b.classList.remove("on"));
+  render();
+}
+
+document.getElementById("prev").onclick=()=>{view=new Date(view.getFullYear(),view.getMonth()-1,1);render();};
+document.getElementById("next").onclick=()=>{view=new Date(view.getFullYear(),view.getMonth()+1,1);render();};
+mSel.onchange=()=>{view=new Date(view.getFullYear(),+mSel.value,1);render();};
+ySel.onchange=()=>{view=new Date(+ySel.value,view.getMonth(),1);render();};
+document.getElementById("clear").onclick=()=>{start=null;end=null;
+  document.querySelectorAll(".side button").forEach(b=>b.classList.remove("on"));render();};
+
+document.querySelectorAll(".side button").forEach(b=>b.addEventListener("click",()=>{
+  const p=b.dataset.p, t=new Date(TODAY);
+  const add=(base,n)=>{const x=new Date(base);x.setDate(x.getDate()+n);return x;};
+  if(p==="today"){start=t;end=t;}
+  if(p==="tomorrow"){start=add(t,1);end=add(t,1);}
+  if(p==="week"){start=t;end=add(t,5-t.getDay());}
+  if(p==="nextweek"){const mon=add(t,8-t.getDay());start=mon;end=add(mon,4);}
+  if(p==="fortnight"){const mon=add(t,8-t.getDay());start=mon;end=add(mon,11);}
+  if(p==="month"){start=t;end=new Date(t.getFullYear(),t.getMonth()+1,0);}
+  view=new Date(start.getFullYear(),start.getMonth(),1);
+  document.querySelectorAll(".side button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on");
+  render();
+}));
+
+render();
+</script>
+</body>
+</html>

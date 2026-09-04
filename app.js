@@ -119,8 +119,21 @@ const leaveTypeFullBtn   = document.getElementById('leaveTypeFullBtn');
 const leaveDateModeSingleBtn = document.getElementById('leaveDateModeSingleBtn');
 const leaveDateModeRangeBtn  = document.getElementById('leaveDateModeRangeBtn');
 const leaveDateModeCustomBtn = document.getElementById('leaveDateModeCustomBtn');
-const leaveDateRangeInput = document.getElementById('leaveDateRangeInput');
 const leaveDateRangeError = document.getElementById('leaveDateRangeError');
+const leaveCalPresets   = document.getElementById('leaveCalPresets');
+const lcalPrevBtn        = document.getElementById('lcalPrevBtn');
+const lcalNextBtn        = document.getElementById('lcalNextBtn');
+const lcalMonthSelect    = document.getElementById('lcalMonthSelect');
+const lcalMonthTrigger   = document.getElementById('lcalMonthTrigger');
+const lcalMonthLabel     = document.getElementById('lcalMonthLabel');
+const lcalMonthMenu      = document.getElementById('lcalMonthMenu');
+const lcalYearSelect     = document.getElementById('lcalYearSelect');
+const lcalYearTrigger    = document.getElementById('lcalYearTrigger');
+const lcalYearLabel      = document.getElementById('lcalYearLabel');
+const lcalYearMenu       = document.getElementById('lcalYearMenu');
+const lcalGrid           = document.getElementById('lcalGrid');
+const lcalFooterLabel    = document.getElementById('lcalFooterLabel');
+const lcalClearBtn       = document.getElementById('lcalClearBtn');
 const leaveToolbar       = document.getElementById('leaveToolbar');
 const leaveReasonEditor  = document.getElementById('leaveReasonEditor');
 const leaveCancelBtn     = document.getElementById('leaveCancelBtn');
@@ -720,8 +733,8 @@ function fmtWeekRange(start, end) {
 
 // "3 Sept 2026" - like fmtFull, but reads the Date object's LOCAL calendar
 // fields rather than its UTC ones. fmtFull is correct for values built via
-// Date.UTC(...) (week Mondays, etc.) - but Flatpickr hands back plain local
-// Date objects (local midnight) for whatever the user clicked, and Firestore
+// Date.UTC(...) (week Mondays, etc.) - but the calendar hands back plain
+// local Date objects (local midnight) for whatever the user clicked, and Firestore
 // Timestamps decoded with .toDate() are also read back through the same
 // local lens elsewhere in this file (see weekLabelFromDate_/dateToIsoWeek_).
 // Using fmtFull (UTC) on those would silently shift the displayed day in any
@@ -877,9 +890,10 @@ let leaveSelectedHalfDay = 'AM'; // 'AM' | 'PM' - derived from the time picker b
 // to 5s), period is 'AM' | 'PM'. Only meaningful when selectedLeaveType === 'casualShort'.
 let leaveSelectedTime = { hour12: 7, minute: 0, period: 'AM' };
 let leaveAttachmentFiles = [];
-let leaveDateRangePicker = null;
 let leaveSelectedDates = []; // [start] or [start, end], plain JS Date objects
-let leaveDateMode = 'single'; // 'single' | 'range' | 'multiple' - which Flatpickr mode is active
+let leaveDateMode = 'single'; // 'single' | 'range' | 'multiple' - which calendar mode is active
+let lcalViewYear = new Date().getFullYear();
+let lcalViewMonth = new Date().getMonth(); // 0-11
 let myLeavesSelectedYear = null;
 let myLeavesSelectedQuarter = null; // 1-4, or null - clicking a quarter tile filters the history list to it
 let myLeavesHistoryFilter = 'all'; // 'all' | 'pending' | 'resolved' - the hfilter chips
@@ -1328,63 +1342,24 @@ function resetLeaveAttachment_() {
   leaveAttachmentCountNote.classList.add('hidden');
 }
 
-// Flatpickr (date-range calendar for the leave drawer) - lazy-loaded like
-// the other optional third-party libs (ExcelJS, Chart.js, jsPDF) since it's
-// only needed once someone actually opens the leave drawer.
-let flatpickrPromise = null;
-function loadFlatpickr_() {
-  if (window.flatpickr) return Promise.resolve(window.flatpickr);
-  if (flatpickrPromise) return flatpickrPromise;
-  flatpickrPromise = new Promise(function (resolve, reject) {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css';
-    document.head.appendChild(link);
-    const sc = document.createElement('script');
-    sc.src = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js';
-    sc.onload = function () {
-      if (window.flatpickr) resolve(window.flatpickr);
-      else reject(new Error('Calendar library failed to initialise.'));
-    };
-    sc.onerror = function () {
-      flatpickrPromise = null;
-      reject(new Error('Could not load the calendar library (check your connection).'));
-    };
-    document.head.appendChild(sc);
-  });
-  return flatpickrPromise;
-}
+// ---------- Custom calendar (replaces the old Flatpickr-based one) ----------
+// Own hand-rolled month grid instead of a third-party library - matches
+// c2.html's exact layout (presets rail, circular days, dotted range
+// connector in the gutter) restyled with our own brand tokens. Supports all
+// three of this app's date modes (Flatpickr's own "multiple" mode has no
+// direct visual equivalent in c2.html, so Custom mode paints every picked
+// day as its own filled circle with no connectors, same look as a range's
+// single endpoint).
+const LCAL_MONTHS_ = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-async function ensureLeaveDatePicker_() {
-  if (leaveDateRangePicker) return leaveDateRangePicker;
-  const flatpickr = await loadFlatpickr_();
-  leaveDateRangePicker = flatpickr(leaveDateRangeInput, {
-    mode: leaveDateMode,
-    dateFormat: 'd M Y',
-    minDate: 'today',
-    // A native <select> for the month name opens the browser's own listbox
-    // (blue-highlight OS chrome) when clicked, which CSS cannot restyle in
-    // any browser - 'static' renders the month as plain themeable text
-    // instead. Month navigation still works fine via the prev/next arrows.
-    monthSelectorType: 'static',
-    inline: true,
-    onChange: function (selectedDates) {
-      // Sort defensively rather than trusting pick order - Range mode is
-      // always chronological already, but Custom (multiple) mode reflects
-      // click order, and start/end/day-count math downstream assumes [0]
-      // is the earliest date and [length-1] is the latest.
-      leaveSelectedDates = selectedDates.slice().sort(function (a, b) { return a - b; });
-      leaveDateRangeError.classList.add('hidden');
-      updateLeaveDatePickedSummary_();
-      updateLeaveDrawerSummaryChips_();
-    }
-  });
-  return leaveDateRangePicker;
-}
+function lcalKey_(d) { return d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate(); }
+function lcalToday0_() { const t = new Date(); t.setHours(0, 0, 0, 0); return t; }
+function lcalAddDays_(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function lcalShortFmt_(d) { return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
 
-// Single Date vs Date Range is an explicit toggle rather than relying on
-// Flatpickr's range mode alone for a one-day pick (clicking the same day
-// twice in range mode is not an obvious gesture) - switching modes clears
+// Single Date vs Date Range is an explicit toggle rather than inferring
+// "range" from a second click (clicking the same day twice to mean "just
+// this one day" is not an obvious gesture) - switching modes clears
 // whatever was selected under the previous mode to avoid a stale mixed
 // selection (e.g. a leftover range end date after switching to Single Date).
 function selectLeaveDateMode_(mode) {
@@ -1392,17 +1367,224 @@ function selectLeaveDateMode_(mode) {
   leaveDateModeSingleBtn.classList.toggle('is-selected', mode === 'single');
   leaveDateModeRangeBtn.classList.toggle('is-selected', mode === 'range');
   leaveDateModeCustomBtn.classList.toggle('is-selected', mode === 'multiple');
-  leaveDateRangeInput.placeholder = mode === 'range'
-    ? 'Select start and end date'
-    : (mode === 'multiple' ? 'Select one or more dates' : 'Select a date');
-  if (leaveDateRangePicker) {
-    leaveDateRangePicker.clear();
-    leaveDateRangePicker.set('mode', mode);
-  }
+  leaveCalPresets.querySelectorAll('.cal2-preset').forEach(function (b) { b.classList.remove('is-active'); });
   leaveSelectedDates = [];
+  leaveDateRangeError.classList.add('hidden');
+  lcalRenderGrid_();
+  updateLeaveDatePickedSummary_();
+  updateLeaveDrawerSummaryChips_();
+}
+
+// Applies a click on a day button - the only place leaveSelectedDates is
+// mutated from user interaction. Range mode mirrors c2.html's pick(): a
+// fresh click (no start, or a start+end pair already complete) begins a new
+// single-point selection; a second click on an existing lone start extends
+// it into [min, max]. Custom mode toggles individual days in/out of a set.
+function lcalPickDate_(date) {
+  if (leaveDateMode === 'single') {
+    leaveSelectedDates = [date];
+  } else if (leaveDateMode === 'range') {
+    if (leaveSelectedDates.length !== 1) {
+      leaveSelectedDates = [date];
+    } else {
+      const s = leaveSelectedDates[0];
+      leaveSelectedDates = date < s ? [date, s] : [s, date];
+    }
+  } else {
+    const idx = leaveSelectedDates.findIndex(function (d) { return lcalKey_(d) === lcalKey_(date); });
+    if (idx >= 0) leaveSelectedDates.splice(idx, 1);
+    else leaveSelectedDates.push(date);
+    leaveSelectedDates.sort(function (a, b) { return a - b; });
+  }
+  leaveCalPresets.querySelectorAll('.cal2-preset').forEach(function (b) { b.classList.remove('is-active'); });
+  lcalRenderGrid_();
   leaveDateRangeError.classList.add('hidden');
   updateLeaveDatePickedSummary_();
   updateLeaveDrawerSummaryChips_();
+}
+
+function lcalRenderGrid_() {
+  lcalMonthLabel.textContent = LCAL_MONTHS_[lcalViewMonth];
+  lcalYearLabel.textContent = lcalViewYear;
+
+  const lead = new Date(lcalViewYear, lcalViewMonth, 1).getDay();
+  const todayKey = lcalKey_(lcalToday0_());
+  const isRangeMode = leaveDateMode === 'range';
+  const start = leaveSelectedDates.length ? leaveSelectedDates[0] : null;
+  const end = leaveSelectedDates.length > 1 ? leaveSelectedDates[leaveSelectedDates.length - 1] : null;
+  const multiSet = leaveDateMode === 'multiple'
+    ? new Set(leaveSelectedDates.map(lcalKey_))
+    : null;
+  const hasRange = isRangeMode && start && end && lcalKey_(start) !== lcalKey_(end);
+
+  let html = '';
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(lcalViewYear, lcalViewMonth, 1 - lead + i);
+    const dKey = lcalKey_(d);
+    const isPast = dKey < todayKey;
+    let isStart = false, isEnd = false, isMid = false;
+    if (isRangeMode && start) {
+      isStart = lcalKey_(start) === dKey;
+      isEnd = end ? lcalKey_(end) === dKey : false;
+      isMid = end ? (dKey > lcalKey_(start) && dKey < lcalKey_(end)) : false;
+    } else if (leaveDateMode === 'single' && start) {
+      isStart = lcalKey_(start) === dKey;
+    } else if (multiSet) {
+      isStart = multiSet.has(dKey);
+    }
+
+    let links = '';
+    if (hasRange && (isMid || isStart || isEnd)) {
+      const col = d.getDay();
+      if ((isMid || isEnd) && col !== 0) links += '<span class="cal2-link l"></span>';
+      if ((isMid || isStart) && col !== 6) links += '<span class="cal2-link r"></span>';
+    }
+
+    const classes = ['cal2-day'];
+    if (d.getMonth() !== lcalViewMonth) classes.push('is-adjacent');
+    if (d.getDay() === 0 || d.getDay() === 6) classes.push('is-weekend');
+    if (dKey === todayKey) classes.push('is-today');
+    if (isStart || isEnd) classes.push('is-edge');
+    else if (isMid) classes.push('is-mid');
+
+    html += '<div class="cal2-cell">' + links +
+      '<button type="button" class="' + classes.join(' ') + '" data-time="' + d.getTime() + '"' + (isPast ? ' disabled' : '') + '>' +
+      d.getDate() + '</button></div>';
+  }
+  lcalGrid.innerHTML = html;
+
+  if (!leaveSelectedDates.length) {
+    lcalFooterLabel.innerHTML = '<em>No dates selected</em>';
+  } else if (leaveDateMode === 'range' && leaveSelectedDates.length === 1) {
+    lcalFooterLabel.innerHTML = lcalShortFmt_(start) + ' <em>&ndash; pick an end date</em>';
+  } else if (leaveDateMode === 'range') {
+    lcalFooterLabel.textContent = lcalShortFmt_(start) + ' – ' + lcalShortFmt_(end) + ' ' + end.getFullYear();
+  } else if (leaveDateMode === 'multiple') {
+    lcalFooterLabel.textContent = leaveSelectedDates.length + (leaveSelectedDates.length === 1 ? ' date selected' : ' dates selected');
+  } else {
+    lcalFooterLabel.textContent = lcalShortFmt_(start) + ' ' + start.getFullYear();
+  }
+}
+
+function lcalGoToMonth_(year, month) {
+  lcalViewYear = year;
+  lcalViewMonth = month;
+  lcalRenderGrid_();
+}
+
+// Quick picks - c2.html's presets, always resolved as a date range (even the
+// 1-day ones), so picking one forces Range mode rather than leaving it
+// mismatched with whatever mode was active before.
+const LCAL_PRESETS_ = {
+  today: function () { const t = lcalToday0_(); return [t, t]; },
+  tomorrow: function () { const t = lcalAddDays_(lcalToday0_(), 1); return [t, t]; },
+  week: function () { const t = lcalToday0_(); return [t, lcalAddDays_(t, 5 - t.getDay())]; },
+  nextweek: function () { const t = lcalToday0_(); const mon = lcalAddDays_(t, 8 - t.getDay()); return [mon, lcalAddDays_(mon, 4)]; },
+  fortnight: function () { const t = lcalToday0_(); const mon = lcalAddDays_(t, 8 - t.getDay()); return [mon, lcalAddDays_(mon, 11)]; },
+  month: function () { const t = lcalToday0_(); return [t, new Date(t.getFullYear(), t.getMonth() + 1, 0)]; }
+};
+
+function lcalApplyPreset_(name, btnEl) {
+  const fn = LCAL_PRESETS_[name];
+  if (!fn) return;
+  const range = fn();
+  leaveDateMode = 'range';
+  leaveDateModeSingleBtn.classList.remove('is-selected');
+  leaveDateModeRangeBtn.classList.add('is-selected');
+  leaveDateModeCustomBtn.classList.remove('is-selected');
+  leaveSelectedDates = range;
+  lcalViewYear = range[0].getFullYear();
+  lcalViewMonth = range[0].getMonth();
+  leaveCalPresets.querySelectorAll('.cal2-preset').forEach(function (b) { b.classList.remove('is-active'); });
+  btnEl.classList.add('is-active');
+  lcalRenderGrid_();
+  leaveDateRangeError.classList.add('hidden');
+  updateLeaveDatePickedSummary_();
+  updateLeaveDrawerSummaryChips_();
+}
+
+// Custom-styled month/year dropdowns (a real popover, not a native <select>
+// listbox) - built once at page load, reused for the life of the app.
+function lcalBuildDropdown_(menuEl, triggerLabelEl, options, onSelect) {
+  menuEl.innerHTML = options.map(function (opt) {
+    return '<button type="button" data-value="' + opt.value + '">' + opt.label + '</button>';
+  }).join('');
+  menuEl.querySelectorAll('button').forEach(function (btn, i) {
+    btn.addEventListener('click', function () {
+      lcalCloseDropdowns_();
+      onSelect(options[i].value);
+    });
+  });
+}
+function lcalCloseDropdowns_() {
+  lcalMonthMenu.classList.add('hidden');
+  lcalYearMenu.classList.add('hidden');
+}
+function lcalToggleDropdown_(menuEl) {
+  const willOpen = menuEl.classList.contains('hidden');
+  lcalCloseDropdowns_();
+  if (willOpen) {
+    menuEl.classList.remove('hidden');
+    const selected = menuEl.querySelector('.is-selected');
+    if (selected) selected.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+function lcalInit_() {
+  const yearOptions = [];
+  const nowYear = new Date().getFullYear();
+  for (let y = nowYear - 1; y <= nowYear + 5; y++) yearOptions.push({ value: y, label: String(y) });
+  lcalBuildDropdown_(lcalYearMenu, lcalYearLabel, yearOptions, function (y) { lcalGoToMonth_(Number(y), lcalViewMonth); });
+  lcalBuildDropdown_(lcalMonthMenu, lcalMonthLabel, LCAL_MONTHS_.map(function (m, i) { return { value: i, label: m }; }), function (m) { lcalGoToMonth_(lcalViewYear, Number(m)); });
+
+  lcalMonthTrigger.addEventListener('click', function (e) {
+    e.stopPropagation();
+    lcalMonthMenu.querySelectorAll('button').forEach(function (b, i) { b.classList.toggle('is-selected', i === lcalViewMonth); });
+    lcalToggleDropdown_(lcalMonthMenu);
+  });
+  lcalYearTrigger.addEventListener('click', function (e) {
+    e.stopPropagation();
+    lcalYearMenu.querySelectorAll('button').forEach(function (b) { b.classList.toggle('is-selected', Number(b.dataset.value) === lcalViewYear); });
+    lcalToggleDropdown_(lcalYearMenu);
+  });
+  document.addEventListener('click', function (e) {
+    if (!lcalMonthSelect.contains(e.target) && !lcalYearSelect.contains(e.target)) lcalCloseDropdowns_();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') lcalCloseDropdowns_();
+  });
+
+  lcalPrevBtn.addEventListener('click', function () {
+    lcalViewMonth--;
+    if (lcalViewMonth < 0) { lcalViewMonth = 11; lcalViewYear--; }
+    lcalRenderGrid_();
+  });
+  lcalNextBtn.addEventListener('click', function () {
+    lcalViewMonth++;
+    if (lcalViewMonth > 11) { lcalViewMonth = 0; lcalViewYear++; }
+    lcalRenderGrid_();
+  });
+
+  lcalGrid.addEventListener('click', function (e) {
+    const btn = e.target.closest('.cal2-day');
+    if (!btn || btn.disabled) return;
+    lcalPickDate_(new Date(Number(btn.dataset.time)));
+  });
+
+  leaveCalPresets.querySelectorAll('.cal2-preset').forEach(function (btn) {
+    btn.addEventListener('click', function () { lcalApplyPreset_(btn.dataset.preset, btn); });
+  });
+
+  lcalClearBtn.addEventListener('click', function () {
+    leaveSelectedDates = [];
+    leaveCalPresets.querySelectorAll('.cal2-preset').forEach(function (b) { b.classList.remove('is-active'); });
+    lcalRenderGrid_();
+    leaveDateRangeError.classList.add('hidden');
+    updateLeaveDatePickedSummary_();
+    updateLeaveDrawerSummaryChips_();
+  });
+
+  lcalRenderGrid_();
 }
 
 // ---------- My Leaves drawer: My Leaves / History / Apply for Leave tabs ----------
@@ -1438,7 +1620,9 @@ async function openApplyLeaveTab_() {
   if (!currentUserContext || !weekInput.value) return;
   leaveReasonEditor.innerHTML = '';
   resetLeaveAttachment_();
-  await ensureLeaveDatePicker_();
+  const today = new Date();
+  lcalViewYear = today.getFullYear();
+  lcalViewMonth = today.getMonth();
   selectLeaveDateMode_('single');
   setLeaveTime_(7, 0, 'AM');
   selectLeaveCategory_('casual');
@@ -1694,7 +1878,9 @@ async function renderMyLeavesTrendChart_(records) {
     const m = d.getMonth();
     if (r.status === 'approved') approved[m]++;
     else if (r.status === 'rejected') rejected[m]++;
-    else pending[m]++;
+    else if (r.status === 'requested') pending[m]++;
+    // withdrawn (and anything else) isn't one of this chart's three
+    // datasets - matches the quarter tiles' pending count just above.
   });
   try {
     const Chart = await loadChartJS();
@@ -1996,6 +2182,7 @@ leaveDateModeSingleBtn.addEventListener('click', () => selectLeaveDateMode_('sin
 leaveDateModeRangeBtn.addEventListener('click', () => selectLeaveDateMode_('range'));
 leaveDateModeCustomBtn.addEventListener('click', () => selectLeaveDateMode_('multiple'));
 initLeaveTimePicker_();
+lcalInit_();
 
 leaveDatePicked.addEventListener('click', openCustomDatesPopup_);
 closeCustomDatesPopupBtn.addEventListener('click', closeCustomDatesPopup_);

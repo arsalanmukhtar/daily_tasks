@@ -1607,19 +1607,26 @@ textarea {
 .tag.wait .dot { background: var(--wait-600); }
 .tag.neutral { background: var(--meta-bg); color: var(--meta); border-color: var(--meta-bd); }
 
-/* ---------- Apply-for-leave: two-column drawer body ---------- */
-.dcols { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 0; min-height: 100%; }
-.dcol { padding: 1rem 1.1rem; min-width: 0; }
-.dcol.dcol-l { border-right: 1px solid var(--line-soft); background: var(--surface-2); }
-/* Right column stretches its Reason block (see .blk-fill / #leaveReasonEditor
-   below) to use whatever vertical space the left column's calendar leaves
-   spare, instead of leaving a dead gap under a fixed-height text box. */
-.dcol.dcol-r { display: flex; flex-direction: column; }
+/* ---------- Apply-for-leave: Leave type + Reason on top, Attachments under
+   Leave type, the calendar spanning full width underneath. ---------- */
+.dcols2 {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-width: 0;
+  grid-template-areas: "type reason" "attach reason" "cal cal";
+}
+.dcell-type, .dcell-attach, .dcell-reason, .dcell-cal { padding: 1rem 1.1rem; min-width: 0; }
+.dcell-type { grid-area: type; border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); background: var(--surface-2); }
+.dcell-attach { grid-area: attach; border-right: 1px solid var(--line-soft); background: var(--surface-2); }
+/* Stretches its Reason block (see .blk-fill / #leaveReasonEditor below) to
+   use the combined height of the type+attachments rows next to it, instead
+   of leaving a dead gap under a fixed-height text box. */
+.dcell-reason { grid-area: reason; display: flex; flex-direction: column; }
+.dcell-cal { grid-area: cal; border-top: 1px solid var(--line-soft); }
 .blk + .blk { margin-top: 1rem; }
 .blk-fill { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 @media (max-width: 639.98px) {
-  .dcols { grid-template-columns: 1fr; }
-  .dcol.dcol-l { border-right: 0; border-bottom: 1px solid var(--line-soft); }
+  .dcols2 { grid-template-columns: 1fr; grid-template-areas: "type" "attach" "reason" "cal"; }
+  .dcell-type { border-right: 0; }
+  .dcell-attach { border-right: 0; border-bottom: 1px solid var(--line-soft); }
 }
 
 /* Leave-type chips */
@@ -1672,119 +1679,79 @@ textarea {
 .seg button:last-child { border-right: 0; }
 .seg button.is-selected { background: var(--brand-50); color: var(--brand-700); }
 
-/* Inline calendar (Flatpickr retheme) */
-.cal-host { margin-top: 9px; }
-#leaveDateRangeInput { display: none; }
-.cal-host .flatpickr-calendar {
-  width: 100% !important; box-shadow: none; border: 1px solid var(--line); border-radius: var(--r-md);
-  background: #fff; padding: 10px 11px 11px; font-family: inherit;
-}
-/* Flatpickr's own CDN stylesheet loads lazily (only once the drawer opens),
-   so its rules land AFTER this file in the cascade - equal-specificity
-   selectors here would lose that tie-break, silently reverting our resets
-   (position, font) back to Flatpickr's defaults. !important sidesteps the
-   load-order race instead of depending on it. */
-.cal-host .flatpickr-calendar, .cal-host .flatpickr-calendar * {
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif !important;
-}
-.cal-host .flatpickr-calendar.inline { margin-top: 0; }
-.cal-host .flatpickr-months { display: flex; align-items: center; margin-bottom: 9px; }
-/* Flatpickr's real DOM order is prev-nav, month, next-nav - reordered via
-   flex `order` (month first/left, nav buttons grouped right) rather than
-   absolute positioning, so the title and the buttons can never overlap. */
-.cal-host .flatpickr-month {
-  order: 1; position: static !important; height: 26px; display: flex; align-items: center;
-  color: var(--ink-900); fill: var(--ink-900); overflow: visible; flex: 1;
-}
-.cal-host .flatpickr-current-month {
-  font-size: 13.5px; font-weight: 600; letter-spacing: -.01em; display: flex; align-items: center; gap: 8px;
-  position: static; width: auto; left: auto; padding: 0;
-}
-/* monthSelectorType:'static' (see ensureLeaveDatePicker_) renders this as
-   plain text, not a native <select> - so it's fully themeable, unlike the
-   OS-drawn dropdown list a <select> would otherwise pop open. */
-.cal-host .flatpickr-current-month .cur-month {
-  font-weight: 600; color: var(--ink-900); cursor: default; padding: 0;
-}
-/* The year field is a real number input (no native listbox involved), so a
-   full reskin - not just color tweaks - is safe here: hide the browser's
-   own spinner and draw flatpickr's .arrowUp/.arrowDown triangles in our
-   own ink tone instead, inside a bordered pill matching the app's inputs.
-   box-sizing is set explicitly (rather than trusting a global reset that
-   may not exist) so width:100% + padding + border add up predictably -
-   otherwise the input renders wider than its wrapper and "2026" clips to
-   "202". Width is sized for 4 digits + both paddings with room to spare. */
-.cal-host .numInputWrapper {
-  /* !important on display/width specifically: verified via a real headless-
-     Chrome render that without it, this exact declaration (the only rule in
-     any loaded stylesheet touching these two properties on this element)
-     is silently not applied - width falls back to a ~53px auto/shrunk size
-     and display stays the UA default "block" instead of "inline-flex". */
-  display: inline-flex !important; align-items: center; position: relative; width: 84px !important;
-  box-sizing: border-box;
-}
-.cal-host .numInputWrapper input.cur-year {
-  box-sizing: border-box; width: 100%; font-weight: 600; color: var(--ink-900); font-size: 13.5px;
-  background: #fff; border: 1px solid var(--line) !important; border-radius: 7px;
-  padding: 5px 22px 5px 10px !important; -moz-appearance: textfield; line-height: 1.3;
-}
-.cal-host .numInputWrapper input.cur-year:hover { border-color: var(--ink-400) !important; }
-.cal-host .numInputWrapper input.cur-year:focus { outline: none; border-color: var(--brand-600) !important; }
-.cal-host .numInputWrapper input.cur-year::-webkit-inner-spin-button,
-.cal-host .numInputWrapper input.cur-year::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-/* Flatpickr's default theme keeps these at opacity:0 until :hover, which
-   never happens on touch or in a static screenshot - always-visible is the
-   right call for a control people are meant to actually use. */
-.cal-host .numInputWrapper span.arrowUp, .cal-host .numInputWrapper span.arrowDown {
-  opacity: 1 !important; position: absolute; right: 2px; width: 18px; height: 13px;
-  display: flex !important; align-items: center; justify-content: center;
-  cursor: pointer; border: 0; background: transparent; box-sizing: border-box;
-}
-.cal-host .numInputWrapper span.arrowUp { top: 2px; }
-.cal-host .numInputWrapper span.arrowDown { bottom: 2px; }
-.cal-host .numInputWrapper span:hover { background: var(--surface-2); border-radius: 4px; }
-.cal-host .numInputWrapper span:after { content: ''; position: static; border-width: 4px; border-style: solid; border-color: transparent; }
-.cal-host .numInputWrapper span.arrowUp:after { border-bottom-color: var(--ink-500) !important; border-top-width: 0; }
-.cal-host .numInputWrapper span.arrowDown:after { border-top-color: var(--ink-500) !important; border-bottom-width: 0; }
-.cal-host .flatpickr-prev-month, .cal-host .flatpickr-next-month {
-  /* Same load-order race as the font rule above - Flatpickr's own CSS
-     positions these absolutely (top/left/right), which otherwise wins the
-     specificity tie and overlaps the arrows on top of the month/year text. */
-  position: static !important; top: auto !important; left: auto !important; right: auto !important;
-  width: 26px; height: 26px; display: inline-flex !important; align-items: center; justify-content: center;
-  border: 1px solid var(--line); border-radius: 7px; background: #fff; padding: 0; margin: 0;
-}
-.cal-host .flatpickr-prev-month { order: 2; margin-left: auto; margin-right: 4px; }
-.cal-host .flatpickr-next-month { order: 3; }
-.cal-host .flatpickr-prev-month:hover, .cal-host .flatpickr-next-month:hover { background: var(--surface-2); }
-.cal-host .flatpickr-prev-month svg, .cal-host .flatpickr-next-month svg { fill: var(--ink-600); width: 12px; height: 12px; }
-.cal-host .flatpickr-weekdays { margin-bottom: 2px; }
-.cal-host span.flatpickr-weekday {
-  font-size: 10px; font-weight: 700; color: var(--ink-400); background: transparent; text-transform: none;
-}
-.cal-host .flatpickr-days { border: 0; width: 100% !important; }
-.cal-host .dayContainer { width: 100% !important; min-width: 0 !important; max-width: none !important; }
-.cal-host .flatpickr-day {
-  height: 31px; line-height: 31px; border-radius: 7px; font-size: 12.5px; color: var(--ink-800);
-  border: 1px solid transparent; max-width: none;
-}
-.cal-host .flatpickr-day:hover { background: var(--surface-2); }
-.cal-host .flatpickr-day.flatpickr-disabled, .cal-host .flatpickr-day.flatpickr-disabled:hover { color: #C4CDD8; cursor: not-allowed; background: transparent; }
-.cal-host .flatpickr-day.prevMonthDay, .cal-host .flatpickr-day.nextMonthDay { color: #C4CDD8; }
-.cal-host .flatpickr-day.today { border-color: var(--brand-600); color: var(--brand-700); font-weight: 700; }
-.cal-host .flatpickr-day.selected, .cal-host .flatpickr-day.startRange, .cal-host .flatpickr-day.endRange {
-  background: var(--brand-600); border-color: var(--brand-600); color: #fff; font-weight: 700;
-}
-.cal-host .flatpickr-day.selected:hover, .cal-host .flatpickr-day.startRange:hover, .cal-host .flatpickr-day.endRange:hover { background: var(--brand-700); }
-.cal-host .flatpickr-day.inRange {
-  background: var(--brand-50); border-color: var(--brand-50); box-shadow: -5px 0 0 var(--brand-50), 5px 0 0 var(--brand-50); color: var(--brand-800);
-}
-.cal-host .flatpickr-day.startRange { border-radius: 7px 0 0 7px; }
-.cal-host .flatpickr-day.endRange { border-radius: 0 7px 7px 0; }
+/* ---------- Custom calendar (c2.html layout, our brand tokens) ----------
+   Presets rail + month/main grid, styled to match c2.html's reference
+   design exactly (circular days, dotted range connector in the gutter so
+   two circles never touch) - our own colors/tokens, not its clay accent. */
+.cal2 { display: flex; border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; margin-top: 9px; background: #fff; }
+.cal2-rail { width: 132px; flex: none; background: var(--surface-2); border-right: 1px solid var(--line-soft); padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; }
+.cal2-rail-label { font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-400); padding: 0 6px 6px; }
+.cal2-preset { text-align: left; border: 0; background: transparent; border-radius: 7px; padding: 6px 7px; cursor: pointer; font-size: 11.5px; font-weight: 500; color: var(--ink-600); }
+.cal2-preset:hover { background: #fff; color: var(--ink-900); }
+.cal2-preset.is-active { background: #fff; color: var(--brand-700); font-weight: 600; box-shadow: 0 1px 2px rgba(15, 23, 42, .06); }
 
-/* Short Leave's time picker - lives inside .cal-host, directly below the
-   calendar (flex column, not side-by-side) so both fit in one compact
-   panel. Colors/shapes follow our own brand tokens, not the teal/orange
+.cal2-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cal2-head { display: flex; align-items: center; gap: 6px; padding: 10px 10px 8px; }
+.cal2-nav { width: 26px; height: 26px; flex: none; border: 1px solid var(--line); background: #fff; border-radius: 999px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--ink-600); }
+.cal2-nav:hover { background: var(--surface-2); border-color: var(--ink-400); color: var(--ink-900); }
+.cal2-nav svg { width: 12px; height: 12px; }
+.cal2-pick { flex: 1; display: flex; justify-content: center; gap: 4px; min-width: 0; }
+
+/* Custom-styled dropdowns (a real popover, not a native <select> listbox) -
+   consistent look across browsers/OSes, matching the app's other dropdowns. */
+.cal2-select { position: relative; }
+.cal2-select-trigger { display: flex; align-items: center; gap: 4px; border: 1px solid transparent; background: transparent; border-radius: 7px; padding: 4px 8px; font-size: 12.5px; font-weight: 600; color: var(--ink-900); cursor: pointer; }
+.cal2-select-trigger:hover { background: var(--surface-2); border-color: var(--line); }
+.cal2-select-trigger svg { width: 11px; height: 11px; color: var(--ink-400); flex-shrink: 0; }
+.cal2-select-menu {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; min-width: 108px; max-height: 220px; overflow-y: auto;
+  background: #fff; border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: 0 8px 20px rgba(15, 23, 42, .12); padding: 4px;
+}
+.cal2-select-menu button { display: block; width: 100%; text-align: left; border: 0; background: transparent; border-radius: 6px; padding: 6px 8px; font-size: 12.5px; color: var(--ink-700); cursor: pointer; }
+.cal2-select-menu button:hover { background: var(--surface-2); }
+.cal2-select-menu button.is-selected { background: var(--brand-50); color: var(--brand-700); font-weight: 600; }
+
+.cal2-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); padding: 0 8px; }
+.cal2-weekdays span { text-align: center; font-size: 9.5px; font-weight: 700; letter-spacing: .05em; color: var(--ink-400); padding-bottom: 4px; }
+
+.cal2-grid { display: grid; grid-template-columns: repeat(7, 1fr); padding: 0 8px 6px; }
+.cal2-cell { height: 34px; position: relative; display: flex; align-items: center; justify-content: center; }
+/* The dotted range connector lives in the gutter between two circles, same
+   as c2.html - so a range's start/mid/end circles never visually touch. */
+.cal2-link { position: absolute; top: 50%; height: 0; border-top: 2px dotted var(--brand-200); pointer-events: none; transform: translateY(-1px); }
+.cal2-link.l { left: 0; right: 50%; margin-right: 14px; }
+.cal2-link.r { left: 50%; right: 0; margin-left: 14px; }
+.cal2-day {
+  width: 26px; height: 26px; border-radius: 999px; border: 1.5px solid transparent; background: transparent;
+  display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 500; color: var(--ink-800);
+  cursor: pointer; position: relative; z-index: 1; font-variant-numeric: tabular-nums;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.cal2-day:hover:not(:disabled) { background: var(--surface-2); border-color: var(--line); }
+.cal2-day:disabled { color: #CBD5E1; cursor: not-allowed; }
+.cal2-day.is-adjacent { color: #CBD5E1; font-weight: 400; }
+.cal2-day.is-weekend { color: var(--ink-400); }
+.cal2-day.is-today { border-color: var(--brand-600); color: var(--brand-700); font-weight: 700; }
+.cal2-day.is-mid { background: var(--brand-50); border-color: var(--brand-50); color: var(--brand-800); }
+.cal2-day.is-edge { background: var(--brand-600); border-color: var(--brand-600); color: #fff; font-weight: 700; }
+.cal2-day.is-edge:hover { background: var(--brand-700); border-color: var(--brand-700); }
+
+.cal2-footer { margin-top: auto; border-top: 1px solid var(--line-soft); background: var(--surface-2); padding: 8px 10px; display: flex; align-items: center; gap: 8px; }
+.cal2-footer-label { font-size: 11.5px; font-weight: 600; color: var(--ink-700); }
+.cal2-footer-label em { font-style: normal; color: var(--ink-400); font-weight: 400; }
+.cal2-clear { margin-left: auto; height: 26px; padding: 0 10px; border-radius: 7px; font-size: 11px; font-weight: 700; cursor: pointer; border: 1px solid var(--line); background: #fff; color: var(--ink-600); }
+.cal2-clear:hover { background: var(--surface-2); border-color: var(--ink-400); }
+
+/* The presets rail assumes ~560px of total width (c2.html's own size) - our
+   drawer can go narrower than that (mobile full-width), so it drops below
+   that point rather than crushing the 7-day grid into illegibility. */
+@media (max-width: 639.98px) {
+  .cal2-rail { display: none; }
+}
+
+/* Short Leave's time picker - lives directly below the calendar (flex
+   column, not side-by-side) so both fit in one compact panel. Colors/shapes
+   follow our own brand tokens, not the teal/orange
    drag-slider it was modeled after - that was a structural/interaction
    reference only. */
 .time-picker { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line-soft); user-select: none; }
