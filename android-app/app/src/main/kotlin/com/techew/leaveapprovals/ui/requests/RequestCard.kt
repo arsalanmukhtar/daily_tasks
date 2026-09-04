@@ -38,6 +38,8 @@ import com.techew.leaveapprovals.ui.common.Avatar
 import com.techew.leaveapprovals.ui.common.LeaveDateDialog
 import com.techew.leaveapprovals.ui.theme.DurationFull
 import com.techew.leaveapprovals.ui.theme.DurationFullBg
+import com.techew.leaveapprovals.ui.theme.DurationOutPass
+import com.techew.leaveapprovals.ui.theme.DurationOutPassBg
 import com.techew.leaveapprovals.ui.theme.DurationShort
 import com.techew.leaveapprovals.ui.theme.DurationShortBg
 import com.techew.leaveapprovals.ui.theme.Meta
@@ -273,6 +275,10 @@ internal fun typeColors(type: String): Pair<Color, Color> = when (LeaveType.norm
     else -> TypeCasual to TypeCasualBg
 }
 
-// Every type has an inherent duration - only casualShort is ever "short".
-internal fun durationColors(type: String): Pair<Color, Color> =
-    if (LeaveType.isShort(type)) DurationShort to DurationShortBg else DurationFull to DurationFullBg
+// Every type has an inherent duration - only casualShort/casualOutPass are
+// ever single-day.
+internal fun durationColors(type: String): Pair<Color, Color> = when {
+    LeaveType.isShort(type) -> DurationShort to DurationShortBg
+    LeaveType.isOutPass(type) -> DurationOutPass to DurationOutPassBg
+    else -> DurationFull to DurationFullBg
+}

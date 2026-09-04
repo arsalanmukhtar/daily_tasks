@@ -1688,6 +1688,8 @@ textarea {
 }
 .seg button:last-child { border-right: 0; }
 .seg button.is-selected { background: var(--brand-50); color: var(--brand-700); }
+.seg button:disabled { color: var(--ink-400); cursor: not-allowed; opacity: .55; }
+.seg button:disabled.is-selected { background: transparent; color: var(--ink-400); }
 
 /* ---------- Custom calendar (c2.html layout, our brand tokens) ----------
    Presets rail + month/main grid, styled to match c2.html's reference

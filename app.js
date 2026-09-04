@@ -991,6 +991,9 @@ async function fetchLeaveStatus_() {
         requestedAt: data.requestedAt && data.requestedAt.toDate ? data.requestedAt.toDate().toISOString() : '',
         startDate: data.startDate && data.startDate.toDate ? data.startDate.toDate().toISOString() : '',
         endDate: data.endDate && data.endDate.toDate ? data.endDate.toDate().toISOString() : '',
+        customDates: Array.isArray(data.customDates)
+          ? data.customDates.map(function (ts) { return ts && ts.toDate ? ts.toDate().toISOString() : null; }).filter(Boolean)
+          : [],
         weekLabel: data.weekLabel || '',
         type: normalizeLeaveType_(data.type),
         halfDayPeriod: data.halfDayPeriod || '',
@@ -1127,6 +1130,23 @@ const LEAVE_CATEGORY_BTNS = {
   casual: leaveCategoryCasualBtn
 };
 
+// Short Leave and Out Pass are both inherently single-day (a part of one
+// day) - Date Range and Custom only make sense for a whole-day leave
+// (Full Leave, or any of the other non-casual categories, which have no
+// short/full sub-choice and are always whole-day). Disables those two
+// mode buttons and forces Single Date whenever the current selection is
+// one of the partial-day types, so it's impossible to end up with a
+// Short/Out Pass request whose dates aren't a single day (the customDates/
+// range fields exist precisely to describe a whole-day leave's span).
+function updateLeaveDateModeAvailability_() {
+  const isPartialDay = selectedLeaveType === 'casualShort' || selectedLeaveType === 'casualOutPass';
+  leaveDateModeRangeBtn.disabled = isPartialDay;
+  leaveDateModeCustomBtn.disabled = isPartialDay;
+  if (isPartialDay && leaveDateMode !== 'single') {
+    selectLeaveDateMode_('single');
+  }
+}
+
 function selectLeaveCategory_(category) {
   selectedLeaveCategory = category;
   Object.keys(LEAVE_CATEGORY_BTNS).forEach(function (key) {
@@ -1139,6 +1159,7 @@ function selectLeaveCategory_(category) {
     selectedLeaveType = category; // 'foreignTrip' | 'umrah' | 'medical' - no sub-choice
     leaveShortTimePicker.classList.add('hidden');
     leaveOutPassTimePicker.classList.add('hidden');
+    updateLeaveDateModeAvailability_();
   }
   updateLeaveDrawerSummaryChips_();
 }
@@ -1159,6 +1180,7 @@ function selectLeaveType_(type) {
     if (leaveOutCheckOutCtl_) leaveOutCheckOutCtl_.refresh();
     if (leaveOutCheckInCtl_) leaveOutCheckInCtl_.refresh();
   }
+  updateLeaveDateModeAvailability_();
   updateLeaveDrawerSummaryChips_();
 }
 
@@ -1189,6 +1211,7 @@ function paintLeaveApplyForm_() {
     leaveShortTimePicker.classList.add('hidden');
     leaveOutPassTimePicker.classList.add('hidden');
   }
+  updateLeaveDateModeAvailability_();
   updateLeaveDatePickedSummary_();
   updateLeaveDrawerSummaryChips_();
 }
@@ -2244,12 +2267,41 @@ function renderMyLeavesList_(records) {
 // count), a 2-line reason clamp with an in-place expand/collapse "View"
 // toggle, colour file-type badges on attachments, and a Withdraw action on
 // the requester's own still-pending requests.
+// Single source of truth for "what dates does this saved record actually
+// cover" - a Custom pick's startDate/endDate only spans first-to-last day
+// for backward-compat (see the comment where customDates is written), so
+// anything reading a record back for display must prefer customDates when
+// present rather than assuming the span is contiguous.
+function leaveDatesSummaryForRecord_(rec) {
+  if (rec.customDates && rec.customDates.length) {
+    const dates = rec.customDates
+      .map(function (iso) { return new Date(iso); })
+      .filter(function (d) { return !isNaN(d.getTime()); })
+      .sort(function (a, b) { return a - b; });
+    if (dates.length) {
+      const label = dates.length <= 3
+        ? dates.map(fmtDateLocal_).join(', ')
+        : dates.slice(0, 3).map(fmtDateLocal_).join(', ') + ' +' + (dates.length - 3) + ' more';
+      return { dateLabel: label, days: dates.length };
+    }
+  }
+  const s = rec.startDate && !isNaN(new Date(rec.startDate).getTime()) ? new Date(rec.startDate) : null;
+  const e = rec.endDate && !isNaN(new Date(rec.endDate).getTime()) ? new Date(rec.endDate) : null;
+  if (s && e && s.getTime() !== e.getTime()) {
+    const days = Math.round((e - s) / 86400000) + 1;
+    return { dateLabel: fmtDateLocal_(s) + ' – ' + fmtDateLocal_(e), days: days };
+  }
+  if (s) return { dateLabel: fmtDateLocal_(s), days: 1 };
+  return { dateLabel: '', days: 1 };
+}
+
 function renderMyLeaveCard_(rec) {
   const type = normalizeLeaveType_(rec.type);
   const isShort = type === 'casualShort';
   const isOutPass = type === 'casualOutPass';
   const expanded = myLeavesExpandedReasons.has(rec.requestId);
-  const dateLabel = rec.startDate && !isNaN(new Date(rec.startDate).getTime()) ? fmtDateLocal_(new Date(rec.startDate)) : '';
+  const dates = leaveDatesSummaryForRecord_(rec);
+  const dateLabel = dates.dateLabel;
   const appliedLabel = rec.requestedAt ? 'applied ' + new Date(rec.requestedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
   const dtLine = [dateLabel, appliedLabel].filter(Boolean).join(' · ');
 
@@ -2264,11 +2316,7 @@ function renderMyLeaveCard_(rec) {
     dayCountChip = range ? '<span class="mchip n">' + escapeHtml(range) + '</span>' : '';
   } else {
     durationChip = '<span class="mchip dur-full">Full leave</span>';
-    let days = 1;
-    if (rec.startDate && rec.endDate) {
-      const s = new Date(rec.startDate), e = new Date(rec.endDate);
-      if (!isNaN(s.getTime()) && !isNaN(e.getTime())) days = Math.round((e - s) / 86400000) + 1;
-    }
+    const days = dates.days;
     dayCountChip = '<span class="mchip n">' + days + (days === 1 ? ' day' : ' days') + '</span>';
   }
   const fileCountChip = (rec.attachments && rec.attachments.length)

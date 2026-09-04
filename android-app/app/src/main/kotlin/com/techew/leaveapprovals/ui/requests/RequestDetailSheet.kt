@@ -396,7 +396,22 @@ private val APPLIED_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm")
 private fun String.toLocalDateOrNull(): LocalDate? =
     if (isBlank()) null else runCatching { Instant.parse(this).atZone(ZoneId.systemDefault()).toLocalDate() }.getOrNull()
 
+// A Custom (non-contiguous) date pick's startDate/endDate only spans
+// first-to-last day for backward-compat with archive/overlap logic
+// elsewhere - customDates carries the exact days actually picked and is
+// what display must prefer, or a request like "15 Sep, 16 Sep, 22 Sep"
+// would misleadingly render as a solid "15 Sep - 22 Sep" range.
 internal fun leaveDateLabel(request: LeaveRequest): String {
+    if (request.customDates.size > 1) {
+        val dates = request.customDates.mapNotNull { it.toLocalDateOrNull() }.sorted()
+        if (dates.isNotEmpty()) {
+            return if (dates.size <= 3) {
+                dates.joinToString(", ") { it.format(SHORT_DATE_FORMATTER) }
+            } else {
+                dates.take(3).joinToString(", ") { it.format(SHORT_DATE_FORMATTER) } + " +${dates.size - 3} more"
+            }
+        }
+    }
     val start = request.startDate.toLocalDateOrNull()
     val end = request.endDate.toLocalDateOrNull()
     return when {
@@ -413,7 +428,12 @@ internal fun durationFact(request: LeaveRequest): String = when {
         request.halfDayPeriod.isNotBlank() -> "Half day · ${request.halfDayPeriod}"
         else -> "Half day"
     }
-    LeaveType.normalize(request.type) == LeaveType.CASUAL_FULL -> "Full day"
+    LeaveType.isOutPass(request.type) -> if (request.checkOutTime.isNotBlank() && request.checkInTime.isNotBlank()) {
+        "${request.checkOutTime} – ${request.checkInTime}"
+    } else {
+        "Out Pass"
+    }
+    request.customDates.size > 1 -> "${request.customDates.size} days"
     else -> {
         val start = request.startDate.toLocalDateOrNull()
         val end = request.endDate.toLocalDateOrNull()

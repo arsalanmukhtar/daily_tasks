@@ -39,6 +39,8 @@ val DurationShort = Color(0xFF0369A1)
 val DurationShortBg = Color(0xFFE3EFF8)
 val DurationFull = Color(0xFF3730A3)
 val DurationFullBg = Color(0xFFE9E8F8)
+val DurationOutPass = Color(0xFF0F766E)
+val DurationOutPassBg = Color(0xFFE3F4F2)
 
 // Neutral "meta" color for informational chips that aren't tied to a type or
 // status - week label, submitted timestamp - matching the mockup's --meta.

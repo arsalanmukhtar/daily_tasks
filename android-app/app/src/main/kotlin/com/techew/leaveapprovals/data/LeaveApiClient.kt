@@ -149,6 +149,7 @@ private fun DocumentSnapshot.toLeaveRequest(): LeaveRequest = LeaveRequest(
     requestedAt = getTimestamp("requestedAt").toIsoStringOrEmpty(),
     startDate = getTimestamp("startDate").toIsoStringOrEmpty(),
     endDate = getTimestamp("endDate").toIsoStringOrEmpty(),
+    customDates = toCustomDates(),
     email = getString("email") ?: "",
     name = getString("name") ?: "",
     weekLabel = getString("weekLabel") ?: "",
@@ -160,6 +161,8 @@ private fun DocumentSnapshot.toLeaveRequest(): LeaveRequest = LeaveRequest(
     attachments = toAttachments(),
     halfDayPeriod = getString("halfDayPeriod") ?: "",
     shortLeaveTime = getString("shortLeaveTime") ?: "",
+    checkOutTime = getString("checkOutTime") ?: "",
+    checkInTime = getString("checkInTime") ?: "",
     decisionNote = getString("decisionNote") ?: "",
     withdrawnAt = getTimestamp("withdrawnAt").toIsoStringOrEmpty()
 )
@@ -180,6 +183,14 @@ private fun DocumentSnapshot.toUninformedLeave(): UninformedLeave = UninformedLe
 )
 
 private fun Timestamp?.toIsoStringOrEmpty(): String = this?.toDate()?.toInstant()?.toString() ?: ""
+
+// Only present on a Custom (non-contiguous) date pick with more than one
+// day - see the matching comment on LeaveRequest.customDates.
+@Suppress("UNCHECKED_CAST")
+private fun DocumentSnapshot.toCustomDates(): List<String> {
+    val list = get("customDates") as? List<Timestamp> ?: return emptyList()
+    return list.mapNotNull { it.toIsoStringOrEmpty().ifBlank { null } }
+}
 
 // New docs store an `attachments` array; old docs have the singular
 // attachmentName/attachmentUrl/attachmentFileId trio instead. Normalize to a
