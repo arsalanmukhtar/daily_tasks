@@ -25,6 +25,7 @@
   /* duration / file-meta secondaries (new) */
   --d-short: #0369A1; --d-short-bg: #E7F1F8;
   --d-full: #3730A3;  --d-full-bg: #ECEBFA;
+  --d-outpass: #0F766E; --d-outpass-bg: #E3F4F2;
   --meta: #54657A;    --meta-bg: #EDF1F5; --meta-bd: #D9E1E9;
 
   --r-sm: 8px; --r-md: 10px; --r-lg: 14px; --r-xl: 18px;
@@ -1656,18 +1657,20 @@ textarea {
 /* Nested casual-duration + AM/PM box */
 .nest { margin-top: 9px; padding: 10px 11px 11px; border-radius: var(--r-md); background: var(--t-casual-bg); border: 1px solid var(--t-casual-bd); }
 .nest .cap { font-size: 11px; font-weight: 700; color: var(--t-casual); margin-bottom: 8px; letter-spacing: .02em; }
-.dseg { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.dseg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
 .dopt {
-  border: 1px solid #D9D2F0; background: #fff; border-radius: 9px; padding: 8px 9px; text-align: left;
-  cursor: pointer; transition: border-color 140ms, background 140ms;
+  border: 1px solid #D9D2F0; background: #fff; border-radius: 8px; padding: 6px 6px; text-align: left;
+  cursor: pointer; transition: border-color 140ms, background 140ms; min-width: 0;
 }
 .dopt:hover:not(:disabled) { border-color: #B9AEE0; }
-.dopt b { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-800); }
-.dopt span { display: block; font-size: 10.5px; color: var(--ink-500); margin-top: 2px; }
+.dopt b { display: block; font-size: 11px; font-weight: 600; color: var(--ink-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dopt span { display: block; font-size: 9px; color: var(--ink-500); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dopt[data-d="short"].is-selected { border-color: var(--d-short); background: var(--d-short-bg); }
 .dopt[data-d="short"].is-selected b { color: var(--d-short); }
 .dopt[data-d="full"].is-selected { border-color: var(--d-full); background: var(--d-full-bg); }
 .dopt[data-d="full"].is-selected b { color: var(--d-full); }
+.dopt[data-d="outpass"].is-selected { border-color: var(--d-outpass); background: var(--d-outpass-bg); }
+.dopt[data-d="outpass"].is-selected b { color: var(--d-outpass); }
 .dopt:disabled { opacity: .5; cursor: not-allowed; }
 
 /* Single-date / date-range segmented toggle (also reused for future 2-way segments) */
@@ -1695,6 +1698,8 @@ textarea {
 .cal2-nav { width: 26px; height: 26px; flex: none; border: 1px solid var(--line); background: #fff; border-radius: 999px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--ink-600); }
 .cal2-nav:hover { background: var(--surface-2); border-color: var(--ink-400); color: var(--ink-900); }
 .cal2-nav svg { width: 12px; height: 12px; }
+.cal2-nav:disabled, .cal2-nav.is-disabled { opacity: .35; cursor: not-allowed; }
+.cal2-nav:disabled:hover, .cal2-nav.is-disabled:hover { background: #fff; border-color: var(--line); color: var(--ink-600); }
 .cal2-pick { flex: 1; display: flex; justify-content: center; gap: 4px; min-width: 0; }
 
 /* Custom-styled dropdowns (a real popover, not a native <select> listbox) -
@@ -1718,7 +1723,7 @@ textarea {
 .cal2-cell { height: 34px; position: relative; display: flex; align-items: center; justify-content: center; }
 /* The dotted range connector lives in the gutter between two circles, same
    as c2.html - so a range's start/mid/end circles never visually touch. */
-.cal2-link { position: absolute; top: 50%; height: 0; border-top: 2px dotted var(--brand-200); pointer-events: none; transform: translateY(-1px); }
+.cal2-link { position: absolute; top: 50%; height: 0; border-top: 2px dashed var(--brand-200); pointer-events: none; transform: translateY(-1px); }
 .cal2-link.l { left: 0; right: 50%; margin-right: 14px; }
 .cal2-link.r { left: 50%; right: 0; margin-left: 14px; }
 .cal2-day {
@@ -1751,24 +1756,13 @@ textarea {
 
 /* Short Leave's time picker - lives directly below the calendar (flex
    column, not side-by-side) so both fit in one compact panel. Colors/shapes
-   follow our own brand tokens, not the teal/orange
-   drag-slider it was modeled after - that was a structural/interaction
-   reference only. */
+   follow our own brand tokens. Manual stepper + typed input + AM/PM only -
+   no drag slider, so every value is either typed or nudged in 5-minute
+   steps and can be clamped to the 8:30 AM-4:30 PM office-hours window. */
 .time-picker { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line-soft); user-select: none; }
-.tp-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-400); margin-bottom: 10px; }
-.tp-slider { position: relative; height: 26px; margin: 0 4px 12px; touch-action: none; cursor: pointer; user-select: none; -webkit-user-select: none; }
-.tp-track { position: absolute; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; background: var(--surface-2); border-radius: 3px; }
-.tp-ticks { position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: center; pointer-events: none; }
-.tp-ticks span { width: 2px; height: 6px; background: var(--line); border-radius: 1px; }
-.tp-ticks span.is-major { height: 10px; background: var(--ink-400); }
-.tp-handle {
-  position: absolute; top: 50%; width: 26px; height: 26px; margin-left: -13px; margin-top: -13px;
-  background: var(--brand-600); border-radius: 8px; box-shadow: 0 2px 6px rgba(194, 65, 12, .35);
-  display: flex; align-items: center; justify-content: center; cursor: grab; transition: background 120ms;
-  user-select: none;
-}
-.tp-handle:active { cursor: grabbing; background: var(--brand-700); }
-.tp-handle span { font-size: 9px; font-weight: 700; color: #fff; white-space: nowrap; pointer-events: none; }
+.tp-row + .tp-row { margin-top: 10px; }
+.tp-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-400); margin-bottom: 6px; }
+.tp-hint { margin-top: 8px; font-size: 10px; color: var(--ink-400); }
 .tp-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .tp-step {
   width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--line); background: #fff;
@@ -1852,6 +1846,7 @@ textarea {
 .mchip.type-uninformed { background: var(--wait-50); color: var(--wait-800); border-color: var(--wait-200); }
 .mchip.dur-short { background: var(--d-short-bg); color: var(--d-short); border-color: #BCD9EC; }
 .mchip.dur-full { background: var(--d-full-bg); color: var(--d-full); border-color: #CBC9F0; }
+.mchip.dur-outpass { background: var(--d-outpass-bg); color: var(--d-outpass); border-color: #BEE1DC; }
 .mchip.n { background: var(--meta-bg); color: var(--meta); border-color: var(--meta-bd); }
 
 /* ---------- My Leaves drawer ---------- */

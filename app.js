@@ -116,6 +116,7 @@ const leaveCategoryCasualBtn      = document.getElementById('leaveCategoryCasual
 const leaveCasualSubRow  = document.getElementById('leaveCasualSubRow');
 const leaveTypeShortBtn  = document.getElementById('leaveTypeShortBtn');
 const leaveTypeFullBtn   = document.getElementById('leaveTypeFullBtn');
+const leaveTypeOutPassBtn = document.getElementById('leaveTypeOutPassBtn');
 const leaveDateModeSingleBtn = document.getElementById('leaveDateModeSingleBtn');
 const leaveDateModeRangeBtn  = document.getElementById('leaveDateModeRangeBtn');
 const leaveDateModeCustomBtn = document.getElementById('leaveDateModeCustomBtn');
@@ -192,18 +193,27 @@ const navSubWeeksTag      = document.getElementById('navSubWeeksTag');
 const navSubDraftTag      = document.getElementById('navSubDraftTag');
 const navLeavePendingTag  = document.getElementById('navLeavePendingTag');
 const navLeaveApprovedTag = document.getElementById('navLeaveApprovedTag');
-// Leave drawer: Short Leave's time picker, inline-calendar picked summary,
-// live footer summary chips, attachment count note.
+// Leave drawer: Short Leave's + Out Pass's time selectors (manual stepper +
+// typed input + AM/PM, no slider), inline-calendar picked summary, live
+// footer summary chips, attachment count note.
 const leaveShortTimePicker = document.getElementById('leaveShortTimePicker');
-const leaveTimeSlider      = document.getElementById('leaveTimeSlider');
-const leaveTimeTicks       = document.getElementById('leaveTimeTicks');
-const leaveTimeHandle      = document.getElementById('leaveTimeHandle');
-const leaveTimeHandleLabel = document.getElementById('leaveTimeHandleLabel');
 const leaveTimeInput       = document.getElementById('leaveTimeInput');
 const leaveTimeMinusBtn    = document.getElementById('leaveTimeMinusBtn');
 const leaveTimePlusBtn     = document.getElementById('leaveTimePlusBtn');
 const leaveTimeAmBtn       = document.getElementById('leaveTimeAmBtn');
 const leaveTimePmBtn       = document.getElementById('leaveTimePmBtn');
+const leaveOutPassTimePicker  = document.getElementById('leaveOutPassTimePicker');
+const leaveOutPassTimeError   = document.getElementById('leaveOutPassTimeError');
+const leaveOutCheckOutInput   = document.getElementById('leaveOutCheckOutInput');
+const leaveOutCheckOutMinusBtn = document.getElementById('leaveOutCheckOutMinusBtn');
+const leaveOutCheckOutPlusBtn  = document.getElementById('leaveOutCheckOutPlusBtn');
+const leaveOutCheckOutAmBtn    = document.getElementById('leaveOutCheckOutAmBtn');
+const leaveOutCheckOutPmBtn    = document.getElementById('leaveOutCheckOutPmBtn');
+const leaveOutCheckInInput    = document.getElementById('leaveOutCheckInInput');
+const leaveOutCheckInMinusBtn = document.getElementById('leaveOutCheckInMinusBtn');
+const leaveOutCheckInPlusBtn  = document.getElementById('leaveOutCheckInPlusBtn');
+const leaveOutCheckInAmBtn    = document.getElementById('leaveOutCheckInAmBtn');
+const leaveOutCheckInPmBtn    = document.getElementById('leaveOutCheckInPmBtn');
 const leaveDatePicked       = document.getElementById('leaveDatePicked');
 const leaveDatePickedSingle = document.getElementById('leaveDatePickedSingle');
 const leaveDatePickedLabel  = document.getElementById('leaveDatePickedLabel');
@@ -849,6 +859,7 @@ const LEAVE_TYPES = {
   medical: 'Medical',
   casualShort: 'Short Leave',
   casualFull: 'Full Leave',
+  casualOutPass: 'Out Pass',
   // Written only by push-daemon (Admin SDK) once an uninformed-leave report
   // is resolved - never created directly by this app.
   uninformedAbsence: 'Uninformed Leave'
@@ -886,9 +897,18 @@ function normalizeLeaveAttachments_(data) {
 let selectedLeaveCategory = 'casual'; // 'foreignTrip' | 'umrah' | 'medical' | 'casual'
 let selectedLeaveType = 'casualShort'; // the concrete value written to Firestore
 let leaveSelectedHalfDay = 'AM'; // 'AM' | 'PM' - derived from the time picker below, kept for the existing halfDayPeriod field
-// The Short Leave time picker's value - hour12 is 1-12, minute is 0-59 (snapped
-// to 5s), period is 'AM' | 'PM'. Only meaningful when selectedLeaveType === 'casualShort'.
-let leaveSelectedTime = { hour12: 7, minute: 0, period: 'AM' };
+// Every leave time field (Short Leave's start time, Out Pass's check-out/
+// check-in) is confined to office hours - no leave time may be booked
+// outside 8:30 AM-4:30 PM.
+const LEAVE_TIME_WINDOW_MIN_ = 8 * 60 + 30;  // 8:30 AM, in minutes since midnight
+const LEAVE_TIME_WINDOW_MAX_ = 16 * 60 + 30; // 4:30 PM
+// hour12 is 1-12, minute is 0-59 (snapped to 5s), period is 'AM' | 'PM'.
+// Only meaningful when selectedLeaveType === 'casualShort'.
+let leaveSelectedTime = { hour12: 8, minute: 30, period: 'AM' };
+// Out Pass's two time fields - only meaningful when
+// selectedLeaveType === 'casualOutPass'.
+let leaveOutPassCheckOutTime = { hour12: 9, minute: 0, period: 'AM' };
+let leaveOutPassCheckInTime = { hour12: 1, minute: 0, period: 'PM' };
 let leaveAttachmentFiles = [];
 let leaveSelectedDates = []; // [start] or [start, end], plain JS Date objects
 let leaveDateMode = 'single'; // 'single' | 'range' | 'multiple' - which calendar mode is active
@@ -970,6 +990,8 @@ async function fetchLeaveStatus_() {
         type: normalizeLeaveType_(data.type),
         halfDayPeriod: data.halfDayPeriod || '',
         shortLeaveTime: data.shortLeaveTime || '',
+        checkOutTime: data.checkOutTime || '',
+        checkInTime: data.checkInTime || '',
         reasonHtml: data.reasonHtml || '',
         status: data.status || 'requested',
         resolvedAt: data.resolvedAt && data.resolvedAt.toDate ? data.resolvedAt.toDate().toISOString() : '',
@@ -1111,6 +1133,7 @@ function selectLeaveCategory_(category) {
   } else {
     selectedLeaveType = category; // 'foreignTrip' | 'umrah' | 'medical' - no sub-choice
     leaveShortTimePicker.classList.add('hidden');
+    leaveOutPassTimePicker.classList.add('hidden');
   }
   updateLeaveDrawerSummaryChips_();
 }
@@ -1119,23 +1142,10 @@ function selectLeaveType_(type) {
   selectedLeaveType = type;
   leaveTypeShortBtn.classList.toggle('is-selected', type === 'casualShort');
   leaveTypeFullBtn.classList.toggle('is-selected', type === 'casualFull');
-  // The time picker only makes sense for a partial (Short Leave) day.
-  const showTimePicker = type === 'casualShort';
-  leaveShortTimePicker.classList.toggle('hidden', !showTimePicker);
-  // The slider measures its own width to position the handle - only
-  // possible once it's actually laid out (not display:none), so refresh
-  // right after un-hiding rather than while it was still hidden.
-  if (showTimePicker) updateLeaveTimeUI_();
-  updateLeaveDrawerSummaryChips_();
-}
-
-// Callers always pass an already-normalized hour12 (1-12) + minute (0-59) -
-// wraparound/AM-PM-flip on stepping past the ends is handled by step() below
-// before it gets here.
-function setLeaveTime_(hour12, minute, period) {
-  leaveSelectedTime = { hour12: hour12, minute: minute, period: period };
-  leaveSelectedHalfDay = period;
-  updateLeaveTimeUI_();
+  leaveTypeOutPassBtn.classList.toggle('is-selected', type === 'casualOutPass');
+  leaveShortTimePicker.classList.toggle('hidden', type !== 'casualShort');
+  leaveOutPassTimePicker.classList.toggle('hidden', type !== 'casualOutPass');
+  leaveOutPassTimeError.classList.add('hidden');
   updateLeaveDrawerSummaryChips_();
 }
 
@@ -1143,99 +1153,94 @@ function leaveTimeLabel_(time) {
   return time.hour12 + ':' + String(time.minute).padStart(2, '0');
 }
 
-function updateLeaveTimeUI_() {
-  const t = leaveSelectedTime;
-  const totalMinutes = (t.hour12 % 12) * 60 + t.minute;
-  const fraction = totalMinutes / 720;
-  const sliderWidth = leaveTimeSlider.clientWidth;
-  if (sliderWidth > 0) {
-    leaveTimeHandle.style.left = (fraction * sliderWidth) + 'px';
-  }
-  const label = leaveTimeLabel_(t);
-  leaveTimeHandleLabel.textContent = label;
-  leaveTimeInput.value = label + ' ' + t.period;
-  leaveTimeAmBtn.classList.toggle('is-selected', t.period === 'AM');
-  leaveTimePmBtn.classList.toggle('is-selected', t.period === 'PM');
+function leaveTimeTo24_(t) {
+  const h = (t.hour12 % 12) + (t.period === 'PM' ? 12 : 0);
+  return h * 60 + t.minute;
+}
+function leaveTime24ToParts_(total) {
+  const h = Math.floor(total / 60), m = total % 60;
+  const period = h >= 12 ? 'PM' : 'AM';
+  let hour12 = h % 12; if (hour12 === 0) hour12 = 12;
+  return { hour12: hour12, minute: m, period: period };
+}
+// Every leave time field (Short Leave's start, Out Pass's check-out/check-in)
+// is confined to office hours.
+function leaveClampTimeToWindow_(t) {
+  const total = Math.min(LEAVE_TIME_WINDOW_MAX_, Math.max(LEAVE_TIME_WINDOW_MIN_, leaveTimeTo24_(t)));
+  return leaveTime24ToParts_(total);
 }
 
-// Builds the 12 tick marks once - every 3rd one drawn taller, matching the
-// reference's quarter-hour rhythm (12/3/6/9 o'clock).
-function buildLeaveTimeTicks_() {
-  if (leaveTimeTicks.childElementCount) return;
-  for (let i = 0; i < 12; i++) {
-    const tick = document.createElement('span');
-    if (i % 3 === 0) tick.classList.add('is-major');
-    leaveTimeTicks.appendChild(tick);
+// Wires one manual time selector - stepper -/+, typed input, AM/PM toggle,
+// no drag slider. `get`/`set` read and write whichever module-level time
+// value this instance owns, so the same wiring serves Short Leave's single
+// field and Out Pass's independent check-out/check-in fields. Returns
+// { refresh } so callers can force the displayed value back in sync after
+// resetting the underlying state (e.g. reopening the Apply tab).
+function initLeaveTimeControl_(cfg) {
+  function refresh() {
+    const t = leaveClampTimeToWindow_(cfg.get());
+    cfg.input.value = leaveTimeLabel_(t) + ' ' + t.period;
+    cfg.amBtn.classList.toggle('is-selected', t.period === 'AM');
+    cfg.pmBtn.classList.toggle('is-selected', t.period === 'PM');
   }
-}
-
-// Shared by drag and click-to-jump - converts a pointer's clientX into a
-// snapped (hour12, minute) pair along the 12-hour dial, keeping the
-// existing AM/PM period (dragging never flips it, only the +/- steppers do).
-function leaveTimeFromPointerX_(clientX) {
-  const rect = leaveTimeSlider.getBoundingClientRect();
-  const fraction = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-  const snapped = Math.round((fraction * 720) / 5) * 5;
-  const totalMinutes = Math.min(715, snapped);
-  let hour12 = Math.floor(totalMinutes / 60);
-  const minute = totalMinutes % 60;
-  if (hour12 === 0) hour12 = 12;
-  return { hour12: hour12, minute: minute };
-}
-
-function initLeaveTimePicker_() {
-  buildLeaveTimeTicks_();
-
-  let dragging = false;
-  function handlePointerMove(clientX) {
-    const picked = leaveTimeFromPointerX_(clientX);
-    setLeaveTime_(picked.hour12, picked.minute, leaveSelectedTime.period);
+  function commit(t) {
+    cfg.set(leaveClampTimeToWindow_(t));
+    refresh();
+    updateLeaveDrawerSummaryChips_();
+    if (cfg.onChange) cfg.onChange();
   }
-  leaveTimeSlider.addEventListener('pointerdown', function (e) {
-    dragging = true;
-    leaveTimeSlider.setPointerCapture(e.pointerId);
-    handlePointerMove(e.clientX);
-  });
-  leaveTimeSlider.addEventListener('pointermove', function (e) {
-    if (dragging) handlePointerMove(e.clientX);
-  });
-  leaveTimeSlider.addEventListener('pointerup', function () { dragging = false; });
-  leaveTimeSlider.addEventListener('pointercancel', function () { dragging = false; });
-
   function step(direction) {
-    const t = leaveSelectedTime;
-    let totalMinutes = (t.hour12 % 12) * 60 + t.minute + (direction === 'increase' ? 5 : -5);
-    let period = t.period;
-    if (totalMinutes >= 720) { totalMinutes -= 720; period = period === 'AM' ? 'PM' : 'AM'; }
-    if (totalMinutes < 0) { totalMinutes += 720; period = period === 'AM' ? 'PM' : 'AM'; }
-    let hour12 = Math.floor(totalMinutes / 60);
-    if (hour12 === 0) hour12 = 12;
-    setLeaveTime_(hour12, totalMinutes % 60, period);
+    commit(leaveTime24ToParts_(leaveTimeTo24_(cfg.get()) + (direction === 'increase' ? 5 : -5)));
   }
-  leaveTimeMinusBtn.addEventListener('click', function () { step('decrease'); });
-  leaveTimePlusBtn.addEventListener('click', function () { step('increase'); });
-  leaveTimeAmBtn.addEventListener('click', function () { setLeaveTime_(leaveSelectedTime.hour12, leaveSelectedTime.minute, 'AM'); });
-  leaveTimePmBtn.addEventListener('click', function () { setLeaveTime_(leaveSelectedTime.hour12, leaveSelectedTime.minute, 'PM'); });
+  cfg.minusBtn.addEventListener('click', function () { step('decrease'); });
+  cfg.plusBtn.addEventListener('click', function () { step('increase'); });
+  cfg.amBtn.addEventListener('click', function () { const t = cfg.get(); commit({ hour12: t.hour12, minute: t.minute, period: 'AM' }); });
+  cfg.pmBtn.addEventListener('click', function () { const t = cfg.get(); commit({ hour12: t.hour12, minute: t.minute, period: 'PM' }); });
 
   // Lenient parse on commit ("7:25 am", "07:25", "725pm", ...) - anything
-  // that doesn't parse just reverts to the last valid value.
-  function commitTypedTime() {
-    const raw = leaveTimeInput.value.trim().toLowerCase();
+  // that doesn't parse just reverts to the last valid value; anything
+  // outside office hours gets clamped into range by commit() instead of
+  // rejected outright.
+  function commitTyped() {
+    const raw = cfg.input.value.trim().toLowerCase();
     const match = /^(\d{1,2})(?::?(\d{2}))?\s*(am|pm)?$/.exec(raw);
-    if (!match) { updateLeaveTimeUI_(); return; }
+    if (!match) { refresh(); return; }
     let hour12 = parseInt(match[1], 10);
     const minute = match[2] ? parseInt(match[2], 10) : 0;
-    const period = match[3] ? match[3].toUpperCase() : leaveSelectedTime.period;
-    if (hour12 < 1 || hour12 > 12 || minute > 59) { updateLeaveTimeUI_(); return; }
-    setLeaveTime_(hour12, Math.round(minute / 5) * 5, period);
+    const period = match[3] ? match[3].toUpperCase() : cfg.get().period;
+    if (hour12 < 1 || hour12 > 12 || minute > 59) { refresh(); return; }
+    commit({ hour12: hour12, minute: Math.round(minute / 5) * 5, period: period });
   }
-  leaveTimeInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); leaveTimeInput.blur(); }
+  cfg.input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); cfg.input.blur(); }
   });
-  leaveTimeInput.addEventListener('blur', commitTypedTime);
+  cfg.input.addEventListener('blur', commitTyped);
 
-  window.addEventListener('resize', function () {
-    if (!leaveShortTimePicker.classList.contains('hidden')) updateLeaveTimeUI_();
+  refresh();
+  return { refresh: refresh };
+}
+
+let leaveShortTimeCtl_ = null;
+let leaveOutCheckOutCtl_ = null;
+let leaveOutCheckInCtl_ = null;
+
+function initLeaveTimePicker_() {
+  leaveShortTimeCtl_ = initLeaveTimeControl_({
+    input: leaveTimeInput, minusBtn: leaveTimeMinusBtn, plusBtn: leaveTimePlusBtn, amBtn: leaveTimeAmBtn, pmBtn: leaveTimePmBtn,
+    get: function () { return leaveSelectedTime; },
+    set: function (t) { leaveSelectedTime = t; leaveSelectedHalfDay = t.period; }
+  });
+  leaveOutCheckOutCtl_ = initLeaveTimeControl_({
+    input: leaveOutCheckOutInput, minusBtn: leaveOutCheckOutMinusBtn, plusBtn: leaveOutCheckOutPlusBtn, amBtn: leaveOutCheckOutAmBtn, pmBtn: leaveOutCheckOutPmBtn,
+    get: function () { return leaveOutPassCheckOutTime; },
+    set: function (t) { leaveOutPassCheckOutTime = t; },
+    onChange: function () { leaveOutPassTimeError.classList.add('hidden'); }
+  });
+  leaveOutCheckInCtl_ = initLeaveTimeControl_({
+    input: leaveOutCheckInInput, minusBtn: leaveOutCheckInMinusBtn, plusBtn: leaveOutCheckInPlusBtn, amBtn: leaveOutCheckInAmBtn, pmBtn: leaveOutCheckInPmBtn,
+    get: function () { return leaveOutPassCheckInTime; },
+    set: function (t) { leaveOutPassCheckInTime = t; },
+    onChange: function () { leaveOutPassTimeError.classList.add('hidden'); }
   });
 }
 
@@ -1250,9 +1255,14 @@ function updateLeaveDrawerSummaryChips_() {
   const categoryLabel = LEAVE_CATEGORY_LABELS_[selectedLeaveCategory] || 'Leave';
   chips.push('<span class="mchip ' + categoryClass + '">' + escapeHtml(categoryLabel) + '</span>');
   if (selectedLeaveCategory === 'casual') {
-    const isShort = selectedLeaveType === 'casualShort';
-    chips.push('<span class="mchip ' + (isShort ? 'dur-short' : 'dur-full') + '">' + (isShort ? 'Short leave' : 'Full leave') + '</span>');
-    if (isShort) chips.push('<span class="mchip n">' + escapeHtml(leaveTimeLabel_(leaveSelectedTime) + ' ' + leaveSelectedTime.period) + '</span>');
+    if (selectedLeaveType === 'casualOutPass') {
+      chips.push('<span class="mchip dur-outpass">Out Pass</span>');
+      chips.push('<span class="mchip n">' + escapeHtml(leaveTimeLabel_(leaveOutPassCheckOutTime) + ' ' + leaveOutPassCheckOutTime.period + ' – ' + leaveTimeLabel_(leaveOutPassCheckInTime) + ' ' + leaveOutPassCheckInTime.period) + '</span>');
+    } else {
+      const isShort = selectedLeaveType === 'casualShort';
+      chips.push('<span class="mchip ' + (isShort ? 'dur-short' : 'dur-full') + '">' + (isShort ? 'Short leave' : 'Full leave') + '</span>');
+      if (isShort) chips.push('<span class="mchip n">' + escapeHtml(leaveTimeLabel_(leaveSelectedTime) + ' ' + leaveSelectedTime.period) + '</span>');
+    }
   }
   if (leaveSelectedDates.length) {
     const start = leaveSelectedDates[0];
@@ -1406,6 +1416,9 @@ function lcalPickDate_(date) {
 function lcalRenderGrid_() {
   lcalMonthLabel.textContent = LCAL_MONTHS_[lcalViewMonth];
   lcalYearLabel.textContent = lcalViewYear;
+  const now = new Date();
+  lcalPrevBtn.disabled = lcalViewYear === now.getFullYear() && lcalViewMonth === now.getMonth();
+  lcalPrevBtn.classList.toggle('is-disabled', lcalPrevBtn.disabled);
 
   const lead = new Date(lcalViewYear, lcalViewMonth, 1).getDay();
   const todayKey = lcalKey_(lcalToday0_());
@@ -1472,6 +1485,17 @@ function lcalGoToMonth_(year, month) {
   lcalRenderGrid_();
 }
 
+// Month options for a given year - the current year only offers this month
+// onwards (leave can't be booked for a past month), any later year offers
+// all twelve.
+function lcalMonthOptionsFor_(year) {
+  const now = new Date();
+  const startMonth = year === now.getFullYear() ? now.getMonth() : 0;
+  const opts = [];
+  for (let m = startMonth; m <= 11; m++) opts.push({ value: m, label: LCAL_MONTHS_[m] });
+  return opts;
+}
+
 // Quick picks - c2.html's presets, always resolved as a date range (even the
 // 1-day ones), so picking one forces Range mode rather than leaving it
 // mismatched with whatever mode was active before.
@@ -1531,15 +1555,25 @@ function lcalToggleDropdown_(menuEl) {
 }
 
 function lcalInit_() {
-  const yearOptions = [];
   const nowYear = new Date().getFullYear();
-  for (let y = nowYear - 1; y <= nowYear + 5; y++) yearOptions.push({ value: y, label: String(y) });
-  lcalBuildDropdown_(lcalYearMenu, lcalYearLabel, yearOptions, function (y) { lcalGoToMonth_(Number(y), lcalViewMonth); });
-  lcalBuildDropdown_(lcalMonthMenu, lcalMonthLabel, LCAL_MONTHS_.map(function (m, i) { return { value: i, label: m }; }), function (m) { lcalGoToMonth_(lcalViewYear, Number(m)); });
+  const yearOptions = [];
+  for (let y = nowYear; y <= nowYear + 5; y++) yearOptions.push({ value: y, label: String(y) });
+  lcalBuildDropdown_(lcalYearMenu, lcalYearLabel, yearOptions, function (y) {
+    const newYear = Number(y);
+    // Jumping back to the current year while parked on a now-past month
+    // (e.g. viewed Mar 2027, then picked 2026 back when "now" is Sep 2026)
+    // would land on a disabled month - clamp forward to the earliest
+    // allowed one instead.
+    const now = new Date();
+    if (newYear === now.getFullYear() && lcalViewMonth < now.getMonth()) lcalViewMonth = now.getMonth();
+    lcalGoToMonth_(newYear, lcalViewMonth);
+  });
 
   lcalMonthTrigger.addEventListener('click', function (e) {
     e.stopPropagation();
-    lcalMonthMenu.querySelectorAll('button').forEach(function (b, i) { b.classList.toggle('is-selected', i === lcalViewMonth); });
+    // Rebuilt on every open since the allowed range depends on lcalViewYear.
+    lcalBuildDropdown_(lcalMonthMenu, lcalMonthLabel, lcalMonthOptionsFor_(lcalViewYear), function (m) { lcalGoToMonth_(lcalViewYear, Number(m)); });
+    lcalMonthMenu.querySelectorAll('button').forEach(function (b) { b.classList.toggle('is-selected', Number(b.dataset.value) === lcalViewMonth); });
     lcalToggleDropdown_(lcalMonthMenu);
   });
   lcalYearTrigger.addEventListener('click', function (e) {
@@ -1555,6 +1589,7 @@ function lcalInit_() {
   });
 
   lcalPrevBtn.addEventListener('click', function () {
+    if (lcalPrevBtn.disabled) return;
     lcalViewMonth--;
     if (lcalViewMonth < 0) { lcalViewMonth = 11; lcalViewYear--; }
     lcalRenderGrid_();
@@ -1624,7 +1659,13 @@ async function openApplyLeaveTab_() {
   lcalViewYear = today.getFullYear();
   lcalViewMonth = today.getMonth();
   selectLeaveDateMode_('single');
-  setLeaveTime_(7, 0, 'AM');
+  leaveSelectedTime = { hour12: 8, minute: 30, period: 'AM' };
+  leaveSelectedHalfDay = 'AM';
+  leaveOutPassCheckOutTime = { hour12: 9, minute: 0, period: 'AM' };
+  leaveOutPassCheckInTime = { hour12: 1, minute: 0, period: 'PM' };
+  if (leaveShortTimeCtl_) leaveShortTimeCtl_.refresh();
+  if (leaveOutCheckOutCtl_) leaveOutCheckOutCtl_.refresh();
+  if (leaveOutCheckInCtl_) leaveOutCheckInCtl_.refresh();
   selectLeaveCategory_('casual');
   switchLeavesTab_('apply');
   // Focus immediately so activeCell/activeToolbarEl point at this editor
@@ -1764,6 +1805,10 @@ async function submitUninformedResolution_() {
       resolutionHtml: html
     });
     closeUninformedResolveDrawer_();
+    // Strip the #resolve-uninformed=<id> hash left over from the email link -
+    // otherwise a later refresh in this same tab still points at a report
+    // that's now resolved.
+    if (/^#resolve-uninformed=/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search);
     showToast_('Resolution submitted.', 'success');
     loadUninformedBanner_();
   } catch (_e) {
@@ -2022,7 +2067,9 @@ function renderMyLeavesList_(records) {
 // toggle, colour file-type badges on attachments, and a Withdraw action on
 // the requester's own still-pending requests.
 function renderMyLeaveCard_(rec) {
-  const isShort = normalizeLeaveType_(rec.type) === 'casualShort';
+  const type = normalizeLeaveType_(rec.type);
+  const isShort = type === 'casualShort';
+  const isOutPass = type === 'casualOutPass';
   const expanded = myLeavesExpandedReasons.has(rec.requestId);
   const dateLabel = rec.startDate && !isNaN(new Date(rec.startDate).getTime()) ? fmtDateLocal_(new Date(rec.startDate)) : '';
   const appliedLabel = rec.requestedAt ? 'applied ' + new Date(rec.requestedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
@@ -2033,6 +2080,10 @@ function renderMyLeaveCard_(rec) {
     durationChip = '<span class="mchip dur-short">Short leave</span>';
     const halfDayDetail = rec.shortLeaveTime || rec.halfDayPeriod || '';
     dayCountChip = '<span class="mchip n">Half day' + (halfDayDetail ? ' (' + escapeHtml(halfDayDetail) + ')' : '') + '</span>';
+  } else if (isOutPass) {
+    durationChip = '<span class="mchip dur-outpass">Out Pass</span>';
+    const range = rec.checkOutTime && rec.checkInTime ? rec.checkOutTime + ' – ' + rec.checkInTime : '';
+    dayCountChip = range ? '<span class="mchip n">' + escapeHtml(range) + '</span>' : '';
   } else {
     durationChip = '<span class="mchip dur-full">Full leave</span>';
     let days = 1;
@@ -2178,6 +2229,7 @@ leaveCategoryMedicalBtn.addEventListener('click', () => selectLeaveCategory_('me
 leaveCategoryCasualBtn.addEventListener('click', () => selectLeaveCategory_('casual'));
 leaveTypeShortBtn.addEventListener('click', () => selectLeaveType_('casualShort'));
 leaveTypeFullBtn.addEventListener('click', () => selectLeaveType_('casualFull'));
+leaveTypeOutPassBtn.addEventListener('click', () => selectLeaveType_('casualOutPass'));
 leaveDateModeSingleBtn.addEventListener('click', () => selectLeaveDateMode_('single'));
 leaveDateModeRangeBtn.addEventListener('click', () => selectLeaveDateMode_('range'));
 leaveDateModeCustomBtn.addEventListener('click', () => selectLeaveDateMode_('multiple'));
@@ -2356,6 +2408,11 @@ leaveSendBtn.addEventListener('click', async () => {
     leaveDateRangeError.classList.remove('hidden');
     return;
   }
+  if (selectedLeaveType === 'casualOutPass' && leaveTimeTo24_(leaveOutPassCheckOutTime) >= leaveTimeTo24_(leaveOutPassCheckInTime)) {
+    leaveOutPassTimeError.textContent = 'Check-in time must be after check-out time.';
+    leaveOutPassTimeError.classList.remove('hidden');
+    return;
+  }
   const startDate = leaveSelectedDates[0];
   const endDate = leaveSelectedDates[leaveSelectedDates.length - 1];
   const weekLabel = weekLabelFromDate_(startDate);
@@ -2405,11 +2462,15 @@ leaveSendBtn.addEventListener('click', async () => {
     if (leaveDateMode === 'multiple' && leaveSelectedDates.length > 1) {
       leaveDocPayload.customDates = leaveSelectedDates.map(function (d) { return Timestamp.fromDate(d); });
     }
-    // Only Short Leave carries a half-day period / start time - omit both
-    // fields entirely for Full Leave and every other leave type.
+    // Only Short Leave carries a half-day period / start time, and only Out
+    // Pass carries a check-out/check-in pair - omit both entirely for Full
+    // Leave and every other leave type.
     if (selectedLeaveType === 'casualShort') {
       leaveDocPayload.halfDayPeriod = leaveSelectedHalfDay;
       leaveDocPayload.shortLeaveTime = leaveTimeLabel_(leaveSelectedTime) + ' ' + leaveSelectedTime.period;
+    } else if (selectedLeaveType === 'casualOutPass') {
+      leaveDocPayload.checkOutTime = leaveTimeLabel_(leaveOutPassCheckOutTime) + ' ' + leaveOutPassCheckOutTime.period;
+      leaveDocPayload.checkInTime = leaveTimeLabel_(leaveOutPassCheckInTime) + ' ' + leaveOutPassCheckInTime.period;
     }
     const docRef = await addDoc(collection(db, 'leaveRequests'), leaveDocPayload);
 
@@ -3004,6 +3065,10 @@ async function openResolveUninformedDeepLinkOnce_() {
     if (!snap.exists()) return;
     const data = snap.data();
     if ((data.email || '').toLowerCase() !== currentUserEmail_()) return;
+    // Only reopen while it's still actually open - the email link's hash
+    // stays in the address bar after resolving, so a later refresh in the
+    // same tab must not resurrect an already-resolved report.
+    if (data.status !== 'reported') return;
     openUninformedResolveDrawer_(Object.assign({ reportId: snap.id }, data));
   } catch (_e) { /* offline or permission-denied - nothing to open */ }
 }
@@ -4447,7 +4512,7 @@ async function renderLeaveKpis_() {
   try {
     if (!currentUserContext) throw new Error('Not signed in.');
     const snap = await getDocs(collection(db, 'leaveRequests'));
-    const typeCounts = { foreignTrip: 0, umrah: 0, medical: 0, casualShort: 0, casualFull: 0 };
+    const typeCounts = { foreignTrip: 0, umrah: 0, medical: 0, casualShort: 0, casualFull: 0, casualOutPass: 0 };
     const counts = { approved: 0, rejected: 0 };
     snap.docs.forEach(function (d) {
       const data = d.data();
@@ -4462,6 +4527,7 @@ async function renderLeaveKpis_() {
       { label: 'Medical', value: typeCounts.medical },
       { label: 'Casual - Short', value: typeCounts.casualShort },
       { label: 'Casual - Full', value: typeCounts.casualFull },
+      { label: 'Casual - Out Pass', value: typeCounts.casualOutPass },
       { label: 'Leaves approved', value: counts.approved },
       { label: 'Leaves rejected', value: counts.rejected }
     ];
