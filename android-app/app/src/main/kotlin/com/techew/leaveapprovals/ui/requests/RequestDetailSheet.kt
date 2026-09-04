@@ -408,8 +408,11 @@ internal fun leaveDateLabel(request: LeaveRequest): String {
 }
 
 internal fun durationFact(request: LeaveRequest): String = when {
-    LeaveType.isShort(request.type) ->
-        if (request.halfDayPeriod.isNotBlank()) "Half day · ${request.halfDayPeriod}" else "Half day"
+    LeaveType.isShort(request.type) -> when {
+        request.shortLeaveTime.isNotBlank() -> "Half day · ${request.shortLeaveTime}"
+        request.halfDayPeriod.isNotBlank() -> "Half day · ${request.halfDayPeriod}"
+        else -> "Half day"
+    }
     LeaveType.normalize(request.type) == LeaveType.CASUAL_FULL -> "Full day"
     else -> {
         val start = request.startDate.toLocalDateOrNull()

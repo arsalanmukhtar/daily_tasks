@@ -146,7 +146,7 @@ function leaveDateDetailHtml(data) {
 
   const halfDayNote =
     normalizeLeaveType(data.type) === 'casualShort' && (data.halfDayPeriod === 'AM' || data.halfDayPeriod === 'PM')
-      ? ` · ${data.halfDayPeriod}`
+      ? ` · ${data.shortLeaveTime || data.halfDayPeriod}`
       : '';
 
   return {

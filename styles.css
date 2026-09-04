@@ -1643,7 +1643,6 @@ textarea {
 /* Nested casual-duration + AM/PM box */
 .nest { margin-top: 9px; padding: 10px 11px 11px; border-radius: var(--r-md); background: var(--t-casual-bg); border: 1px solid var(--t-casual-bd); }
 .nest .cap { font-size: 11px; font-weight: 700; color: var(--t-casual); margin-bottom: 8px; letter-spacing: .02em; }
-.nest .cap2 { font-size: 10.5px; font-weight: 700; color: var(--ink-500); margin: 10px 0 6px; letter-spacing: .04em; }
 .dseg { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 .dopt {
   border: 1px solid #D9D2F0; background: #fff; border-radius: 9px; padding: 8px 9px; text-align: left;
@@ -1656,8 +1655,6 @@ textarea {
 .dopt[data-d="short"].is-selected b { color: var(--d-short); }
 .dopt[data-d="full"].is-selected { border-color: var(--d-full); background: var(--d-full-bg); }
 .dopt[data-d="full"].is-selected b { color: var(--d-full); }
-.dopt[data-d="am"].is-selected, .dopt[data-d="pm"].is-selected { border-color: var(--brand-200); background: var(--brand-50); }
-.dopt[data-d="am"].is-selected b, .dopt[data-d="pm"].is-selected b { color: var(--brand-700); }
 .dopt:disabled { opacity: .5; cursor: not-allowed; }
 
 /* Single-date / date-range segmented toggle (also reused for future 2-way segments) */
@@ -1778,6 +1775,42 @@ textarea {
 }
 .cal-host .flatpickr-day.startRange { border-radius: 7px 0 0 7px; }
 .cal-host .flatpickr-day.endRange { border-radius: 0 7px 7px 0; }
+
+/* Short Leave's time picker - lives inside .cal-host, directly below the
+   calendar (flex column, not side-by-side) so both fit in one compact
+   panel. Colors/shapes follow our own brand tokens, not the teal/orange
+   drag-slider it was modeled after - that was a structural/interaction
+   reference only. */
+.time-picker { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+.tp-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-400); margin-bottom: 16px; }
+.tp-slider { position: relative; height: 34px; margin: 0 4px 18px; touch-action: none; cursor: pointer; }
+.tp-track { position: absolute; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; background: var(--surface-2); border-radius: 3px; }
+.tp-ticks { position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: center; pointer-events: none; }
+.tp-ticks span { width: 2px; height: 6px; background: var(--line); border-radius: 1px; }
+.tp-ticks span.is-major { height: 10px; background: var(--ink-400); }
+.tp-handle {
+  position: absolute; top: 50%; width: 34px; height: 34px; margin-left: -17px; margin-top: -17px;
+  background: var(--brand-600); border-radius: 9px; box-shadow: 0 2px 6px rgba(194, 65, 12, .35);
+  display: flex; align-items: center; justify-content: center; cursor: grab; transition: background 120ms;
+}
+.tp-handle:active { cursor: grabbing; background: var(--brand-700); }
+.tp-handle span { font-size: 10px; font-weight: 700; color: #fff; white-space: nowrap; pointer-events: none; }
+.tp-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tp-step {
+  width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--line); background: #fff;
+  color: var(--ink-600); font-size: 15px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; line-height: 1;
+}
+.tp-step:hover { border-color: var(--ink-400); background: var(--surface-2); }
+.tp-input {
+  flex: 1; min-width: 84px; height: 28px; border: 1px solid var(--line); border-radius: 7px;
+  padding: 0 8px; font-size: 12.5px; font-weight: 600; color: var(--ink-900); text-align: center;
+}
+.tp-input:focus { outline: none; border-color: var(--brand-600); }
+.tp-ampm-seg { display: flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; flex-shrink: 0; }
+.tp-ampm-btn { padding: 0 10px; height: 28px; font-size: 11px; font-weight: 700; color: var(--ink-500); background: #fff; cursor: pointer; }
+.tp-ampm-btn + .tp-ampm-btn { border-left: 1px solid var(--line); }
+.tp-ampm-btn.is-selected { background: var(--brand-600); color: #fff; }
 
 .picked {
   display: flex; align-items: center; gap: 8px; margin-top: 9px; padding: 9px 10px;

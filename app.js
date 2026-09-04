@@ -161,11 +161,18 @@ const navSubWeeksTag      = document.getElementById('navSubWeeksTag');
 const navSubDraftTag      = document.getElementById('navSubDraftTag');
 const navLeavePendingTag  = document.getElementById('navLeavePendingTag');
 const navLeaveApprovedTag = document.getElementById('navLeaveApprovedTag');
-// Leave drawer: AM/PM half-day toggle, inline-calendar picked summary, live
-// footer summary chips, attachment count note.
-const leaveHalfDayRow     = document.getElementById('leaveHalfDayRow');
-const leaveHalfDayAmBtn   = document.getElementById('leaveHalfDayAmBtn');
-const leaveHalfDayPmBtn   = document.getElementById('leaveHalfDayPmBtn');
+// Leave drawer: Short Leave's time picker, inline-calendar picked summary,
+// live footer summary chips, attachment count note.
+const leaveShortTimePicker = document.getElementById('leaveShortTimePicker');
+const leaveTimeSlider      = document.getElementById('leaveTimeSlider');
+const leaveTimeTicks       = document.getElementById('leaveTimeTicks');
+const leaveTimeHandle      = document.getElementById('leaveTimeHandle');
+const leaveTimeHandleLabel = document.getElementById('leaveTimeHandleLabel');
+const leaveTimeInput       = document.getElementById('leaveTimeInput');
+const leaveTimeMinusBtn    = document.getElementById('leaveTimeMinusBtn');
+const leaveTimePlusBtn     = document.getElementById('leaveTimePlusBtn');
+const leaveTimeAmBtn       = document.getElementById('leaveTimeAmBtn');
+const leaveTimePmBtn       = document.getElementById('leaveTimePmBtn');
 const leaveDatePicked       = document.getElementById('leaveDatePicked');
 const leaveDatePickedLabel  = document.getElementById('leaveDatePickedLabel');
 const leaveDatePickedMeta   = document.getElementById('leaveDatePickedMeta');
@@ -834,7 +841,10 @@ function normalizeLeaveAttachments_(data) {
 
 let selectedLeaveCategory = 'casual'; // 'foreignTrip' | 'umrah' | 'medical' | 'casual'
 let selectedLeaveType = 'casualShort'; // the concrete value written to Firestore
-let leaveSelectedHalfDay = 'AM'; // 'AM' | 'PM' - only meaningful when selectedLeaveType === 'casualShort'
+let leaveSelectedHalfDay = 'AM'; // 'AM' | 'PM' - derived from the time picker below, kept for the existing halfDayPeriod field
+// The Short Leave time picker's value - hour12 is 1-12, minute is 0-59 (snapped
+// to 5s), period is 'AM' | 'PM'. Only meaningful when selectedLeaveType === 'casualShort'.
+let leaveSelectedTime = { hour12: 7, minute: 0, period: 'AM' };
 let leaveAttachmentFiles = [];
 let leaveDateRangePicker = null;
 let leaveSelectedDates = []; // [start] or [start, end], plain JS Date objects
@@ -923,6 +933,7 @@ async function fetchLeaveStatus_() {
         weekLabel: data.weekLabel || '',
         type: normalizeLeaveType_(data.type),
         halfDayPeriod: data.halfDayPeriod || '',
+        shortLeaveTime: data.shortLeaveTime || '',
         reasonHtml: data.reasonHtml || '',
         status: data.status || 'requested',
         resolvedAt: data.resolvedAt && data.resolvedAt.toDate ? data.resolvedAt.toDate().toISOString() : '',
@@ -1065,7 +1076,7 @@ function selectLeaveCategory_(category) {
     selectLeaveType_('casualShort');
   } else {
     selectedLeaveType = category; // 'foreignTrip' | 'umrah' | 'medical' - no sub-choice
-    leaveHalfDayRow.classList.add('hidden');
+    leaveShortTimePicker.classList.add('hidden');
   }
   updateLeaveDrawerSummaryChips_();
 }
@@ -1075,16 +1086,124 @@ function selectLeaveType_(type) {
   selectedLeaveType = type;
   leaveTypeShortBtn.classList.toggle('is-selected', type === 'casualShort');
   leaveTypeFullBtn.classList.toggle('is-selected', type === 'casualFull');
-  // AM/PM only makes sense for a partial (Short Leave) day.
-  leaveHalfDayRow.classList.toggle('hidden', type !== 'casualShort');
-  if (type === 'casualShort' && !leaveSelectedHalfDay) selectLeaveHalfDay_('AM');
+  // The time picker only makes sense for a partial (Short Leave) day.
+  const showTimePicker = type === 'casualShort';
+  leaveShortTimePicker.classList.toggle('hidden', !showTimePicker);
+  // The slider measures its own width to position the handle - only
+  // possible once it's actually laid out (not display:none), so refresh
+  // right after un-hiding rather than while it was still hidden.
+  if (showTimePicker) updateLeaveTimeUI_();
   updateLeaveDrawerSummaryChips_();
 }
 
-function selectLeaveHalfDay_(period) {
+// Callers always pass an already-normalized hour12 (1-12) + minute (0-59) -
+// wraparound/AM-PM-flip on stepping past the ends is handled by step() below
+// before it gets here.
+function setLeaveTime_(hour12, minute, period) {
+  leaveSelectedTime = { hour12: hour12, minute: minute, period: period };
   leaveSelectedHalfDay = period;
-  leaveHalfDayAmBtn.classList.toggle('is-selected', period === 'AM');
-  leaveHalfDayPmBtn.classList.toggle('is-selected', period === 'PM');
+  updateLeaveTimeUI_();
+  updateLeaveDrawerSummaryChips_();
+}
+
+function leaveTimeLabel_(time) {
+  return time.hour12 + ':' + String(time.minute).padStart(2, '0');
+}
+
+function updateLeaveTimeUI_() {
+  const t = leaveSelectedTime;
+  const totalMinutes = (t.hour12 % 12) * 60 + t.minute;
+  const fraction = totalMinutes / 720;
+  const sliderWidth = leaveTimeSlider.clientWidth;
+  if (sliderWidth > 0) {
+    leaveTimeHandle.style.left = (fraction * sliderWidth) + 'px';
+  }
+  const label = leaveTimeLabel_(t);
+  leaveTimeHandleLabel.textContent = label;
+  leaveTimeInput.value = label + ' ' + t.period;
+  leaveTimeAmBtn.classList.toggle('is-selected', t.period === 'AM');
+  leaveTimePmBtn.classList.toggle('is-selected', t.period === 'PM');
+}
+
+// Builds the 12 tick marks once - every 3rd one drawn taller, matching the
+// reference's quarter-hour rhythm (12/3/6/9 o'clock).
+function buildLeaveTimeTicks_() {
+  if (leaveTimeTicks.childElementCount) return;
+  for (let i = 0; i < 12; i++) {
+    const tick = document.createElement('span');
+    if (i % 3 === 0) tick.classList.add('is-major');
+    leaveTimeTicks.appendChild(tick);
+  }
+}
+
+// Shared by drag and click-to-jump - converts a pointer's clientX into a
+// snapped (hour12, minute) pair along the 12-hour dial, keeping the
+// existing AM/PM period (dragging never flips it, only the +/- steppers do).
+function leaveTimeFromPointerX_(clientX) {
+  const rect = leaveTimeSlider.getBoundingClientRect();
+  const fraction = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+  const snapped = Math.round((fraction * 720) / 5) * 5;
+  const totalMinutes = Math.min(715, snapped);
+  let hour12 = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+  if (hour12 === 0) hour12 = 12;
+  return { hour12: hour12, minute: minute };
+}
+
+function initLeaveTimePicker_() {
+  buildLeaveTimeTicks_();
+
+  let dragging = false;
+  function handlePointerMove(clientX) {
+    const picked = leaveTimeFromPointerX_(clientX);
+    setLeaveTime_(picked.hour12, picked.minute, leaveSelectedTime.period);
+  }
+  leaveTimeSlider.addEventListener('pointerdown', function (e) {
+    dragging = true;
+    leaveTimeSlider.setPointerCapture(e.pointerId);
+    handlePointerMove(e.clientX);
+  });
+  leaveTimeSlider.addEventListener('pointermove', function (e) {
+    if (dragging) handlePointerMove(e.clientX);
+  });
+  leaveTimeSlider.addEventListener('pointerup', function () { dragging = false; });
+  leaveTimeSlider.addEventListener('pointercancel', function () { dragging = false; });
+
+  function step(direction) {
+    const t = leaveSelectedTime;
+    let totalMinutes = (t.hour12 % 12) * 60 + t.minute + (direction === 'increase' ? 5 : -5);
+    let period = t.period;
+    if (totalMinutes >= 720) { totalMinutes -= 720; period = period === 'AM' ? 'PM' : 'AM'; }
+    if (totalMinutes < 0) { totalMinutes += 720; period = period === 'AM' ? 'PM' : 'AM'; }
+    let hour12 = Math.floor(totalMinutes / 60);
+    if (hour12 === 0) hour12 = 12;
+    setLeaveTime_(hour12, totalMinutes % 60, period);
+  }
+  leaveTimeMinusBtn.addEventListener('click', function () { step('decrease'); });
+  leaveTimePlusBtn.addEventListener('click', function () { step('increase'); });
+  leaveTimeAmBtn.addEventListener('click', function () { setLeaveTime_(leaveSelectedTime.hour12, leaveSelectedTime.minute, 'AM'); });
+  leaveTimePmBtn.addEventListener('click', function () { setLeaveTime_(leaveSelectedTime.hour12, leaveSelectedTime.minute, 'PM'); });
+
+  // Lenient parse on commit ("7:25 am", "07:25", "725pm", ...) - anything
+  // that doesn't parse just reverts to the last valid value.
+  function commitTypedTime() {
+    const raw = leaveTimeInput.value.trim().toLowerCase();
+    const match = /^(\d{1,2})(?::?(\d{2}))?\s*(am|pm)?$/.exec(raw);
+    if (!match) { updateLeaveTimeUI_(); return; }
+    let hour12 = parseInt(match[1], 10);
+    const minute = match[2] ? parseInt(match[2], 10) : 0;
+    const period = match[3] ? match[3].toUpperCase() : leaveSelectedTime.period;
+    if (hour12 < 1 || hour12 > 12 || minute > 59) { updateLeaveTimeUI_(); return; }
+    setLeaveTime_(hour12, Math.round(minute / 5) * 5, period);
+  }
+  leaveTimeInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); leaveTimeInput.blur(); }
+  });
+  leaveTimeInput.addEventListener('blur', commitTypedTime);
+
+  window.addEventListener('resize', function () {
+    if (!leaveShortTimePicker.classList.contains('hidden')) updateLeaveTimeUI_();
+  });
 }
 
 // Live footer summary-chip strip (mockup .summary/.mchip) - reflects the
@@ -1100,7 +1219,7 @@ function updateLeaveDrawerSummaryChips_() {
   if (selectedLeaveCategory === 'casual') {
     const isShort = selectedLeaveType === 'casualShort';
     chips.push('<span class="mchip ' + (isShort ? 'dur-short' : 'dur-full') + '">' + (isShort ? 'Short leave' : 'Full leave') + '</span>');
-    if (isShort) chips.push('<span class="mchip n">' + escapeHtml(leaveSelectedHalfDay) + '</span>');
+    if (isShort) chips.push('<span class="mchip n">' + escapeHtml(leaveTimeLabel_(leaveSelectedTime) + ' ' + leaveSelectedTime.period) + '</span>');
   }
   if (leaveSelectedDates.length) {
     const start = leaveSelectedDates[0];
@@ -1258,7 +1377,7 @@ async function openLeaveDrawer() {
   resetLeaveAttachment_();
   await ensureLeaveDatePicker_();
   selectLeaveDateMode_('single');
-  selectLeaveHalfDay_('AM');
+  setLeaveTime_(7, 0, 'AM');
   selectLeaveCategory_('casual');
   leaveDrawer.classList.add('open');
   leaveBackdrop.classList.add('open');
@@ -1578,7 +1697,8 @@ function renderMyLeaveCard_(rec) {
   let durationChip, dayCountChip;
   if (isShort) {
     durationChip = '<span class="mchip dur-short">Short leave</span>';
-    dayCountChip = '<span class="mchip n">Half day' + (rec.halfDayPeriod ? ' (' + escapeHtml(rec.halfDayPeriod) + ')' : '') + '</span>';
+    const halfDayDetail = rec.shortLeaveTime || rec.halfDayPeriod || '';
+    dayCountChip = '<span class="mchip n">Half day' + (halfDayDetail ? ' (' + escapeHtml(halfDayDetail) + ')' : '') + '</span>';
   } else {
     durationChip = '<span class="mchip dur-full">Full leave</span>';
     let days = 1;
@@ -1723,8 +1843,7 @@ leaveTypeFullBtn.addEventListener('click', () => selectLeaveType_('casualFull'))
 leaveDateModeSingleBtn.addEventListener('click', () => selectLeaveDateMode_('single'));
 leaveDateModeRangeBtn.addEventListener('click', () => selectLeaveDateMode_('range'));
 leaveDateModeCustomBtn.addEventListener('click', () => selectLeaveDateMode_('multiple'));
-leaveHalfDayAmBtn.addEventListener('click', () => selectLeaveHalfDay_('AM'));
-leaveHalfDayPmBtn.addEventListener('click', () => selectLeaveHalfDay_('PM'));
+initLeaveTimePicker_();
 
 viewMyLeavesBtn.addEventListener('click', openMyLeavesDrawer);
 closeMyLeavesDrawerBtn.addEventListener('click', closeMyLeavesDrawer);
@@ -1928,10 +2047,11 @@ leaveSendBtn.addEventListener('click', async () => {
     if (leaveDateMode === 'multiple' && leaveSelectedDates.length > 1) {
       leaveDocPayload.customDates = leaveSelectedDates.map(function (d) { return Timestamp.fromDate(d); });
     }
-    // Only Short Leave carries a half-day period - omit the field entirely
-    // for Full Leave and every other leave type.
+    // Only Short Leave carries a half-day period / start time - omit both
+    // fields entirely for Full Leave and every other leave type.
     if (selectedLeaveType === 'casualShort') {
       leaveDocPayload.halfDayPeriod = leaveSelectedHalfDay;
+      leaveDocPayload.shortLeaveTime = leaveTimeLabel_(leaveSelectedTime) + ' ' + leaveSelectedTime.period;
     }
     const docRef = await addDoc(collection(db, 'leaveRequests'), leaveDocPayload);
 

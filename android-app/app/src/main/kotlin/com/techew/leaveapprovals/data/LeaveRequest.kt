@@ -23,6 +23,9 @@ data class LeaveRequest(
     // 'AM' | 'PM', only ever set by the web app at creation, only meaningful
     // when type normalizes to casualShort.
     val halfDayPeriod: String = "",
+    // e.g. "7:00 AM" - the exact time the web app's Short Leave time picker
+    // was set to, alongside halfDayPeriod (which stays AM/PM-only).
+    val shortLeaveTime: String = "",
     // Optional note the approver can attach when approving/rejecting.
     val decisionNote: String = "",
     // Set only when status == "withdrawn" - start of the 7-day grace window

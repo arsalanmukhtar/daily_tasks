@@ -113,6 +113,7 @@ private fun DocumentSnapshot.toLeaveRequest(): LeaveRequest = LeaveRequest(
     resolvedBy = getString("resolvedBy") ?: "",
     attachments = toAttachments(),
     halfDayPeriod = getString("halfDayPeriod") ?: "",
+    shortLeaveTime = getString("shortLeaveTime") ?: "",
     decisionNote = getString("decisionNote") ?: "",
     withdrawnAt = getTimestamp("withdrawnAt").toIsoStringOrEmpty()
 )
