@@ -85,6 +85,17 @@ class LeaveApiClient(
             throw ApiException(err.message ?: "Could not save decision.")
         }
     }
+
+    // Permanently removes a request that's past its 7-day withdrawn grace
+    // window - firestore.rules is what actually enforces that floor, this is
+    // just the trigger (see RequestListViewModel's cleanup pass, which calls
+    // this for every withdrawn request it notices is expired). Silently
+    // ignored on failure: another client may have already deleted it, or the
+    // rule's time check hasn't technically opened yet - either way it'll be
+    // retried next time the list reloads.
+    suspend fun deleteExpiredRequest(requestId: String) {
+        runCatching { db.collection("leaveRequests").document(requestId).delete().await() }
+    }
 }
 
 private fun DocumentSnapshot.toLeaveRequest(): LeaveRequest = LeaveRequest(
@@ -102,7 +113,8 @@ private fun DocumentSnapshot.toLeaveRequest(): LeaveRequest = LeaveRequest(
     resolvedBy = getString("resolvedBy") ?: "",
     attachments = toAttachments(),
     halfDayPeriod = getString("halfDayPeriod") ?: "",
-    decisionNote = getString("decisionNote") ?: ""
+    decisionNote = getString("decisionNote") ?: "",
+    withdrawnAt = getTimestamp("withdrawnAt").toIsoStringOrEmpty()
 )
 
 private fun Timestamp?.toIsoStringOrEmpty(): String = this?.toDate()?.toInstant()?.toString() ?: ""

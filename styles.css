@@ -1852,6 +1852,9 @@ textarea {
 .an-kpi.stat-wait { background: var(--wait-50); border-color: var(--wait-200); }
 .an-kpi.stat-wait .an-kpi-value { color: var(--wait-800); }
 .an-kpi.stat-wait .an-kpi-label i { background: var(--wait-600); }
+.an-kpi.stat-neutral { background: var(--meta-bg); border-color: var(--meta-bd); }
+.an-kpi.stat-neutral .an-kpi-value { color: var(--meta); }
+.an-kpi.stat-neutral .an-kpi-label i { background: var(--meta); }
 
 /* Quarter tiles + approve/reject progress bar */
 .qs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
@@ -1888,6 +1891,7 @@ textarea {
 .meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .lv-r { font-size: 12.5px; line-height: 1.5; color: var(--ink-700); margin: 9px 0 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .lv-r.is-expanded { display: block; -webkit-line-clamp: unset; overflow: visible; }
+.lv-expiry-notice { margin-top: 9px; padding: 7px 10px; border-radius: var(--r-md); background: var(--no-50); border: 1px solid var(--no-200); color: var(--no-800); font-size: 11.5px; font-weight: 600; }
 .lv-f { display: flex; align-items: center; gap: 8px; margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--line-soft); flex-wrap: wrap; }
 .lv-f .by { font-size: 11.5px; color: var(--ink-500); }
 .lv-f .by b { color: var(--ink-800); font-weight: 600; }

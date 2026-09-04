@@ -1,10 +1,16 @@
 package com.techew.leaveapprovals.data
 
 import java.time.DayOfWeek
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.WeekFields
+
+// A withdrawn request is kept for a 7-day grace window (see the matching
+// firestore.rules delete branch) so it stays visible in Archived with a
+// countdown before it's actually removed.
+private const val WITHDRAWN_RETENTION_DAYS = 7L
 
 private val WEEK_LABEL_REGEX = Regex("""Week\s+(\d+),\s*(\d+)""")
 
@@ -32,10 +38,34 @@ fun LeaveRequest.effectiveEndDate(): LocalDate? {
 }
 
 // A request stays in "Requests" through the full day of its last leave date,
-// moving to "Archived" starting the next day - independent of status, so an
-// undecided-but-stale request still ages out (and stays fully actionable
-// there; RequestDetailSheet only hides Approve/Reject once status != "requested").
+// moving to "Archived" starting the next day - independent of status (other
+// than withdrawn, see below), so an undecided-but-stale request still ages
+// out (and stays fully actionable there; RequestDetailSheet only hides
+// Approve/Reject once status != "requested").
+//
+// A withdrawn request skips that date check entirely and archives right
+// away, regardless of whether its leave dates are in the past or still
+// upcoming - withdrawing takes it out of play immediately either way.
 fun LeaveRequest.isArchived(today: LocalDate = LocalDate.now()): Boolean {
+    if (status == "withdrawn") return true
     val end = effectiveEndDate() ?: return false
     return end.isBefore(today)
+}
+
+// Days left before a withdrawn request is permanently deleted, counting down
+// from 7 to 0 - null if this isn't a withdrawn request or it predates the
+// withdrawnAt field.
+fun LeaveRequest.daysUntilPermanentDeletion(now: Instant = Instant.now()): Long? {
+    if (status != "withdrawn" || withdrawnAt.isBlank()) return null
+    val withdrawnInstant = runCatching { Instant.parse(withdrawnAt) }.getOrNull() ?: return null
+    val elapsedDays = Duration.between(withdrawnInstant, now).toDays()
+    return (WITHDRAWN_RETENTION_DAYS - elapsedDays).coerceAtLeast(0)
+}
+
+// True once a withdrawn request has sat past its 7-day grace window - the
+// signal RequestListViewModel uses to trigger LeaveApiClient.deleteExpiredRequest().
+fun LeaveRequest.isPastWithdrawnRetention(now: Instant = Instant.now()): Boolean {
+    if (status != "withdrawn" || withdrawnAt.isBlank()) return false
+    val withdrawnInstant = runCatching { Instant.parse(withdrawnAt) }.getOrNull() ?: return false
+    return Duration.between(withdrawnInstant, now).toDays() >= WITHDRAWN_RETENTION_DAYS
 }

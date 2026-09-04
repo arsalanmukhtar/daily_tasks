@@ -28,6 +28,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   addDoc,
   collection,
   query,
@@ -146,6 +147,7 @@ const myLeavesKpiTotal     = document.getElementById('myLeavesKpiTotal');
 const myLeavesKpiApproved  = document.getElementById('myLeavesKpiApproved');
 const myLeavesKpiRejected  = document.getElementById('myLeavesKpiRejected');
 const myLeavesKpiPending   = document.getElementById('myLeavesKpiPending');
+const myLeavesKpiWithdrawn = document.getElementById('myLeavesKpiWithdrawn');
 const myLeavesYearChips    = document.getElementById('myLeavesYearChips');
 const myLeavesQuarterTiles = document.getElementById('myLeavesQuarterTiles');
 const myLeavesHistoryFilters = document.getElementById('myLeavesHistoryFilters');
@@ -926,7 +928,8 @@ async function fetchLeaveStatus_() {
         resolvedAt: data.resolvedAt && data.resolvedAt.toDate ? data.resolvedAt.toDate().toISOString() : '',
         resolvedBy: data.resolvedBy || '',
         attachments: normalizeLeaveAttachments_(data),
-        dismissed: data.dismissed === true
+        dismissed: data.dismissed === true,
+        withdrawnAt: data.withdrawnAt && data.withdrawnAt.toDate ? data.withdrawnAt.toDate().toISOString() : ''
       };
     }
     const byNewest = function (a, b) { return new Date(b.requestedAt) - new Date(a.requestedAt); };
@@ -956,6 +959,24 @@ async function fetchLeaveStatus_() {
 function leaveRecordDate_(rec) {
   const d = new Date(rec.requestedAt);
   return isNaN(d.getTime()) ? null : d;
+}
+
+// A withdrawn request is kept for a 7-day grace window (see the matching
+// firestore.rules delete branch) before it's eligible for permanent removal -
+// counts down from 7 to 0 regardless of the leave's own dates, since
+// withdrawing takes it out of play immediately either way.
+const WITHDRAWN_RETENTION_DAYS = 7;
+
+function daysUntilPermanentDeletion_(rec) {
+  if (rec.status !== 'withdrawn' || !rec.withdrawnAt) return null;
+  const withdrawnAt = new Date(rec.withdrawnAt);
+  if (isNaN(withdrawnAt.getTime())) return null;
+  const elapsedDays = Math.floor((Date.now() - withdrawnAt.getTime()) / 86400000);
+  return Math.max(0, WITHDRAWN_RETENTION_DAYS - elapsedDays);
+}
+
+function isPastWithdrawnRetention_(rec) {
+  return daysUntilPermanentDeletion_(rec) === 0;
 }
 
 // Fixed-width state button: Apply for Leave (idle) -> Requested for Approval
@@ -1300,6 +1321,7 @@ async function loadMyLeavesData_() {
   renderMyLeavesTrendChart_(records);
   renderMyLeavesHistorySection_(records);
   updateNavStatBadges_();
+  cleanupExpiredWithdrawnRequests_(records);
 }
 
 // Pending-request banner (mockup .banner) - the most recently requested
@@ -1330,6 +1352,7 @@ function renderMyLeavesKpis_(records) {
   myLeavesKpiApproved.textContent = String(records.filter((r) => r.status === 'approved').length);
   myLeavesKpiRejected.textContent = String(records.filter((r) => r.status === 'rejected').length);
   myLeavesKpiPending.textContent = String(records.filter((r) => r.status === 'requested').length);
+  myLeavesKpiWithdrawn.textContent = String(records.filter((r) => r.status === 'withdrawn').length);
 }
 
 function renderMyLeavesYearChips_(records) {
@@ -1599,12 +1622,22 @@ function renderMyLeaveCard_(rec) {
     actions = viewBtn;
   }
 
+  let expiryNoticeHtml = '';
+  if (rec.status === 'withdrawn') {
+    const daysLeft = daysUntilPermanentDeletion_(rec);
+    if (daysLeft !== null) {
+      expiryNoticeHtml = '<div class="lv-expiry-notice">This withdrawn request will be permanently deleted after ' +
+        daysLeft + (daysLeft === 1 ? ' day' : ' days') + '.</div>';
+    }
+  }
+
   return '<div class="lv" id="leave-card-' + escapeHtml(rec.requestId) + '">' +
     '<div class="lv-h"><div><div class="wk">' + escapeHtml(rec.weekLabel) + '</div><div class="dt">' + escapeHtml(dtLine) + '</div></div>' +
       '<span class="status ' + leaveStatusTone_(rec.status) + '"><i></i>' + escapeHtml(leaveStatusLabel_(rec.status).toUpperCase()) + '</span></div>' +
     '<div class="meta"><span class="mchip ' + leaveTypeChipClass_(rec.type) + '">' + escapeHtml(leaveTypeLabel_(rec.type)) + '</span>' + durationChip + dayCountChip + fileCountChip + '</div>' +
     '<div class="lv-r rich-text' + (expanded ? ' is-expanded' : '') + '">' + reasonHtml + '</div>' +
     filesHtml +
+    expiryNoticeHtml +
     '<div class="lv-f"><span class="by">' + byText + '</span><span class="act">' + actions + '</span></div>' +
   '</div>';
 }
@@ -1633,10 +1666,23 @@ async function withdrawLeaveRequest_(requestId, buttonEl) {
     buttonEl.innerHTML = '<span class="loader loader-sm" style="vertical-align: middle; margin-right: 4px;"></span>Working...';
   }
   try {
-    await updateDoc(doc(db, 'leaveRequests', requestId), { status: 'withdrawn' });
+    await updateDoc(doc(db, 'leaveRequests', requestId), { status: 'withdrawn', withdrawnAt: serverTimestamp() });
   } catch (_e) { /* best-effort */ }
   await refreshApplyLeaveButton();
   await loadMyLeavesData_();
+}
+
+// Best-effort cleanup for requests that have sat withdrawn past their 7-day
+// grace window - firestore.rules is what actually enforces the floor, this
+// just triggers the delete the next time either app happens to load the
+// list (no backend cron in this project, see the rules comment).
+async function cleanupExpiredWithdrawnRequests_(records) {
+  const expired = (records || []).filter(isPastWithdrawnRetention_);
+  for (const rec of expired) {
+    try {
+      await deleteDoc(doc(db, 'leaveRequests', rec.requestId));
+    } catch (_e) { /* another client may already have deleted it, or we're not the owner/requester */ }
+  }
 }
 
 function showToast_(message, tone) {

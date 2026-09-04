@@ -129,7 +129,13 @@ fun AppRoot(
                 requestListViewModel = requestListViewModel,
                 summaryViewModel = summaryViewModel,
                 highlightRequestId = highlightRequestId,
-                onHighlightHandled = onHighlightHandled
+                onHighlightHandled = onHighlightHandled,
+                onSignOut = {
+                    scope.launch {
+                        authRepository.signOut(context)
+                        authState = AuthState.SignedOut
+                    }
+                }
             )
         }
     }

@@ -24,5 +24,9 @@ data class LeaveRequest(
     // when type normalizes to casualShort.
     val halfDayPeriod: String = "",
     // Optional note the approver can attach when approving/rejecting.
-    val decisionNote: String = ""
+    val decisionNote: String = "",
+    // Set only when status == "withdrawn" - start of the 7-day grace window
+    // before the request is eligible for permanent deletion (see
+    // isArchived()/daysUntilPermanentDeletion() in ArchiveRules.kt).
+    val withdrawnAt: String = ""
 )

@@ -87,7 +87,7 @@ service cloud.firestore {
           resource.data.status == 'requested' &&
           request.resource.data.status == 'withdrawn' &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status'])
+            .hasOnly(['status', 'withdrawnAt'])
         ) || (
           isAllowlisted() &&
           resource.data.email == emailLower() &&
@@ -96,7 +96,18 @@ service cloud.firestore {
             .hasOnly(['attachmentName', 'attachmentUrl', 'attachmentFileId', 'attachments'])
         );
 
-      allow delete: if false;
+      // A withdrawn request is kept around for a 7-day grace window (see
+      // isArchived()/daysUntilPermanentDeletion() on both clients) so the
+      // requester or owner can still see it in Archived before it's gone for
+      // good. No Cloud Functions/cron in this project, so deletion itself is
+      // client-triggered: whichever app (web or Android) next loads the list
+      // and notices a withdrawn request past its window fires this delete -
+      // the rule is what actually enforces the 7-day floor, not the client.
+      allow delete: if isAllowlisted() &&
+        (isOwner() || resource.data.email == emailLower()) &&
+        resource.data.status == 'withdrawn' &&
+        resource.data.withdrawnAt is timestamp &&
+        request.time > resource.data.withdrawnAt + duration.value(7, 'd');
     }
 
     // ---------- pushTokens ----------

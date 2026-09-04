@@ -1,5 +1,6 @@
 package com.techew.leaveapprovals.ui.requests
 
+import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -9,6 +10,8 @@ import com.techew.leaveapprovals.data.AllowlistRepository
 import com.techew.leaveapprovals.data.LeaveApiClient
 import com.techew.leaveapprovals.data.LeaveRequest
 import com.techew.leaveapprovals.data.isArchived
+import com.techew.leaveapprovals.data.isPastWithdrawnRetention
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -87,25 +90,44 @@ class RequestListViewModel(
         }
     }
 
-    private fun startListening() {
+    private fun startListening(minSpinnerMs: Long = 0L) {
         listenerRegistration?.remove()
         _isLoading.value = true
+        val startedAt = SystemClock.elapsedRealtime()
         listenerRegistration = apiClient.listenLeaveRequests { result ->
-            _isLoading.value = false
             result.onSuccess {
                 _errorMessage.value = null
                 _records.value = it
+                // Best-effort cleanup: no backend cron in this project, so
+                // whichever client next observes a withdrawn request past its
+                // 7-day grace window is what actually triggers its deletion -
+                // firestore.rules is what enforces the floor, not this check.
+                it.filter { request -> request.isPastWithdrawnRetention() }.forEach { request ->
+                    viewModelScope.launch { apiClient.deleteExpiredRequest(request.requestId) }
+                }
             }.onFailure {
                 Log.e("RequestListViewModel", "listener error", it)
                 _errorMessage.value = it.message ?: "Could not load requests."
+            }
+            val remaining = minSpinnerMs - (SystemClock.elapsedRealtime() - startedAt)
+            if (remaining > 0) {
+                viewModelScope.launch {
+                    delay(remaining)
+                    _isLoading.value = false
+                }
+            } else {
+                _isLoading.value = false
             }
         }
     }
 
     // The list is already live without this - kept as a manual "force
     // resync" for the topBar's refresh button (e.g. after a long stretch in
-    // the background, or a suspected dropped listener).
-    fun refresh() = startListening()
+    // the background, or a suspected dropped listener). Firestore's local
+    // cache usually answers a fresh listener within a few milliseconds, so
+    // without a floor here the refresh spinner's isLoading window is too
+    // short for the rotate animation to ever render a visible frame.
+    fun refresh() = startListening(minSpinnerMs = 600L)
 
     // Must be called explicitly when this ViewModel is done with (sign-out,
     // switching accounts) - it's a plain `remember{}` instance, not one

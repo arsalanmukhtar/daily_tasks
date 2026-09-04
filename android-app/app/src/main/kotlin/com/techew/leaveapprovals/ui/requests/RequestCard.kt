@@ -1,6 +1,7 @@
 package com.techew.leaveapprovals.ui.requests
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +18,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,7 +33,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.text.HtmlCompat
 import com.techew.leaveapprovals.data.LeaveRequest
 import com.techew.leaveapprovals.data.LeaveType
+import com.techew.leaveapprovals.data.daysUntilPermanentDeletion
 import com.techew.leaveapprovals.ui.common.Avatar
+import com.techew.leaveapprovals.ui.common.LeaveDateDialog
 import com.techew.leaveapprovals.ui.theme.DurationFull
 import com.techew.leaveapprovals.ui.theme.DurationFullBg
 import com.techew.leaveapprovals.ui.theme.DurationShort
@@ -75,6 +81,14 @@ fun RequestCard(
         ).toString().trim()
         plain.ifBlank { "No reason provided." }
     }
+    var showDateDialog by remember { mutableStateOf(false) }
+    if (showDateDialog) {
+        LeaveDateDialog(
+            startIso = request.startDate,
+            endIso = request.endDate,
+            onDismiss = { showDateDialog = false }
+        )
+    }
 
     Card(
         modifier = Modifier
@@ -117,7 +131,11 @@ fun RequestCard(
             ) {
                 MetaChip(LeaveType.familyLabel(request.type), kind = ChipKind.TYPE, type = request.type)
                 MetaChip(LeaveType.durationLabel(request.type), kind = ChipKind.DURATION, type = request.type)
-                MetaChip(request.weekLabel, kind = ChipKind.META)
+                MetaChip(
+                    request.weekLabel,
+                    kind = ChipKind.META,
+                    onClick = if (request.startDate.isNotBlank()) { { showDateDialog = true } } else null
+                )
                 val time = formatTimeHHmm(request.requestedAt)
                 if (time.isNotBlank()) MetaChip(time, kind = ChipKind.META)
             }
@@ -138,6 +156,22 @@ fun RequestCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+
+            val daysLeft = request.daysUntilPermanentDeletion()
+            if (daysLeft != null) {
+                Text(
+                    "This withdrawn request will be permanently deleted after $daysLeft" +
+                        if (daysLeft == 1L) " day." else " days.",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    color = StatusRejected,
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .fillMaxWidth()
+                        .background(StatusRejectedBg, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 7.dp)
                 )
             }
 
@@ -202,18 +236,21 @@ internal fun formatTimeHHmm(iso: String): String {
 internal enum class ChipKind { TYPE, DURATION, META }
 
 @Composable
-internal fun MetaChip(label: String, kind: ChipKind = ChipKind.META, type: String = "") {
+internal fun MetaChip(
+    label: String,
+    kind: ChipKind = ChipKind.META,
+    type: String = "",
+    onClick: (() -> Unit)? = null
+) {
     val (color, background) = when (kind) {
         ChipKind.TYPE -> typeColors(type)
         ChipKind.DURATION -> durationColors(type)
         ChipKind.META -> Meta to MetaBg
     }
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(background)
-            .padding(horizontal = 10.dp, vertical = 5.dp)
-    ) {
+    var modifier = Modifier.clip(RoundedCornerShape(8.dp))
+    if (onClick != null) modifier = modifier.clickable(onClick = onClick)
+    modifier = modifier.background(background).padding(horizontal = 10.dp, vertical = 5.dp)
+    Box(modifier = modifier) {
         Text(
             label,
             style = MaterialTheme.typography.labelMedium,

@@ -1,5 +1,6 @@
 package com.techew.leaveapprovals.ui.summary
 
+import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.ListenerRegistration
@@ -7,6 +8,7 @@ import com.techew.leaveapprovals.data.AllowlistEntry
 import com.techew.leaveapprovals.data.AllowlistRepository
 import com.techew.leaveapprovals.data.LeaveApiClient
 import com.techew.leaveapprovals.data.LeaveRequest
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,23 +52,33 @@ class LeaveSummaryViewModel(
         }
     }
 
-    private fun startListening() {
+    private fun startListening(minSpinnerMs: Long = 0L) {
         listenerRegistration?.remove()
         _isLoading.value = true
+        val startedAt = SystemClock.elapsedRealtime()
         listenerRegistration = apiClient.listenLeaveRequests(limit = SUMMARY_LIMIT) { result ->
-            _isLoading.value = false
             result.onSuccess {
                 _errorMessage.value = null
                 _records.value = it
             }.onFailure {
                 _errorMessage.value = it.message ?: "Could not load leave history."
             }
+            val remaining = minSpinnerMs - (SystemClock.elapsedRealtime() - startedAt)
+            if (remaining > 0) {
+                viewModelScope.launch {
+                    delay(remaining)
+                    _isLoading.value = false
+                }
+            } else {
+                _isLoading.value = false
+            }
         }
     }
 
     // The list is already live without this - kept as a manual "force
-    // resync" for the topBar's refresh button.
-    fun refresh() = startListening()
+    // resync" for the topBar's refresh button. See RequestListViewModel's
+    // refresh() for why a minimum spinner duration is needed here too.
+    fun refresh() = startListening(minSpinnerMs = 600L)
 
     // Must be called explicitly when this ViewModel is done with (sign-out,
     // switching accounts) - see RequestListViewModel.stopListening() for why.

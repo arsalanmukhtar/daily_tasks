@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Inter+Tight:wght@600;700;800&family=Archivo+Narrow:wght@600;700&display=swap" rel="stylesheet" />
 
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="styles.css?v=20260903d" rel="stylesheet" />
+  <link href="styles.css?v=20260904a" rel="stylesheet" />
 </head>
 <!-- `app-shell` drives the desktop single-viewport lock - see the media query
      in styles.css (engages only when the screen is wide AND tall enough). -->
@@ -579,7 +579,7 @@
       <!-- Stats summary -->
       <div class="rounded-xl border border-slate-200 bg-white p-3.5">
         <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2.5">Leave activity</div>
-        <div class="grid grid-cols-4 gap-2 mb-4">
+        <div class="grid grid-cols-3 gap-2 mb-2">
           <div class="an-kpi stat-tile stat-all">
             <div class="an-kpi-label"><i></i>Total</div>
             <div id="myLeavesKpiTotal" class="an-kpi-value">0</div>
@@ -592,9 +592,15 @@
             <div class="an-kpi-label"><i></i>Rejected</div>
             <div id="myLeavesKpiRejected" class="an-kpi-value">0</div>
           </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mb-4">
           <div class="an-kpi stat-tile stat-wait">
             <div class="an-kpi-label"><i></i>Pending</div>
             <div id="myLeavesKpiPending" class="an-kpi-value">0</div>
+          </div>
+          <div class="an-kpi stat-tile stat-neutral">
+            <div class="an-kpi-label"><i></i>Withdrawn</div>
+            <div id="myLeavesKpiWithdrawn" class="an-kpi-value">0</div>
           </div>
         </div>
 
@@ -843,6 +849,6 @@
 
   <!-- ?v= is a cache-buster: bump it whenever app.js changes so browsers
        fetch the new file instead of serving a stale cached copy. -->
-  <script type="module" src="app.js?v=20260903g"></script>
+  <script type="module" src="app.js?v=20260904a"></script>
 </body>
 </html>

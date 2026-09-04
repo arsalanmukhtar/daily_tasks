@@ -58,6 +58,7 @@ import com.techew.leaveapprovals.data.Attachment
 import com.techew.leaveapprovals.data.LeaveRequest
 import com.techew.leaveapprovals.data.LeaveType
 import com.techew.leaveapprovals.ui.common.Avatar
+import com.techew.leaveapprovals.ui.common.LeaveDateDialog
 import com.techew.leaveapprovals.ui.theme.StatusApproved
 import com.techew.leaveapprovals.ui.theme.StatusRejected
 import java.time.Duration
@@ -120,6 +121,14 @@ fun RequestDetailSheet(
 @Composable
 private fun DetailHeader(request: LeaveRequest) {
     val (statusColor, statusBg) = statusColors(request.status)
+    var showDateDialog by remember { mutableStateOf(false) }
+    if (showDateDialog) {
+        LeaveDateDialog(
+            startIso = request.startDate,
+            endIso = request.endDate,
+            onDismiss = { showDateDialog = false }
+        )
+    }
 
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
         Avatar(name = request.name, email = request.email, size = 44.dp)
@@ -142,7 +151,11 @@ private fun DetailHeader(request: LeaveRequest) {
     ) {
         MetaChip(LeaveType.familyLabel(request.type), kind = ChipKind.TYPE, type = request.type)
         MetaChip(LeaveType.durationLabel(request.type), kind = ChipKind.DURATION, type = request.type)
-        MetaChip(request.weekLabel, kind = ChipKind.META)
+        MetaChip(
+            request.weekLabel,
+            kind = ChipKind.META,
+            onClick = if (request.startDate.isNotBlank()) { { showDateDialog = true } } else null
+        )
     }
 
     val showDecidedIn = (request.status == "approved" || request.status == "rejected") && request.resolvedAt.isNotBlank()
