@@ -11,18 +11,28 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,7 +45,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.techew.leaveapprovals.data.AllowlistEntry
 import com.techew.leaveapprovals.data.LeaveRequest
 import com.techew.leaveapprovals.data.LeaveType
 import com.techew.leaveapprovals.ui.charts.MonthlyTrendChart
@@ -142,28 +154,11 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                     ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         SectionLabel("Developers", topPadding = 0.dp)
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            item {
-                                FilterChip(
-                                    selected = selectedEmails.isEmpty(),
-                                    onClick = { selectedEmails = emptySet() },
-                                    label = { Text("All developers") }
-                                )
-                            }
-                            items(roster.sortedBy { it.name }) { entry ->
-                                FilterChip(
-                                    selected = entry.email in selectedEmails,
-                                    onClick = {
-                                        selectedEmails = if (entry.email in selectedEmails) {
-                                            selectedEmails - entry.email
-                                        } else {
-                                            selectedEmails + entry.email
-                                        }
-                                    },
-                                    label = { Text(entry.name.ifBlank { entry.email }) }
-                                )
-                            }
-                        }
+                        DeveloperFilterDropdown(
+                            roster = roster,
+                            selectedEmails = selectedEmails,
+                            onSelectionChange = { selectedEmails = it }
+                        )
 
                         SectionLabel("Period", topPadding = 20.dp)
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -489,6 +484,66 @@ private fun SectionLabel(text: String, topPadding: androidx.compose.ui.unit.Dp =
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = topPadding, bottom = 8.dp)
     )
+}
+
+// Multi-select "Developers" filter, redesigned from a horizontally-scrolling
+// row of one-chip-per-developer (which clipped/overflowed once the roster
+// grew past 2-3 names) into a single compact dropdown. Unlike the single-
+// select status/type dropdowns elsewhere, this one stays open across taps -
+// only "All developers" or dismissing it closes the menu - since picking
+// several developers to compare at once is the whole point of multi-select.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DeveloperFilterDropdown(
+    roster: List<AllowlistEntry>,
+    selectedEmails: Set<String>,
+    onSelectionChange: (Set<String>) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val sortedRoster = remember(roster) { roster.sortedBy { it.name.ifBlank { it.email } } }
+    val label = when {
+        selectedEmails.isEmpty() -> "All developers"
+        selectedEmails.size == 1 -> {
+            val email = selectedEmails.first()
+            sortedRoster.find { it.email == email }?.name?.ifBlank { email } ?: email
+        }
+        else -> "${selectedEmails.size} developers"
+    }
+
+    Box {
+        OutlinedButton(
+            onClick = { expanded = true },
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                label, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f)
+            )
+            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text("All developers") },
+                trailingIcon = { if (selectedEmails.isEmpty()) Icon(Icons.Filled.Check, contentDescription = null) },
+                onClick = {
+                    onSelectionChange(emptySet())
+                    expanded = false
+                }
+            )
+            HorizontalDivider()
+            sortedRoster.forEach { entry ->
+                val isSelected = entry.email in selectedEmails
+                DropdownMenuItem(
+                    text = { Text(entry.name.ifBlank { entry.email }) },
+                    trailingIcon = { if (isSelected) Icon(Icons.Filled.Check, contentDescription = null) },
+                    onClick = {
+                        onSelectionChange(if (isSelected) selectedEmails - entry.email else selectedEmails + entry.email)
+                    }
+                )
+            }
+        }
+    }
 }
 
 @Composable
