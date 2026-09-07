@@ -14,31 +14,30 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// A dedicated identity palette - pastel background paired with a matching
-// dark foreground, same "light bg + saturated same-hue text" convention as
-// the Type/Status chips elsewhere, but kept separate from those (reusing
-// only 4 semantic type colors left the roster's 14 developers colliding
-// into the same handful of hues constantly). Ten genuinely distinct hues
-// keeps collisions rare without needing a lookup table per person.
-private val AVATAR_PALETTE: List<Pair<Color, Color>> = listOf(
-    Color(0xFF6C4CC4) to Color(0xFFEDE7FA), // purple
-    Color(0xFF0E8A7D) to Color(0xFFDFF2EF), // teal
-    Color(0xFFC2410C) to Color(0xFFFFE7D6), // orange
-    Color(0xFF3B5BDB) to Color(0xFFE8EDFC), // blue
-    Color(0xFFBE185D) to Color(0xFFFCE4EF), // pink
-    Color(0xFF15803D) to Color(0xFFDCFCE7), // green
-    Color(0xFF4338CA) to Color(0xFFE5E3FB), // indigo
-    Color(0xFF92400E) to Color(0xFFFDECC8), // brown
-    Color(0xFF0B7FA8) to Color(0xFFDFF0F8), // cyan
-    Color(0xFFB91C1C) to Color(0xFFFEE2E2)  // red
-)
+// Hashing a person's key into one of a handful of fixed colors (the old
+// approach) guarantees collisions the moment the roster outgrows the
+// palette - with 14 developers and even a 10-color palette, at least two
+// people are mathematically certain to collide (pigeonhole principle), and
+// in practice several usually do. This instead assigns each newly-seen key
+// the next slot around the hue wheel, stepped by the golden angle - the
+// standard technique for generating any number of well-separated colors
+// without knowing the final count up front. Two different keys always get
+// two different slots, so they can never land on the same hue: real,
+// guaranteed uniqueness instead of low collision odds. The tradeoff is that
+// a person's color is now stable only for the current app process (assigned
+// on first render, not derived from a fixed formula), not across restarts.
+private object AvatarColorRegistry {
+    private const val GOLDEN_ANGLE = 137.50776f
+    private val indexByKey = LinkedHashMap<String, Int>()
 
-private fun avatarColorsFor(key: String): Pair<Color, Color> {
-    val trimmed = key.trim().lowercase()
-    if (trimmed.isBlank()) return AVATAR_PALETTE.first()
-    val hash = trimmed.fold(0) { acc, c -> acc * 31 + c.code }
-    val index = ((hash % AVATAR_PALETTE.size) + AVATAR_PALETTE.size) % AVATAR_PALETTE.size
-    return AVATAR_PALETTE[index]
+    @Synchronized
+    fun colorsFor(key: String): Pair<Color, Color> {
+        val index = indexByKey.getOrPut(key) { indexByKey.size }
+        val hue = (index * GOLDEN_ANGLE) % 360f
+        val textColor = Color.hsl(hue, 0.6f, 0.32f)
+        val backgroundColor = Color.hsl(hue, 0.6f, 0.87f)
+        return textColor to backgroundColor
+    }
 }
 
 private fun initialsFor(name: String, email: String): String {
@@ -55,12 +54,13 @@ private fun initialsFor(name: String, email: String): String {
 /**
  * Initials circle used for a person's identity everywhere the app shows one
  * (request card header, detail sheet header, person-filter sheet rows,
- * Summary leaderboard). Color is deterministic from the name/email hash so
- * the same person always renders the same color without any lookup table.
+ * Summary leaderboard). Color is assigned per email/name key via
+ * AvatarColorRegistry, so every distinct person gets a distinct color.
  */
 @Composable
 fun Avatar(name: String, email: String, size: Dp = 36.dp) {
-    val (textColor, backgroundColor) = avatarColorsFor(email.ifBlank { name })
+    val key = email.ifBlank { name }.trim().lowercase()
+    val (textColor, backgroundColor) = AvatarColorRegistry.colorsFor(key)
     Box(
         modifier = Modifier.size(size).clip(CircleShape).background(backgroundColor),
         contentAlignment = Alignment.Center
