@@ -337,13 +337,13 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                             )
                         }
 
-                        SectionLabel("By leave type", topPadding = 20.dp)
                         Card(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                                SectionLabel("By leave type", topPadding = 0.dp)
                                 // Uninformed Leave's count comes from the separate
                                 // uninformedLeaves collection (see finalUninformed
                                 // above), not from finalRecords like every other type.
@@ -513,20 +513,23 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                 .take(5)
                         }
 
-                        Row(modifier = Modifier.fillMaxWidth().padding(top = 20.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                            SectionLabel("Most requests", topPadding = 0.dp)
-                            Text(
-                                "Top ${leaderboard.size} · ${MONTH_LABELS[today.monthValue - 1]}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
                         Card(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    SectionLabel("Most requests", topPadding = 0.dp)
+                                    Text(
+                                        "Top ${leaderboard.size} · ${MONTH_LABELS[today.monthValue - 1]}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                                 if (leaderboard.isEmpty()) {
                                     Text(
                                         "No requests this month.",
