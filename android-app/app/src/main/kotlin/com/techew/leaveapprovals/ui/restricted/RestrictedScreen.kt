@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -47,7 +48,7 @@ fun RestrictedScreen(email: String, onSignOut: () -> Unit) {
     val palette = authPalette()
 
     Surface(modifier = Modifier.fillMaxSize(), color = palette.bg) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
