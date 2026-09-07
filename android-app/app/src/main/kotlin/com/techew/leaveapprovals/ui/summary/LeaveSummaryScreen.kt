@@ -62,6 +62,8 @@ import com.techew.leaveapprovals.ui.theme.StatusApproved
 import com.techew.leaveapprovals.ui.theme.StatusApprovedBg
 import com.techew.leaveapprovals.ui.theme.StatusRejected
 import com.techew.leaveapprovals.ui.theme.StatusRejectedBg
+import com.techew.leaveapprovals.ui.common.DropdownSearchField
+import com.techew.leaveapprovals.ui.common.filterByQuery
 import com.techew.leaveapprovals.ui.theme.StatusRequested
 import com.techew.leaveapprovals.ui.theme.StatusRequestedBg
 import com.techew.leaveapprovals.ui.theme.themedFilterChipColors
@@ -602,7 +604,9 @@ private fun DeveloperFilterRow(
     onSelectionChange: (Set<String>) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
     val sortedRoster = remember(roster) { roster.sortedBy { it.name.ifBlank { it.email } } }
+    val filteredRoster = remember(sortedRoster, query) { sortedRoster.filterByQuery(query) }
     val allSelected = selectedEmails.isEmpty()
     val compareLabel = when {
         selectedEmails.isEmpty() -> "Compare"
@@ -628,8 +632,9 @@ private fun DeveloperFilterRow(
                 trailingIcon = { Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(16.dp)) },
                 modifier = Modifier.fillMaxWidth()
             )
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                sortedRoster.forEach { entry ->
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false; query = "" }) {
+                DropdownSearchField(query = query, onQueryChange = { query = it }, itemCount = sortedRoster.size)
+                filteredRoster.forEach { entry ->
                     val isSelected = entry.email in selectedEmails
                     DropdownMenuItem(
                         text = { Text(entry.name.ifBlank { entry.email }) },

@@ -54,8 +54,10 @@ import androidx.compose.ui.unit.sp
 import com.techew.leaveapprovals.data.AllowlistEntry
 import com.techew.leaveapprovals.data.UninformedLeave
 import com.techew.leaveapprovals.ui.common.DeveloperPickerDropdown
+import com.techew.leaveapprovals.ui.common.DropdownSearchField
 import com.techew.leaveapprovals.ui.common.EditableDateField
 import com.techew.leaveapprovals.ui.common.HtmlText
+import com.techew.leaveapprovals.ui.common.filterByQuery
 import com.techew.leaveapprovals.ui.common.RichTextEditor
 import com.techew.leaveapprovals.ui.common.rememberRichTextState
 import com.techew.leaveapprovals.ui.theme.StatusApproved
@@ -455,7 +457,9 @@ private fun ReportDeveloperFilterDropdown(
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
     val sortedRoster = remember(roster) { roster.sortedBy { it.name.ifBlank { it.email } } }
+    val filteredRoster = remember(sortedRoster, query) { sortedRoster.filterByQuery(query) }
     val label = sortedRoster.find { it.email == selectedEmail }?.name?.ifBlank { selectedEmail } ?: "All developers"
 
     Box(modifier = modifier) {
@@ -467,15 +471,16 @@ private fun ReportDeveloperFilterDropdown(
             )
             Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false; query = "" }) {
             DropdownMenuItem(
                 text = { Text("All developers") },
-                onClick = { onSelect(null); expanded = false }
+                onClick = { onSelect(null); expanded = false; query = "" }
             )
-            sortedRoster.forEach { entry ->
+            DropdownSearchField(query = query, onQueryChange = { query = it }, itemCount = sortedRoster.size)
+            filteredRoster.forEach { entry ->
                 DropdownMenuItem(
                     text = { Text(entry.name.ifBlank { entry.email }) },
-                    onClick = { onSelect(entry.email); expanded = false }
+                    onClick = { onSelect(entry.email); expanded = false; query = "" }
                 )
             }
         }

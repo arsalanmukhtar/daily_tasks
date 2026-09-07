@@ -43,7 +43,9 @@ fun DeveloperPickerDropdown(
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
     val sortedRoster = remember(roster) { roster.sortedBy { it.name.ifBlank { it.email } } }
+    val filteredRoster = remember(sortedRoster, query) { sortedRoster.filterByQuery(query) }
     val label = sortedRoster.find { it.email == selectedEmail }?.name?.ifBlank { selectedEmail }
         ?: "Select a developer"
 
@@ -65,13 +67,15 @@ fun DeveloperPickerDropdown(
             )
             Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            sortedRoster.forEach { entry ->
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false; query = "" }) {
+            DropdownSearchField(query = query, onQueryChange = { query = it }, itemCount = sortedRoster.size)
+            filteredRoster.forEach { entry ->
                 DropdownMenuItem(
                     text = { Text(entry.name.ifBlank { entry.email }) },
                     onClick = {
                         onSelect(entry)
                         expanded = false
+                        query = ""
                     }
                 )
             }
