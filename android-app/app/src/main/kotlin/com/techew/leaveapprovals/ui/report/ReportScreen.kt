@@ -1,5 +1,7 @@
 package com.techew.leaveapprovals.ui.report
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,10 +14,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -37,9 +44,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.techew.leaveapprovals.data.AllowlistEntry
 import com.techew.leaveapprovals.data.UninformedLeave
 import com.techew.leaveapprovals.ui.common.DeveloperPickerDropdown
@@ -47,14 +56,20 @@ import com.techew.leaveapprovals.ui.common.EditableDateField
 import com.techew.leaveapprovals.ui.common.HtmlText
 import com.techew.leaveapprovals.ui.common.RichTextEditor
 import com.techew.leaveapprovals.ui.common.rememberRichTextState
+import com.techew.leaveapprovals.ui.theme.StatusApproved
+import com.techew.leaveapprovals.ui.theme.StatusApprovedBg
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private val DATE_FORMATTER = DateTimeFormatter.ofPattern("d MMM yyyy")
+private val DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("d MMM, HH:mm")
 
 private fun String.toFriendlyDate(): String =
     runCatching { Instant.parse(this).atZone(ZoneId.systemDefault()).format(DATE_FORMATTER) }.getOrDefault("-")
+
+private fun String.toFriendlyDateTime(): String =
+    runCatching { Instant.parse(this).atZone(ZoneId.systemDefault()).format(DATE_TIME_FORMATTER) }.getOrDefault("-")
 
 /**
  * Manager-only screen: file a report against a developer who was absent
@@ -90,13 +105,26 @@ fun ReportScreen(viewModel: ReportViewModel) {
                     .padding(16.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        "Report", style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)
-                    )
-                    Button(onClick = { showNewReportForm = !showNewReportForm }) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Report", style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Flag unexplained absences",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Button(
+                        onClick = { showNewReportForm = !showNewReportForm },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
                         Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Text("New report", modifier = Modifier.padding(start = 6.dp))
+                        Text("New report", fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 6.dp))
                     }
                 }
 
@@ -131,12 +159,30 @@ fun ReportScreen(viewModel: ReportViewModel) {
                     )
                 }
 
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Open reports · ${visibleOpenReports.size}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (visibleOpenReports.isNotEmpty()) {
+                        Text(
+                            "Tap Resolve to act",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 if (visibleOpenReports.isEmpty()) {
                     Text(
                         if (filterEmail == null) "No open reports." else "No open reports for this developer.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 12.dp)
+                        modifier = Modifier.padding(top = 8.dp)
                     )
                 } else {
                     visibleOpenReports.forEach { report ->
@@ -155,10 +201,21 @@ fun ReportScreen(viewModel: ReportViewModel) {
                     }
                 }
 
-                Text(
-                    "Resolutions", style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 24.dp, bottom = 4.dp)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Resolutions · audit log", style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Read-only",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 if (visibleResolvedReports.isEmpty()) {
                     Text(
                         if (filterEmail == null) "Nothing resolved yet." else "Nothing resolved yet for this developer.",
@@ -185,8 +242,20 @@ private fun NewReportCard(
     var dateMillis by remember { mutableStateOf(System.currentTimeMillis()) }
     val reasonState = rememberRichTextState()
 
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("New report", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    "Flag absence",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
             DeveloperPickerDropdown(
                 roster = roster,
                 selectedEmail = selectedEmail,
@@ -227,30 +296,57 @@ private fun OpenReportCard(
     onCancelResolve: () -> Unit,
     onSubmitResolve: (String) -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(report.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Text(report.email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Text(
-                    report.date.toFriendlyDate(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(report.date.toFriendlyDate(), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        "ABSENCE",
+                        style = MaterialTheme.typography.labelSmall,
+                        letterSpacing = 0.5.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
-            HtmlText(report.reasonHtml, modifier = Modifier.padding(top = 8.dp))
+            Box(
+                modifier = Modifier
+                    .padding(top = 10.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(12.dp)
+            ) {
+                HtmlText(report.reasonHtml)
+            }
             Text(
-                "Reported by ${report.reportedBy}",
+                "Reported by ${report.reportedBy} · ${report.reportedAt.toFriendlyDateTime()}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 6.dp)
+                modifier = Modifier.padding(top = 8.dp)
             )
 
             if (!isResolving) {
-                OutlinedButton(onClick = onStartResolve, modifier = Modifier.padding(top = 10.dp)) {
-                    Text("Resolve")
+                OutlinedButton(
+                    onClick = onStartResolve,
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Comment, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Text("Resolve", modifier = Modifier.padding(start = 8.dp))
                 }
             } else {
                 val resolutionState = rememberRichTextState()
@@ -281,22 +377,38 @@ private fun OpenReportCard(
 private fun ResolvedReportCard(report: UninformedLeave) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(report.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Text(report.email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Text(
-                    "Absence: ${report.date.toFriendlyDate()}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(StatusApprovedBg)
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Icon(Icons.Filled.Check, contentDescription = null, tint = StatusApproved, modifier = Modifier.size(13.dp))
+                    Text("Resolved", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = StatusApproved)
+                }
             }
+            Text(
+                "Absence: ${report.date.toFriendlyDate()}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
             HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
-            Text("Reported reason", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "REPORTED REASON", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             HtmlText(report.reasonHtml, modifier = Modifier.padding(top = 2.dp))
             HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
             Text("Resolved by ${report.resolvedBy}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
@@ -324,9 +436,10 @@ private fun ReportDeveloperFilterDropdown(
 
     Box(modifier = modifier) {
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Filled.Group, contentDescription = null, modifier = Modifier.size(18.dp))
             Text(
                 label, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f)
+                style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f).padding(start = 8.dp)
             )
             Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
         }
