@@ -288,7 +288,7 @@ internal fun MetaChip(
         // Meta color) so it visibly reads as "tap for the calendar".
         ChipKind.DATE -> MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.primaryContainer
     }
-    var modifier = Modifier.clip(RoundedCornerShape(8.dp))
+    var modifier = Modifier.clip(RoundedCornerShape(50))
     if (onClick != null) modifier = modifier.clickable(onClick = onClick)
     modifier = modifier.background(background).padding(horizontal = 10.dp, vertical = 5.dp)
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {

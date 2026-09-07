@@ -223,6 +223,7 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                     selected = granularity == g,
                                     onClick = { granularity = g },
                                     label = { Text(g.label) },
+                                    shape = RoundedCornerShape(50),
                                     colors = themedFilterChipColors()
                                 )
                             }
@@ -233,6 +234,7 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                     selected = selectedYear == year,
                                     onClick = { selectedYear = year },
                                     label = { Text(year.toString()) },
+                                    shape = RoundedCornerShape(50),
                                     colors = themedFilterChipColors()
                                 )
                             }
@@ -244,6 +246,7 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                         selected = selectedQuarter == q,
                                         onClick = { selectedQuarter = q },
                                         label = { Text("Q$q") },
+                                        shape = RoundedCornerShape(50),
                                         colors = themedFilterChipColors()
                                     )
                                 }
@@ -257,6 +260,7 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                         selected = selectedMonth == m,
                                         onClick = { selectedMonth = m },
                                         label = { Text(MONTH_LABELS[m - 1]) },
+                                        shape = RoundedCornerShape(50),
                                         colors = themedFilterChipColors()
                                     )
                                 }
@@ -271,6 +275,7 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                         selected = selectedWeek == w,
                                         onClick = { selectedWeek = w },
                                         label = { Text("Week $w") },
+                                        shape = RoundedCornerShape(50),
                                         colors = themedFilterChipColors()
                                     )
                                 }
