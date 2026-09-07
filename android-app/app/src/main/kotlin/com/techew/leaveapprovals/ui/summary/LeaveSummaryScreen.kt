@@ -289,12 +289,11 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                 }
                             }
                         }
-                    }
-                    }
 
                         // Drill-down breadcrumb, mirroring the mockup's
                         // "2026 · full year" / "2026 › Q3 · Jul – Sep" /
-                        // "2026 › Q3 › Sep · N requests".
+                        // "2026 › Q3 › Sep · N requests" - it's the Period
+                        // card's own last row, not a line floating below it.
                         if (granularity == Granularity.YEAR) {
                             Breadcrumb(parts = listOf(selectedYear.toString() to true), suffix = "full year")
                         }
@@ -314,6 +313,8 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                 suffix = "${finalRecords.size} request${if (finalRecords.size == 1) "" else "s"}"
                             )
                         }
+                    }
+                    }
 
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
@@ -720,19 +721,23 @@ private fun KpiTile(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = containerColor ?: MaterialTheme.colorScheme.surface)
     ) {
-        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Text(
-                label.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = valueColor ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                value,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = valueColor ?: MaterialTheme.colorScheme.onSurface,
                 maxLines = 1
             )
             Text(
-                value,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                color = valueColor ?: MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(top = 2.dp)
+                label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = valueColor ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                modifier = Modifier.padding(top = 4.dp)
             )
         }
     }
