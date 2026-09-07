@@ -511,59 +511,67 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                     }
                                 }
                             }
+                        }
 
-                            val leaderboard = remember(finalRecords) {
-                                finalRecords.groupBy { it.email }
-                                    .map { (email, list) ->
-                                        Triple(list.firstOrNull { it.name.isNotBlank() }?.name ?: email, email, list.size)
-                                    }
-                                    .sortedByDescending { it.third }
-                                    .take(5)
-                            }
+                        // "Most requests" is a fixed "who's busiest this month" widget -
+                        // always visible regardless of the Period drill-down above,
+                        // scoped to the real current calendar month (not whatever
+                        // year/quarter/month the manager is currently browsing).
+                        val today = java.time.LocalDate.now()
+                        val currentMonthRecords = remember(scopedRecords) {
+                            scopedRecords.filter { it.dateOrNull()?.year == today.year && it.dateOrNull()?.monthValue == today.monthValue }
+                        }
+                        val leaderboard = remember(currentMonthRecords) {
+                            currentMonthRecords.groupBy { it.email }
+                                .map { (email, list) ->
+                                    Triple(list.firstOrNull { it.name.isNotBlank() }?.name ?: email, email, list.size)
+                                }
+                                .sortedByDescending { it.third }
+                                .take(5)
+                        }
 
-                            Row(modifier = Modifier.fillMaxWidth().padding(top = 20.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                                SectionLabel("Most requests", topPadding = 0.dp)
-                                Text(
-                                    "Top ${leaderboard.size} · ${MONTH_LABELS[selectedMonth - 1]}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                            ) {
-                                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
-                                    if (leaderboard.isEmpty()) {
-                                        Text(
-                                            "No requests in this period.",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.padding(vertical = 12.dp)
-                                        )
-                                    } else {
-                                        leaderboard.forEach { (name, email, count) ->
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Avatar(name = name, email = email, size = 28.dp)
-                                                Text(
-                                                    name,
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    modifier = Modifier.weight(1f).padding(start = 10.dp)
-                                                )
-                                                Text(
-                                                    count.toString(),
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    modifier = Modifier
-                                                        .clip(RoundedCornerShape(50))
-                                                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                                                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                                                )
-                                            }
+                        Row(modifier = Modifier.fillMaxWidth().padding(top = 20.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                            SectionLabel("Most requests", topPadding = 0.dp)
+                            Text(
+                                "Top ${leaderboard.size} · ${MONTH_LABELS[today.monthValue - 1]}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+                                if (leaderboard.isEmpty()) {
+                                    Text(
+                                        "No requests this month.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(vertical = 12.dp)
+                                    )
+                                } else {
+                                    leaderboard.forEach { (name, email, count) ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Avatar(name = name, email = email, size = 28.dp)
+                                            Text(
+                                                name,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                modifier = Modifier.weight(1f).padding(start = 10.dp)
+                                            )
+                                            Text(
+                                                count.toString(),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(50))
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                                            )
                                         }
                                     }
                                 }
