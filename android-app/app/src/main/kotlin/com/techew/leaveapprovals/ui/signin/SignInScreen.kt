@@ -30,7 +30,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Fingerprint
-import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Shield
@@ -57,7 +56,6 @@ import androidx.compose.ui.unit.sp
 import com.techew.leaveapprovals.R
 import com.techew.leaveapprovals.ui.common.AuthPalette
 import com.techew.leaveapprovals.ui.common.authPalette
-import com.techew.leaveapprovals.ui.common.dotGrid
 
 // Google's own brand button spec (white surface, #DADCE0 border, #3C4045
 // label) - kept exact rather than themed, since altering an official Google
@@ -78,16 +76,9 @@ fun SignInScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .dotGrid(palette.bgDot)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 18.dp, vertical = 24.dp)
         ) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                LanguageBadge(palette)
-            }
-
-            Spacer(Modifier.height(18.dp))
-
             SignInCard(palette, isLoading, errorMessage, onSignInClick)
 
             Spacer(Modifier.height(14.dp))
@@ -104,22 +95,6 @@ fun SignInScreen(
 
             Spacer(Modifier.height(12.dp))
         }
-    }
-}
-
-@Composable
-private fun LanguageBadge(palette: AuthPalette) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-        modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(palette.surface)
-            .border(1.dp, palette.line, RoundedCornerShape(50))
-            .padding(horizontal = 12.dp, vertical = 7.dp)
-    ) {
-        Icon(Icons.Outlined.Language, contentDescription = null, tint = palette.ink500, modifier = Modifier.size(13.dp))
-        Text("EN", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = palette.ink700)
     }
 }
 
@@ -226,10 +201,10 @@ private fun LogoHalo(palette: AuthPalette) {
         label = "halo-alpha"
     )
 
-    Box(modifier = Modifier.size(132.dp), contentAlignment = Alignment.Center) {
+    Box(modifier = Modifier.size(116.dp), contentAlignment = Alignment.Center) {
         Box(
             modifier = Modifier
-                .size(132.dp)
+                .size(116.dp)
                 .graphicsLayer { scaleX = scale; scaleY = scale; alpha = haloAlpha }
                 .background(
                     Brush.radialGradient(listOf(palette.brandTintStrong.copy(alpha = 0.55f), Color.Transparent)),

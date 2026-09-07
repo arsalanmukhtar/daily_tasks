@@ -32,7 +32,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.techew.leaveapprovals.ui.common.authPalette
-import com.techew.leaveapprovals.ui.common.dotGrid
 import com.techew.leaveapprovals.ui.theme.StatusRejected
 import com.techew.leaveapprovals.ui.theme.StatusRejectedBg
 
@@ -48,7 +47,7 @@ fun RestrictedScreen(email: String, onSignOut: () -> Unit) {
     val palette = authPalette()
 
     Surface(modifier = Modifier.fillMaxSize(), color = palette.bg) {
-        Box(modifier = Modifier.fillMaxSize().dotGrid(palette.bgDot)) {
+        Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
