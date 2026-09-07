@@ -145,6 +145,7 @@ fun RequestCard(
             // wrapping so every chip stays fully readable.
             Row(
                 modifier = Modifier
+                    .fillMaxWidth()
                     .padding(top = 10.dp)
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)

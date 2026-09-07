@@ -1,5 +1,6 @@
 package com.techew.leaveapprovals.ui.summary
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,8 +21,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -45,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.techew.leaveapprovals.data.AllowlistEntry
@@ -184,17 +189,34 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                     ) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                     ) {
                     Column(modifier = Modifier.padding(12.dp)) {
-                        SectionLabel("Developers", topPadding = 0.dp)
-                        DeveloperFilterDropdown(
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            SectionLabel("Developers", topPadding = 0.dp)
+                            Text(
+                                "${roster.size} developer${if (roster.size == 1) "" else "s"}",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        DeveloperFilterRow(
                             roster = roster,
                             selectedEmails = selectedEmails,
                             onSelectionChange = { selectedEmails = it }
                         )
+                    }
+                    }
 
-                        SectionLabel("Period", topPadding = 20.dp)
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        SectionLabel("Period", topPadding = 0.dp)
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(Granularity.entries) { g ->
                                 FilterChip(
@@ -295,7 +317,8 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                         SectionLabel("By leave type", topPadding = 20.dp)
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                                 // Uninformed Leave's count comes from the separate
@@ -361,19 +384,36 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                             }
                             Card(
                                 modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     MonthlyTrendChart(values = monthlyValues, labels = MONTH_LABELS)
                                     val peakCount = monthlyValues.maxOrNull() ?: 0
                                     if (peakCount > 0) {
                                         val peakMonth = MONTH_LABELS[monthlyValues.indexOf(peakCount)]
-                                        Text(
-                                            "Busiest month: $peakMonth · $peakCount request${if (peakCount == 1) "" else "s"}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.padding(top = 10.dp)
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            modifier = Modifier
+                                                .padding(top = 10.dp)
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                .padding(horizontal = 12.dp, vertical = 9.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.AutoMirrored.Filled.TrendingUp,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                            Text(
+                                                "Busiest month: $peakMonth · $peakCount request${if (peakCount == 1) "" else "s"}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -399,7 +439,8 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                             SectionLabel("By week", topPadding = 20.dp)
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                             ) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -420,10 +461,18 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                     .take(5)
                             }
 
-                            SectionLabel("Most requests", topPadding = 20.dp)
+                            Row(modifier = Modifier.fillMaxWidth().padding(top = 20.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                SectionLabel("Most requests", topPadding = 0.dp)
+                                Text(
+                                    "Top ${leaderboard.size} · ${MONTH_LABELS[selectedMonth - 1]}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                             ) {
                                 Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
                                     if (leaderboard.isEmpty()) {
@@ -528,23 +577,25 @@ private fun SectionLabel(text: String, topPadding: androidx.compose.ui.unit.Dp =
     )
 }
 
-// Multi-select "Developers" filter, redesigned from a horizontally-scrolling
-// row of one-chip-per-developer (which clipped/overflowed once the roster
-// grew past 2-3 names) into a single compact dropdown. Unlike the single-
-// select status/type dropdowns elsewhere, this one stays open across taps -
-// only "All developers" or dismissing it closes the menu - since picking
-// several developers to compare at once is the whole point of multi-select.
+// Multi-select "Developers" filter, shown as two segments matching the
+// reference design: a plain "All developers" reset pill, and a "Compare"
+// pill that opens the same multi-select dropdown as before (unlike the
+// single-select status/type dropdowns elsewhere, this one stays open
+// across taps - picking several developers to compare at once is the
+// whole point of multi-select). Whichever segment reflects the current
+// selection (all vs a specific subset) renders filled/solid.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DeveloperFilterDropdown(
+private fun DeveloperFilterRow(
     roster: List<AllowlistEntry>,
     selectedEmails: Set<String>,
     onSelectionChange: (Set<String>) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     val sortedRoster = remember(roster) { roster.sortedBy { it.name.ifBlank { it.email } } }
-    val label = when {
-        selectedEmails.isEmpty() -> "All developers"
+    val allSelected = selectedEmails.isEmpty()
+    val compareLabel = when {
+        selectedEmails.isEmpty() -> "Compare"
         selectedEmails.size == 1 -> {
             val email = selectedEmails.first()
             sortedRoster.find { it.email == email }?.name?.ifBlank { email } ?: email
@@ -552,38 +603,66 @@ private fun DeveloperFilterDropdown(
         else -> "${selectedEmails.size} developers"
     }
 
-    Box {
-        OutlinedButton(
-            onClick = { expanded = true },
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                label, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f)
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+        DevSegmentButton(
+            "All developers",
+            selected = allSelected,
+            onClick = { onSelectionChange(emptySet()) },
+            modifier = Modifier.weight(1f)
+        )
+        Box(modifier = Modifier.weight(1f)) {
+            DevSegmentButton(
+                compareLabel,
+                selected = !allSelected,
+                onClick = { expanded = true },
+                trailingIcon = { Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                modifier = Modifier.fillMaxWidth()
             )
-            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text("All developers") },
-                trailingIcon = { if (selectedEmails.isEmpty()) Icon(Icons.Filled.Check, contentDescription = null) },
-                onClick = {
-                    onSelectionChange(emptySet())
-                    expanded = false
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                sortedRoster.forEach { entry ->
+                    val isSelected = entry.email in selectedEmails
+                    DropdownMenuItem(
+                        text = { Text(entry.name.ifBlank { entry.email }) },
+                        trailingIcon = { if (isSelected) Icon(Icons.Filled.Check, contentDescription = null) },
+                        onClick = {
+                            onSelectionChange(if (isSelected) selectedEmails - entry.email else selectedEmails + entry.email)
+                        }
+                    )
                 }
-            )
-            HorizontalDivider()
-            sortedRoster.forEach { entry ->
-                val isSelected = entry.email in selectedEmails
-                DropdownMenuItem(
-                    text = { Text(entry.name.ifBlank { entry.email }) },
-                    trailingIcon = { if (isSelected) Icon(Icons.Filled.Check, contentDescription = null) },
-                    onClick = {
-                        onSelectionChange(if (isSelected) selectedEmails - entry.email else selectedEmails + entry.email)
-                    }
-                )
             }
+        }
+    }
+}
+
+@Composable
+private fun DevSegmentButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    trailingIcon: (@Composable () -> Unit)? = null
+) {
+    if (selected) {
+        Button(
+            onClick = onClick,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.inverseSurface,
+                contentColor = MaterialTheme.colorScheme.inverseOnSurface
+            ),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+            modifier = modifier
+        ) {
+            Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+            trailingIcon?.invoke()
+        }
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+            modifier = modifier
+        ) {
+            Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+            trailingIcon?.invoke()
         }
     }
 }

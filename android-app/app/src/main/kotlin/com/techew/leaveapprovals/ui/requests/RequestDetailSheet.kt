@@ -151,6 +151,7 @@ private fun DetailHeader(request: LeaveRequest) {
     // on RequestCard's chip row).
     Row(
         modifier = Modifier
+            .fillMaxWidth()
             .padding(top = 12.dp)
             .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp)

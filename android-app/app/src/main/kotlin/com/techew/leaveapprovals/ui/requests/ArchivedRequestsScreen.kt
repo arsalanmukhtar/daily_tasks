@@ -1,5 +1,6 @@
 package com.techew.leaveapprovals.ui.requests
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -122,10 +123,18 @@ fun ArchivedRequestsScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         Card(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                ArchiveSectionLabel("Period", topPadding = 0.dp)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    ArchiveSectionLabel("Period", topPadding = 0.dp)
+                    Text(
+                        "Archives grow over time",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(ArchiveGranularity.entries) { g ->
                         FilterChip(selected = granularity == g, onClick = { granularity = g }, label = { Text(g.label) })
