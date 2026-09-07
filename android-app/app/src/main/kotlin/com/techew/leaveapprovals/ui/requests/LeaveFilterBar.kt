@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -212,10 +213,11 @@ private fun PersonFilterSheet(
                 value = query,
                 onValueChange = { query = it },
                 singleLine = true,
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                placeholder = { Text("Search ${roster.size} developers") },
+                textStyle = MaterialTheme.typography.bodyMedium,
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                placeholder = { Text("Search ${roster.size} developers", style = MaterialTheme.typography.bodyMedium) },
                 shape = RoundedCornerShape(50),
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 6.dp)
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 6.dp).height(46.dp)
             )
             LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
                 item {

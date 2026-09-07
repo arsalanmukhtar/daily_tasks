@@ -1,11 +1,14 @@
 package com.techew.leaveapprovals.ui.common
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,10 +30,11 @@ fun DropdownSearchField(query: String, onQueryChange: (String) -> Unit, itemCoun
         value = query,
         onValueChange = onQueryChange,
         singleLine = true,
-        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-        placeholder = { Text("Search $itemCount developers") },
+        textStyle = MaterialTheme.typography.bodyMedium,
+        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+        placeholder = { Text("Search $itemCount developers", style = MaterialTheme.typography.bodyMedium) },
         shape = RoundedCornerShape(50),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).height(46.dp)
     )
 }
 
