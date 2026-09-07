@@ -405,11 +405,22 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
+                                        // With nothing manually drilled into, the mockup highlights
+                                        // the busiest quarter (matching the chart's own peak-bar
+                                        // callout) rather than leaving all four looking equal.
+                                        val peakQuarterIndex = quarterCounts.indices
+                                            .filter { quarterCounts[it] > 0 }
+                                            .maxByOrNull { quarterCounts[it] }
                                         quarterCounts.forEachIndexed { index, count ->
+                                            val highlighted = if (granularity == Granularity.QUARTER) {
+                                                selectedQuarter == index + 1
+                                            } else {
+                                                index == peakQuarterIndex
+                                            }
                                             QuarterTile(
                                                 label = "Q${index + 1}",
                                                 count = count,
-                                                selected = granularity == Granularity.QUARTER && selectedQuarter == index + 1,
+                                                highlighted = highlighted,
                                                 modifier = Modifier.weight(1f),
                                                 onClick = {
                                                     granularity = Granularity.QUARTER
@@ -419,7 +430,7 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                         }
                                     }
                                     Box(Modifier.height(16.dp))
-                                    MonthlyTrendChart(values = monthlyValues, labels = MONTH_LABELS)
+                                    MonthlyTrendChart(values = monthlyValues, labels = MONTH_LABELS.map { it.take(1) })
                                     val peakCount = monthlyValues.maxOrNull() ?: 0
                                     if (peakCount > 0) {
                                         val peakMonth = MONTH_LABELS[monthlyValues.indexOf(peakCount)]
@@ -523,11 +534,18 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                         modifier = Modifier.padding(vertical = 12.dp)
                                     )
                                 } else {
-                                    leaderboard.forEach { (name, email, count) ->
+                                    leaderboard.forEachIndexed { index, (name, email, count) ->
+                                        if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                                         Row(
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
+                                            Text(
+                                                (index + 1).toString(),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.width(20.dp)
+                                            )
                                             Avatar(name = name, email = email, size = 28.dp)
                                             Text(
                                                 name,
@@ -537,11 +555,12 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                             Text(
                                                 count.toString(),
                                                 style = MaterialTheme.typography.labelMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.inverseOnSurface,
                                                 modifier = Modifier
                                                     .clip(RoundedCornerShape(50))
-                                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                                                    .background(MaterialTheme.colorScheme.inverseSurface)
+                                                    .padding(horizontal = 10.dp, vertical = 4.dp)
                                             )
                                         }
                                     }
@@ -791,36 +810,28 @@ private fun TypeBarRow(label: String, count: Int, maxCount: Int, barColor: Color
 private fun QuarterTile(
     label: String,
     count: Int,
-    selected: Boolean = false,
+    highlighted: Boolean = false,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null
 ) {
-    val containerColor = when {
-        selected -> MaterialTheme.colorScheme.inverseSurface
-        else -> MaterialTheme.colorScheme.surfaceVariant
-    }
-    val contentColor = when {
-        selected -> MaterialTheme.colorScheme.inverseOnSurface
+    val containerColor = if (highlighted) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+    val valueColor = when {
+        highlighted -> MaterialTheme.colorScheme.primary
         count == 0 -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.onSurface
     }
+    val labelColor = if (highlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
             .background(containerColor)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(vertical = 10.dp),
+            .padding(vertical = 14.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = contentColor, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-            Text(
-                count.toString(),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                color = contentColor.takeIf { selected } ?: MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(top = 2.dp)
-            )
+            Text(count.toString(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = valueColor)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = labelColor, modifier = Modifier.padding(top = 2.dp))
         }
     }
 }
