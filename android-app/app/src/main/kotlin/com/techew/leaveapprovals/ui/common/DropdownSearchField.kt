@@ -2,6 +2,7 @@ package com.techew.leaveapprovals.ui.common
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
@@ -28,6 +29,7 @@ fun DropdownSearchField(query: String, onQueryChange: (String) -> Unit, itemCoun
         singleLine = true,
         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
         placeholder = { Text("Search $itemCount developers") },
+        shape = RoundedCornerShape(50),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)
     )
 }

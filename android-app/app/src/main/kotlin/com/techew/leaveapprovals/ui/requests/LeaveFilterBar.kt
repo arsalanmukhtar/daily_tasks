@@ -214,6 +214,7 @@ private fun PersonFilterSheet(
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 placeholder = { Text("Search ${roster.size} developers") },
+                shape = RoundedCornerShape(50),
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 6.dp)
             )
             LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
