@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.SubdirectoryArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -561,8 +562,13 @@ private fun quarterMonthRange(quarter: Int): String {
 
 @Composable
 private fun Breadcrumb(parts: List<Pair<String, Boolean>>, suffix: String? = null) {
-    Row(modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)) {
-        Text("↳ ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(modifier = Modifier.padding(top = 10.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            Icons.Filled.SubdirectoryArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(14.dp).padding(end = 6.dp)
+        )
         parts.forEachIndexed { index, (label, isCurrent) ->
             if (index > 0) {
                 Text(" › ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
