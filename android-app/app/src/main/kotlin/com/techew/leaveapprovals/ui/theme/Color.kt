@@ -46,3 +46,41 @@ val DurationOutPassBg = Color(0xFFE3F4F2)
 // status - week label, submitted timestamp - matching the mockup's --meta.
 val Meta = Color(0xFF54607A)
 val MetaBg = Color(0xFFECEEF4)
+
+// ---------- Sign-in screen palette ----------
+// A distinct warm-neutral identity for the sign-in screen (rather than the
+// rest of the app's plain Material scheme), matching
+// screens/mobile/sign-in.html - the HTML design reference this was built
+// from. Kept screen-local (see SignInScreen.kt's SignInPalette) rather than
+// folded into the app-wide MaterialTheme, since no other screen uses it yet.
+val SignInBgLight = Color(0xFFF5F0E7)
+val SignInBgDotLight = Color(0xFFE2DACB)
+val SignInSurfaceLight = Color(0xFFFFFFFF)
+val SignInSurface2Light = Color(0xFFFAF6EF)
+val SignInInk900Light = Color(0xFF1C1712)
+val SignInInk700Light = Color(0xFF4C4437)
+val SignInInk500Light = Color(0xFF8C8072)
+val SignInInk400Light = Color(0xFFABA090)
+val SignInLineLight = Color(0xFFE9E1D2)
+val SignInLineStrongLight = Color(0xFFDCD2BC)
+val SignInBrandTintLight = Color(0xFFFFF0E2)
+val SignInBrandTintStrongLight = Color(0xFFFBD3AC)
+val SignInSecureLight = Color(0xFF157F45)
+val SignInSecureTintLight = Color(0xFFE4F5EA)
+
+val SignInBgDark = Color(0xFF17130E)
+val SignInBgDotDark = Color(0xFF251F17)
+val SignInSurfaceDark = Color(0xFF221C15)
+val SignInSurface2Dark = Color(0xFF2B241A)
+val SignInInk900Dark = Color(0xFFF6EFE3)
+val SignInInk700Dark = Color(0xFFCDC1AC)
+val SignInInk500Dark = Color(0xFF94886F)
+val SignInInk400Dark = Color(0xFF6E6350)
+val SignInLineDark = Color(0xFF362E22)
+val SignInLineStrongDark = Color(0xFF453A2A)
+// Brighter than TechEwOrange for legibility against the dark warm ground.
+val SignInBrandOnDark = Color(0xFFFB8A3C)
+val SignInBrandTintDark = Color(0xFF3C2716)
+val SignInBrandTintStrongDark = Color(0xFF55341A)
+val SignInSecureDark = Color(0xFF4ADE94)
+val SignInSecureTintDark = Color(0xFF143323)
