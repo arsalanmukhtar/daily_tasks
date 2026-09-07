@@ -382,14 +382,6 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                         }
 
                         if (granularity == Granularity.YEAR || granularity == Granularity.QUARTER) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                SectionLabel("By quarter & month", topPadding = 0.dp)
-                            }
-
                             val quarterCounts = remember(yearRecords) {
                                 IntArray(4).also { arr ->
                                     yearRecords.forEach { r ->
@@ -398,24 +390,6 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                     }
                                 }
                             }
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                quarterCounts.forEachIndexed { index, count ->
-                                    QuarterTile(
-                                        label = "Q${index + 1}",
-                                        count = count,
-                                        selected = granularity == Granularity.QUARTER && selectedQuarter == index + 1,
-                                        modifier = Modifier.weight(1f),
-                                        onClick = {
-                                            granularity = Granularity.QUARTER
-                                            selectedQuarter = index + 1
-                                        }
-                                    )
-                                }
-                            }
-
                             val monthlyValues = remember(yearRecords) {
                                 IntArray(12).also { arr ->
                                     yearRecords.forEach { r ->
@@ -425,11 +399,46 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                 }.toList()
                             }
                             Card(
-                                modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                                modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        SectionLabel("Monthly trend", topPadding = 0.dp)
+                                        Text(
+                                            "Q1–Q4",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(50))
+                                                .background(MaterialTheme.colorScheme.primaryContainer)
+                                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        quarterCounts.forEachIndexed { index, count ->
+                                            QuarterTile(
+                                                label = "Q${index + 1}",
+                                                count = count,
+                                                selected = granularity == Granularity.QUARTER && selectedQuarter == index + 1,
+                                                modifier = Modifier.weight(1f),
+                                                onClick = {
+                                                    granularity = Granularity.QUARTER
+                                                    selectedQuarter = index + 1
+                                                }
+                                            )
+                                        }
+                                    }
+                                    Box(Modifier.height(16.dp))
                                     MonthlyTrendChart(values = monthlyValues, labels = MONTH_LABELS)
                                     val peakCount = monthlyValues.maxOrNull() ?: 0
                                     if (peakCount > 0) {
@@ -612,10 +621,10 @@ private fun WeekTile(label: String, count: Int, modifier: Modifier = Modifier) {
 @Composable
 private fun SectionLabel(text: String, topPadding: androidx.compose.ui.unit.Dp = 0.dp) {
     Text(
-        text.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
+        text,
+        style = MaterialTheme.typography.titleMedium,
         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.padding(top = topPadding, bottom = 8.dp)
     )
 }
