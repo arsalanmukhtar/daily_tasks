@@ -4,7 +4,13 @@ const TIME_ZONE = 'Asia/Karachi';
 const APP_URL = 'https://arsalanmukhtar.github.io/daily_tasks/';
 const HISTORY_URL = APP_URL + '#my-leaves';
 
-const FONT = "-apple-system,'Segoe UI',Roboto,Arial,sans-serif";
+// Roboto first (not buried behind -apple-system/Segoe UI) so every client
+// that actually has it installed (Android/Gmail app, ChromeOS, most Linux
+// desktops) renders it, falling back to each platform's native UI font
+// elsewhere - email clients can't reliably load a web font (Outlook's
+// desktop renderer ignores @font-face/<link> entirely), so a declared
+// preference is the only "use Roboto" that's actually safe here.
+const FONT = "Roboto,-apple-system,'Segoe UI',Arial,sans-serif";
 
 // Leave-type chip colors, matching the web/Android apps' new --t-*/--d-*
 // design tokens (see screens/mail-response.html) - a "family" chip for every
