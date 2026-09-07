@@ -171,9 +171,9 @@ fun RequestCard(
 
             val daysLeft = request.daysUntilPermanentDeletion()
             if (daysLeft != null) {
+                // Same wording as the web app's .lv-expiry-notice.
                 Text(
-                    "This withdrawn request will be permanently deleted after $daysLeft" +
-                        if (daysLeft == 1L) " day." else " days.",
+                    "Deletes permanently in $daysLeft" + if (daysLeft == 1L) " day." else " days.",
                     style = MaterialTheme.typography.bodySmall,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
