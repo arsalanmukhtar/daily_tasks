@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -218,7 +219,14 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                     ) {
                     Column(modifier = Modifier.padding(12.dp)) {
-                        SectionLabel("Period", topPadding = 0.dp)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            SectionLabel("Period", topPadding = 0.dp)
+                            Text(
+                                "Archives grow over time",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(Granularity.entries) { g ->
                                 FilterChip(
@@ -230,8 +238,11 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                 )
                             }
                         }
+                        val ascendingYears = remember(availableYears) { availableYears.sorted() }
+                        var yearsExpanded by remember { mutableStateOf(false) }
+                        val visibleYears = if (yearsExpanded || ascendingYears.size <= 3) ascendingYears else ascendingYears.takeLast(3)
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-                            items(availableYears) { year ->
+                            items(visibleYears) { year ->
                                 FilterChip(
                                     selected = selectedYear == year,
                                     onClick = { selectedYear = year },
@@ -239,6 +250,23 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                     shape = RoundedCornerShape(50),
                                     colors = themedFilterChipColors()
                                 )
+                            }
+                            if (ascendingYears.size > 3) {
+                                item {
+                                    FilterChip(
+                                        selected = false,
+                                        onClick = { yearsExpanded = !yearsExpanded },
+                                        label = { Text(if (yearsExpanded) "Less" else "More") },
+                                        leadingIcon = {
+                                            Icon(
+                                                if (yearsExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        },
+                                        shape = RoundedCornerShape(50)
+                                    )
+                                }
                             }
                         }
                         if (granularity == Granularity.QUARTER) {
@@ -286,9 +314,12 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                     }
                     }
 
-                        // Drill-down breadcrumb - only meaningful once the manager
-                        // has actually narrowed past Year, mirroring the mockup's
-                        // "2026 › Q3 · Jul – Sep" / "2026 › Q3 › Sep · N requests".
+                        // Drill-down breadcrumb, mirroring the mockup's
+                        // "2026 · full year" / "2026 › Q3 · Jul – Sep" /
+                        // "2026 › Q3 › Sep · N requests".
+                        if (granularity == Granularity.YEAR) {
+                            Breadcrumb(parts = listOf(selectedYear.toString() to true), suffix = "full year")
+                        }
                         if (granularity == Granularity.QUARTER) {
                             Breadcrumb(
                                 parts = listOf(selectedYear.toString() to false, "Q$selectedQuarter" to true),
@@ -306,9 +337,8 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                             )
                         }
 
-                        SectionLabel("Activity", topPadding = 20.dp)
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             KpiTile("Total", finalRecords.size.toString(), Modifier.weight(1f))
@@ -536,6 +566,7 @@ private fun quarterMonthRange(quarter: Int): String {
 @Composable
 private fun Breadcrumb(parts: List<Pair<String, Boolean>>, suffix: String? = null) {
     Row(modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)) {
+        Text("↳ ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         parts.forEachIndexed { index, (label, isCurrent) ->
             if (index > 0) {
                 Text(" › ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
