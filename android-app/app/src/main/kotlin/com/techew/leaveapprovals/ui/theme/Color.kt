@@ -13,10 +13,12 @@ val StatusRequestedBg = Color(0xFFFEF3C7)
 // hits ~6.5:1 while staying clearly green, not just dark.
 val StatusApproved = Color(0xFF166534)
 val StatusApprovedBg = Color(0xFFDCFCE7)
-// Warning/alert - oklch(64.5% 0.246 16.439), a lighter red than the old
-// dark maroon, plus a light pastel tint of the same hue for its badge
-// background.
-val StatusRejected = Color(0xFFFF2056)
+// Warning/alert. The original oklch(64.5% 0.246 16.439) read as pink/
+// raspberry rather than red (its blue channel sits almost as high as
+// green) and only hit ~3.1:1 contrast on its own badge background - under
+// WCAG AA's 4.5:1. Tailwind's red-700 is a true red with no pink cast, at
+// ~5.3:1 on the same background.
+val StatusRejected = Color(0xFFB91C1C)
 val StatusRejectedBg = Color(0xFFFFE2E3)
 
 // A withdrawn request is only ever created by the web app (the requester
