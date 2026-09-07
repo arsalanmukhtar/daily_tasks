@@ -10,11 +10,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,7 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.techew.leaveapprovals.data.LeaveRequest
-import com.techew.leaveapprovals.ui.theme.themedFilterChipColors
+import com.techew.leaveapprovals.ui.common.PeriodChip
 import java.time.Instant
 import java.time.LocalDate
 import java.time.Year
@@ -139,24 +137,18 @@ fun ArchivedRequestsScreen(
                 }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(ArchiveGranularity.entries) { g ->
-                        FilterChip(selected = granularity == g, onClick = { granularity = g }, label = { Text(g.label) }, shape = RoundedCornerShape(50), colors = themedFilterChipColors())
+                        PeriodChip(selected = granularity == g, onClick = { granularity = g }, label = g.label)
                     }
                 }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                     items(availableYears) { year ->
-                        FilterChip(
-                            selected = selectedYear == year,
-                            onClick = { selectedYear = year },
-                            label = { Text(year.toString()) },
-                            shape = RoundedCornerShape(50),
-                            colors = themedFilterChipColors()
-                        )
+                        PeriodChip(selected = selectedYear == year, onClick = { selectedYear = year }, label = year.toString())
                     }
                 }
                 if (granularity == ArchiveGranularity.QUARTER) {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                         items((1..4).toList()) { q ->
-                            FilterChip(selected = selectedQuarter == q, onClick = { selectedQuarter = q }, label = { Text("Q$q") }, shape = RoundedCornerShape(50), colors = themedFilterChipColors())
+                            PeriodChip(selected = selectedQuarter == q, onClick = { selectedQuarter = q }, label = "Q$q")
                         }
                     }
                 }
@@ -164,7 +156,7 @@ fun ArchivedRequestsScreen(
                     val monthListState = remember { androidx.compose.foundation.lazy.LazyListState(firstVisibleItemIndex = (selectedMonth - 1).coerceAtLeast(0)) }
                     LazyRow(state = monthListState, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                         items((1..12).toList()) { m ->
-                            FilterChip(selected = selectedMonth == m, onClick = { selectedMonth = m }, label = { Text(ARCHIVE_MONTH_LABELS[m - 1]) }, shape = RoundedCornerShape(50), colors = themedFilterChipColors())
+                            PeriodChip(selected = selectedMonth == m, onClick = { selectedMonth = m }, label = ARCHIVE_MONTH_LABELS[m - 1])
                         }
                     }
                 }
@@ -173,7 +165,7 @@ fun ArchivedRequestsScreen(
                     val weekListState = remember(availableWeeks) { androidx.compose.foundation.lazy.LazyListState(firstVisibleItemIndex = weekIndex) }
                     LazyRow(state = weekListState, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                         items(availableWeeks) { w ->
-                            FilterChip(selected = selectedWeek == w, onClick = { selectedWeek = w }, label = { Text("Week $w") }, shape = RoundedCornerShape(50), colors = themedFilterChipColors())
+                            PeriodChip(selected = selectedWeek == w, onClick = { selectedWeek = w }, label = "Week $w")
                         }
                     }
                 }

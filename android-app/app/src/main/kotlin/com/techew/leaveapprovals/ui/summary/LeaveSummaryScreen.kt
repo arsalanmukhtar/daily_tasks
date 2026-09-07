@@ -32,7 +32,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -58,6 +57,7 @@ import com.techew.leaveapprovals.data.LeaveType
 import com.techew.leaveapprovals.data.UninformedLeave
 import com.techew.leaveapprovals.ui.charts.MonthlyTrendChart
 import com.techew.leaveapprovals.ui.common.Avatar
+import com.techew.leaveapprovals.ui.common.PeriodChip
 import com.techew.leaveapprovals.ui.requests.durationColors
 import com.techew.leaveapprovals.ui.theme.StatusApproved
 import com.techew.leaveapprovals.ui.theme.StatusApprovedBg
@@ -67,7 +67,6 @@ import com.techew.leaveapprovals.ui.common.DropdownSearchField
 import com.techew.leaveapprovals.ui.common.filterByQuery
 import com.techew.leaveapprovals.ui.theme.StatusRequested
 import com.techew.leaveapprovals.ui.theme.StatusRequestedBg
-import com.techew.leaveapprovals.ui.theme.themedFilterChipColors
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.TextStyle
@@ -238,13 +237,7 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                         }
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(Granularity.entries) { g ->
-                                FilterChip(
-                                    selected = granularity == g,
-                                    onClick = { granularity = g },
-                                    label = { Text(g.label) },
-                                    shape = RoundedCornerShape(50),
-                                    colors = themedFilterChipColors()
-                                )
+                                PeriodChip(selected = granularity == g, onClick = { granularity = g }, label = g.label)
                             }
                         }
                         val ascendingYears = remember(availableYears) { availableYears.sorted() }
@@ -252,28 +245,21 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                         val visibleYears = if (yearsExpanded || ascendingYears.size <= 3) ascendingYears else ascendingYears.takeLast(3)
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                             items(visibleYears) { year ->
-                                FilterChip(
-                                    selected = selectedYear == year,
-                                    onClick = { selectedYear = year },
-                                    label = { Text(year.toString()) },
-                                    shape = RoundedCornerShape(50),
-                                    colors = themedFilterChipColors()
-                                )
+                                PeriodChip(selected = selectedYear == year, onClick = { selectedYear = year }, label = year.toString())
                             }
                             if (ascendingYears.size > 3) {
                                 item {
-                                    FilterChip(
+                                    PeriodChip(
                                         selected = false,
                                         onClick = { yearsExpanded = !yearsExpanded },
-                                        label = { Text(if (yearsExpanded) "Less" else "More") },
+                                        label = if (yearsExpanded) "Less" else "More",
                                         leadingIcon = {
                                             Icon(
                                                 if (yearsExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                                                 contentDescription = null,
                                                 modifier = Modifier.size(16.dp)
                                             )
-                                        },
-                                        shape = RoundedCornerShape(50)
+                                        }
                                     )
                                 }
                             }
@@ -281,13 +267,7 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                         if (granularity == Granularity.QUARTER) {
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                                 items((1..4).toList()) { q ->
-                                    FilterChip(
-                                        selected = selectedQuarter == q,
-                                        onClick = { selectedQuarter = q },
-                                        label = { Text("Q$q") },
-                                        shape = RoundedCornerShape(50),
-                                        colors = themedFilterChipColors()
-                                    )
+                                    PeriodChip(selected = selectedQuarter == q, onClick = { selectedQuarter = q }, label = "Q$q")
                                 }
                             }
                         }
@@ -295,13 +275,7 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                             val monthListState = remember { androidx.compose.foundation.lazy.LazyListState(firstVisibleItemIndex = (selectedMonth - 1).coerceAtLeast(0)) }
                             LazyRow(state = monthListState, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                                 items((1..12).toList()) { m ->
-                                    FilterChip(
-                                        selected = selectedMonth == m,
-                                        onClick = { selectedMonth = m },
-                                        label = { Text(MONTH_LABELS[m - 1]) },
-                                        shape = RoundedCornerShape(50),
-                                        colors = themedFilterChipColors()
-                                    )
+                                    PeriodChip(selected = selectedMonth == m, onClick = { selectedMonth = m }, label = MONTH_LABELS[m - 1])
                                 }
                             }
                         }
@@ -310,13 +284,7 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                             val weekListState = remember(availableWeeks) { androidx.compose.foundation.lazy.LazyListState(firstVisibleItemIndex = weekIndex) }
                             LazyRow(state = weekListState, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                                 items(availableWeeks) { w ->
-                                    FilterChip(
-                                        selected = selectedWeek == w,
-                                        onClick = { selectedWeek = w },
-                                        label = { Text("Week $w") },
-                                        shape = RoundedCornerShape(50),
-                                        colors = themedFilterChipColors()
-                                    )
+                                    PeriodChip(selected = selectedWeek == w, onClick = { selectedWeek = w }, label = "Week $w")
                                 }
                             }
                         }
