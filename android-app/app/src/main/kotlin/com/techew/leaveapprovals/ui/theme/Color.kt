@@ -54,48 +54,31 @@ val MetaBg = Color(0xFFECEEF4)
 
 // ---------- App neutral palette ----------
 // The "Sign in" prefix is legacy (this started as a sign-in-screen-only
-// identity, matching screens/mobile/sign-in.html) but these Dark values are
-// now the whole app's main neutral colors (background/surface/text/borders)
-// - see Theme.kt's colorScheme and AuthPalette.kt. Dark values are a true
-// neutral gray scale (gunmetal/stone-toned, zero hue bias - see the note
-// above SignInBgDark); the Light values below are unused dead code (the
-// app is dark-only) and were never migrated off the original warm palette.
-val SignInBgLight = Color(0xFFF5F0E7)
-val SignInBgDotLight = Color(0xFFE2DACB)
+// identity, matching screens/mobile/sign-in.html) but these values are now
+// the whole app's main neutral colors (background/surface/text/borders) -
+// see Theme.kt's colorScheme and AuthPalette.kt. True neutral gray (zero
+// chroma/no hue), sampled directly from the screens/mobile/*.png
+// references (Summary.png's page background, card fill, hairline card
+// border, heading text, and muted caption text) rather than guessed -
+// white cards on a barely-off-white page, near-black text, with a thin
+// outline doing the work of separating elements instead of shadows or
+// background-color contrast.
+val SignInBgLight = Color(0xFFF6F6F4)
 val SignInSurfaceLight = Color(0xFFFFFFFF)
-val SignInSurface2Light = Color(0xFFFAF6EF)
-val SignInInk900Light = Color(0xFF1C1712)
-val SignInInk700Light = Color(0xFF4C4437)
-val SignInInk500Light = Color(0xFF8C8072)
-val SignInInk400Light = Color(0xFFABA090)
-val SignInLineLight = Color(0xFFE9E1D2)
-val SignInLineStrongLight = Color(0xFFDCD2BC)
-val SignInBrandTintLight = Color(0xFFFFF0E2)
-val SignInBrandTintStrongLight = Color(0xFFFBD3AC)
-val SignInSecureLight = Color(0xFF157F45)
-val SignInSecureTintLight = Color(0xFFE4F5EA)
-
-// True neutral gray (zero chroma / no hue) - gunmetal/stone-toned rather
-// than Tailwind Slate's blue-leaning gray, at the same lightness steps
-// Slate used (Tailwind's whole gray family shares one L-scale; only C/H
-// differ per family, so swapping families here is just C -> 0).
-val SignInBgDark = Color(0xFF070707) // neutral-950
-val SignInBgDotDark = Color(0xFF181818) // neutral-900 (unused - dot grid removed)
-val SignInSurfaceDark = Color(0xFF181818) // neutral-900
-val SignInSurface2Dark = Color(0xFF292929) // neutral-800
-val SignInSurface3Dark = Color(0xFF404040) // neutral-700
-val SignInInk900Dark = Color(0xFFFAFAFA) // neutral-50
-val SignInInk700Dark = Color(0xFFD4D4D4) // neutral-300
-val SignInInk500Dark = Color(0xFF9F9F9F) // neutral-400
-val SignInInk400Dark = Color(0xFF737373) // neutral-500
-val SignInLineDark = Color(0xFF292929) // neutral-800
-val SignInLineStrongDark = Color(0xFF404040) // neutral-700
-// Brighter than TechEwOrange for legibility against the dark slate ground.
-val SignInBrandOnDark = Color(0xFFFB8A3C)
-val SignInBrandTintDark = Color(0xFF3C2716)
-val SignInBrandTintStrongDark = Color(0xFF55341A)
+val SignInSurface2Light = Color(0xFFECEBE8) // filled chip/tile background
+val SignInSurface3Light = Color(0xFFE0DEDA)
+val SignInInk900Light = Color(0xFF131316) // headings, primary text
+val SignInInk700Light = Color(0xFF75757A) // muted captions/secondary text
+val SignInInk500Light = Color(0xFF9C9C9F)
+val SignInInk400Light = Color(0xFFC2C2C4)
+val SignInLineLight = Color(0xFFE6E4DF) // hairline card border
+val SignInLineStrongLight = Color(0xFFD1CFC9)
+// TechEwOrange itself is the sampled accent (#E4571D in the mockups, a hair
+// off #EA580C) - reused directly rather than duplicated under a new name.
+val SignInBrandTintLight = Color(0xFFFFE9DA) // primaryContainer, e.g. the "Q1-Q4" badge
+val SignInBrandTintStrongLight = Color(0xFFFFD2AD)
 // Reuses the app-wide success green (see StatusApproved/StatusApprovedBg)
-// rather than a separate dark-tinted green, so every "positive" badge in
-// the app - this SECURE tag included - shares one visual language.
-val SignInSecureDark = StatusApproved
-val SignInSecureTintDark = StatusApprovedBg
+// rather than a separate tinted green, so every "positive" badge in the
+// app - this SECURE tag included - shares one visual language.
+val SignInSecureLight = StatusApproved
+val SignInSecureTintLight = StatusApprovedBg

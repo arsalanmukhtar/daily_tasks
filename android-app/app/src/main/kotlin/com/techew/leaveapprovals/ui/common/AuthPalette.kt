@@ -1,31 +1,28 @@
 package com.techew.leaveapprovals.ui.common
 
 import androidx.compose.ui.graphics.Color
-import com.techew.leaveapprovals.ui.theme.SignInBgDark
-import com.techew.leaveapprovals.ui.theme.SignInBrandOnDark
-import com.techew.leaveapprovals.ui.theme.SignInBrandTintDark
-import com.techew.leaveapprovals.ui.theme.SignInBrandTintStrongDark
-import com.techew.leaveapprovals.ui.theme.SignInInk400Dark
-import com.techew.leaveapprovals.ui.theme.SignInInk500Dark
-import com.techew.leaveapprovals.ui.theme.SignInInk700Dark
-import com.techew.leaveapprovals.ui.theme.SignInInk900Dark
-import com.techew.leaveapprovals.ui.theme.SignInLineDark
-import com.techew.leaveapprovals.ui.theme.SignInLineStrongDark
-import com.techew.leaveapprovals.ui.theme.SignInSecureDark
-import com.techew.leaveapprovals.ui.theme.SignInSecureTintDark
-import com.techew.leaveapprovals.ui.theme.SignInSurface2Dark
-import com.techew.leaveapprovals.ui.theme.SignInSurfaceDark
+import com.techew.leaveapprovals.ui.theme.SignInBgLight
+import com.techew.leaveapprovals.ui.theme.SignInBrandTintLight
+import com.techew.leaveapprovals.ui.theme.SignInBrandTintStrongLight
+import com.techew.leaveapprovals.ui.theme.SignInInk400Light
+import com.techew.leaveapprovals.ui.theme.SignInInk500Light
+import com.techew.leaveapprovals.ui.theme.SignInInk700Light
+import com.techew.leaveapprovals.ui.theme.SignInInk900Light
+import com.techew.leaveapprovals.ui.theme.SignInLineLight
+import com.techew.leaveapprovals.ui.theme.SignInLineStrongLight
+import com.techew.leaveapprovals.ui.theme.SignInSecureLight
+import com.techew.leaveapprovals.ui.theme.SignInSecureTintLight
+import com.techew.leaveapprovals.ui.theme.SignInSurface2Light
+import com.techew.leaveapprovals.ui.theme.SignInSurfaceLight
+import com.techew.leaveapprovals.ui.theme.TechEwOrange
 
 /**
- * The shared warm-neutral identity for the pre-sign-in "gate" screens
- * (Sign In, Restricted) - distinct from the rest of the app's plain
- * Material scheme. Matches screens/mobile/sign-in.html and
- * screens/mobile/Restricted.png, the design references both screens were
- * built from. `internal` (not per-screen `private`) so both screens share
- * one definition instead of drifting apart.
- *
- * Dark-only, matching the rest of the app's now permanently-dark theme
- * (see LeaveApprovalsTheme) - there's no light variant to switch to.
+ * The shared neutral identity for the pre-sign-in "gate" screens (Sign In,
+ * Restricted) - distinct from the rest of the app's plain Material scheme.
+ * Matches screens/mobile/SignIn.png and screens/mobile/Restricted.png, the
+ * design references both screens were built from. `internal` (not
+ * per-screen `private`) so both screens share one definition instead of
+ * drifting apart.
  */
 internal data class AuthPalette(
     val bg: Color,
@@ -44,12 +41,12 @@ internal data class AuthPalette(
     val secureTint: Color
 )
 
-internal val DarkAuthPalette = AuthPalette(
-    bg = SignInBgDark, surface = SignInSurfaceDark, surface2 = SignInSurface2Dark,
-    ink900 = SignInInk900Dark, ink700 = SignInInk700Dark, ink500 = SignInInk500Dark, ink400 = SignInInk400Dark,
-    line = SignInLineDark, lineStrong = SignInLineStrongDark, brand = SignInBrandOnDark,
-    brandTint = SignInBrandTintDark, brandTintStrong = SignInBrandTintStrongDark,
-    secure = SignInSecureDark, secureTint = SignInSecureTintDark
+internal val LightAuthPalette = AuthPalette(
+    bg = SignInBgLight, surface = SignInSurfaceLight, surface2 = SignInSurface2Light,
+    ink900 = SignInInk900Light, ink700 = SignInInk700Light, ink500 = SignInInk500Light, ink400 = SignInInk400Light,
+    line = SignInLineLight, lineStrong = SignInLineStrongLight, brand = TechEwOrange,
+    brandTint = SignInBrandTintLight, brandTintStrong = SignInBrandTintStrongLight,
+    secure = SignInSecureLight, secureTint = SignInSecureTintLight
 )
 
-internal fun authPalette(): AuthPalette = DarkAuthPalette
+internal fun authPalette(): AuthPalette = LightAuthPalette
