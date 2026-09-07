@@ -56,10 +56,10 @@ val MetaBg = Color(0xFFECEEF4)
 // The "Sign in" prefix is legacy (this started as a sign-in-screen-only
 // identity, matching screens/mobile/sign-in.html) but these Dark values are
 // now the whole app's main neutral colors (background/surface/text/borders)
-// - see Theme.kt's colorScheme and AuthPalette.kt. Dark values are Tailwind
-// Slate (50/100/200/300/400/500/600/700/800/900/950); the Light values below
-// are unused dead code (the app is dark-only) and were never migrated off
-// the original warm palette.
+// - see Theme.kt's colorScheme and AuthPalette.kt. Dark values are a true
+// neutral gray scale (gunmetal/stone-toned, zero hue bias - see the note
+// above SignInBgDark); the Light values below are unused dead code (the
+// app is dark-only) and were never migrated off the original warm palette.
 val SignInBgLight = Color(0xFFF5F0E7)
 val SignInBgDotLight = Color(0xFFE2DACB)
 val SignInSurfaceLight = Color(0xFFFFFFFF)
@@ -75,19 +75,21 @@ val SignInBrandTintStrongLight = Color(0xFFFBD3AC)
 val SignInSecureLight = Color(0xFF157F45)
 val SignInSecureTintLight = Color(0xFFE4F5EA)
 
-// Tailwind Slate - slate-950/900/800/700 (surfaces) and slate-50/300/400/500
-// (text), replacing the original warm-brown dark palette.
-val SignInBgDark = Color(0xFF020617) // slate-950
-val SignInBgDotDark = Color(0xFF0F172A) // slate-900 (unused - dot grid removed)
-val SignInSurfaceDark = Color(0xFF0F172A) // slate-900
-val SignInSurface2Dark = Color(0xFF1E293B) // slate-800
-val SignInSurface3Dark = Color(0xFF334155) // slate-700
-val SignInInk900Dark = Color(0xFFF8FAFC) // slate-50
-val SignInInk700Dark = Color(0xFFCBD5E1) // slate-300
-val SignInInk500Dark = Color(0xFF94A3B8) // slate-400
-val SignInInk400Dark = Color(0xFF64748B) // slate-500
-val SignInLineDark = Color(0xFF1E293B) // slate-800
-val SignInLineStrongDark = Color(0xFF334155) // slate-700
+// True neutral gray (zero chroma / no hue) - gunmetal/stone-toned rather
+// than Tailwind Slate's blue-leaning gray, at the same lightness steps
+// Slate used (Tailwind's whole gray family shares one L-scale; only C/H
+// differ per family, so swapping families here is just C -> 0).
+val SignInBgDark = Color(0xFF070707) // neutral-950
+val SignInBgDotDark = Color(0xFF181818) // neutral-900 (unused - dot grid removed)
+val SignInSurfaceDark = Color(0xFF181818) // neutral-900
+val SignInSurface2Dark = Color(0xFF292929) // neutral-800
+val SignInSurface3Dark = Color(0xFF404040) // neutral-700
+val SignInInk900Dark = Color(0xFFFAFAFA) // neutral-50
+val SignInInk700Dark = Color(0xFFD4D4D4) // neutral-300
+val SignInInk500Dark = Color(0xFF9F9F9F) // neutral-400
+val SignInInk400Dark = Color(0xFF737373) // neutral-500
+val SignInLineDark = Color(0xFF292929) // neutral-800
+val SignInLineStrongDark = Color(0xFF404040) // neutral-700
 // Brighter than TechEwOrange for legibility against the dark slate ground.
 val SignInBrandOnDark = Color(0xFFFB8A3C)
 val SignInBrandTintDark = Color(0xFF3C2716)
