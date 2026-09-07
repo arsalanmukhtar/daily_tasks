@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -552,16 +553,21 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 modifier = Modifier.weight(1f).padding(start = 10.dp)
                                             )
-                                            Text(
-                                                count.toString(),
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.inverseOnSurface,
+                                            Box(
                                                 modifier = Modifier
-                                                    .clip(RoundedCornerShape(50))
-                                                    .background(MaterialTheme.colorScheme.inverseSurface)
-                                                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                                            )
+                                                    .size(28.dp)
+                                                    .clip(CircleShape)
+                                                    .background(MaterialTheme.colorScheme.inverseSurface),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    count.toString(),
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.inverseOnSurface,
+                                                    maxLines = 1
+                                                )
+                                            }
                                         }
                                     }
                                 }
