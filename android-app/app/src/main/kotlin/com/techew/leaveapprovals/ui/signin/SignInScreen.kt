@@ -10,7 +10,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,48 +46,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.techew.leaveapprovals.R
-import com.techew.leaveapprovals.ui.theme.SignInBgDark
-import com.techew.leaveapprovals.ui.theme.SignInBgDotDark
-import com.techew.leaveapprovals.ui.theme.SignInBgDotLight
-import com.techew.leaveapprovals.ui.theme.SignInBgLight
-import com.techew.leaveapprovals.ui.theme.SignInBrandOnDark
-import com.techew.leaveapprovals.ui.theme.SignInBrandTintDark
-import com.techew.leaveapprovals.ui.theme.SignInBrandTintLight
-import com.techew.leaveapprovals.ui.theme.SignInBrandTintStrongDark
-import com.techew.leaveapprovals.ui.theme.SignInBrandTintStrongLight
-import com.techew.leaveapprovals.ui.theme.SignInInk400Dark
-import com.techew.leaveapprovals.ui.theme.SignInInk400Light
-import com.techew.leaveapprovals.ui.theme.SignInInk500Dark
-import com.techew.leaveapprovals.ui.theme.SignInInk500Light
-import com.techew.leaveapprovals.ui.theme.SignInInk700Dark
-import com.techew.leaveapprovals.ui.theme.SignInInk700Light
-import com.techew.leaveapprovals.ui.theme.SignInInk900Dark
-import com.techew.leaveapprovals.ui.theme.SignInInk900Light
-import com.techew.leaveapprovals.ui.theme.SignInLineDark
-import com.techew.leaveapprovals.ui.theme.SignInLineLight
-import com.techew.leaveapprovals.ui.theme.SignInLineStrongDark
-import com.techew.leaveapprovals.ui.theme.SignInLineStrongLight
-import com.techew.leaveapprovals.ui.theme.SignInSecureDark
-import com.techew.leaveapprovals.ui.theme.SignInSecureLight
-import com.techew.leaveapprovals.ui.theme.SignInSecureTintDark
-import com.techew.leaveapprovals.ui.theme.SignInSecureTintLight
-import com.techew.leaveapprovals.ui.theme.SignInSurface2Dark
-import com.techew.leaveapprovals.ui.theme.SignInSurface2Light
-import com.techew.leaveapprovals.ui.theme.SignInSurfaceDark
-import com.techew.leaveapprovals.ui.theme.SignInSurfaceLight
-import com.techew.leaveapprovals.ui.theme.TechEwOrange
+import com.techew.leaveapprovals.ui.common.AuthPalette
+import com.techew.leaveapprovals.ui.common.authPalette
+import com.techew.leaveapprovals.ui.common.dotGrid
 
 // Google's own brand button spec (white surface, #DADCE0 border, #3C4045
 // label) - kept exact rather than themed, since altering an official Google
@@ -97,70 +66,13 @@ import com.techew.leaveapprovals.ui.theme.TechEwOrange
 private val GoogleButtonBorder = Color(0xFFDADCE0)
 private val GoogleButtonLabel = Color(0xFF3C4043)
 
-/**
- * The sign-in screen's own warm-neutral identity, distinct from the rest of
- * the app's plain Material scheme - see screens/mobile/sign-in.html, the
- * design this was built from. Chosen explicitly per theme rather than
- * derived from MaterialTheme.colorScheme so it matches that reference
- * exactly in both light and dark.
- */
-private data class SignInPalette(
-    val bg: Color,
-    val bgDot: Color,
-    val surface: Color,
-    val surface2: Color,
-    val ink900: Color,
-    val ink700: Color,
-    val ink500: Color,
-    val ink400: Color,
-    val line: Color,
-    val lineStrong: Color,
-    val brand: Color,
-    val brandTint: Color,
-    val brandTintStrong: Color,
-    val secure: Color,
-    val secureTint: Color
-)
-
-private val LightSignInPalette = SignInPalette(
-    bg = SignInBgLight, bgDot = SignInBgDotLight, surface = SignInSurfaceLight, surface2 = SignInSurface2Light,
-    ink900 = SignInInk900Light, ink700 = SignInInk700Light, ink500 = SignInInk500Light, ink400 = SignInInk400Light,
-    line = SignInLineLight, lineStrong = SignInLineStrongLight, brand = TechEwOrange,
-    brandTint = SignInBrandTintLight, brandTintStrong = SignInBrandTintStrongLight,
-    secure = SignInSecureLight, secureTint = SignInSecureTintLight
-)
-
-private val DarkSignInPalette = SignInPalette(
-    bg = SignInBgDark, bgDot = SignInBgDotDark, surface = SignInSurfaceDark, surface2 = SignInSurface2Dark,
-    ink900 = SignInInk900Dark, ink700 = SignInInk700Dark, ink500 = SignInInk500Dark, ink400 = SignInInk400Dark,
-    line = SignInLineDark, lineStrong = SignInLineStrongDark, brand = SignInBrandOnDark,
-    brandTint = SignInBrandTintDark, brandTintStrong = SignInBrandTintStrongDark,
-    secure = SignInSecureDark, secureTint = SignInSecureTintDark
-)
-
-/** Faint repeating dot grid, matching the reference design's textured background. */
-private fun Modifier.dotGrid(color: Color, spacing: Dp = 20.dp, radius: Dp = 1.1.dp): Modifier =
-    this.drawBehind {
-        val spacingPx = spacing.toPx()
-        val radiusPx = radius.toPx()
-        var y = spacingPx / 2
-        while (y < size.height) {
-            var x = spacingPx / 2
-            while (x < size.width) {
-                drawCircle(color = color, radius = radiusPx, center = Offset(x, y))
-                x += spacingPx
-            }
-            y += spacingPx
-        }
-    }
-
 @Composable
 fun SignInScreen(
     isLoading: Boolean,
     errorMessage: String?,
     onSignInClick: () -> Unit
 ) {
-    val palette = if (isSystemInDarkTheme()) DarkSignInPalette else LightSignInPalette
+    val palette = authPalette()
 
     Surface(modifier = Modifier.fillMaxSize(), color = palette.bg) {
         Column(
@@ -196,7 +108,7 @@ fun SignInScreen(
 }
 
 @Composable
-private fun LanguageBadge(palette: SignInPalette) {
+private fun LanguageBadge(palette: AuthPalette) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -213,7 +125,7 @@ private fun LanguageBadge(palette: SignInPalette) {
 
 @Composable
 private fun SignInCard(
-    palette: SignInPalette,
+    palette: AuthPalette,
     isLoading: Boolean,
     errorMessage: String?,
     onSignInClick: () -> Unit
@@ -299,7 +211,7 @@ private fun SignInCard(
 }
 
 @Composable
-private fun LogoHalo(palette: SignInPalette) {
+private fun LogoHalo(palette: AuthPalette) {
     val transition = rememberInfiniteTransition(label = "logo-halo")
     val scale by transition.animateFloat(
         initialValue = 0.94f,
@@ -382,7 +294,7 @@ private fun GoogleSignInButton(isLoading: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun FeatureRow(palette: SignInPalette) {
+private fun FeatureRow(palette: AuthPalette) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         FeatureCard(palette, Icons.Outlined.Shield, "Owner-only access", "Single manager account", Modifier.weight(1f))
         FeatureCard(palette, Icons.Outlined.NotificationsActive, "Instant decisions", "Push on every request", Modifier.weight(1f))
@@ -391,7 +303,7 @@ private fun FeatureRow(palette: SignInPalette) {
 }
 
 @Composable
-private fun FeatureCard(palette: SignInPalette, icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, caption: String, modifier: Modifier) {
+private fun FeatureCard(palette: AuthPalette, icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, caption: String, modifier: Modifier) {
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(18.dp))
@@ -428,7 +340,7 @@ private fun FeatureCard(palette: SignInPalette, icon: androidx.compose.ui.graphi
 }
 
 @Composable
-private fun TrustStrip(palette: SignInPalette) {
+private fun TrustStrip(palette: AuthPalette) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -478,7 +390,7 @@ private fun TrustStrip(palette: SignInPalette) {
 }
 
 @Composable
-private fun Footer(palette: SignInPalette) {
+private fun Footer(palette: AuthPalette) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
