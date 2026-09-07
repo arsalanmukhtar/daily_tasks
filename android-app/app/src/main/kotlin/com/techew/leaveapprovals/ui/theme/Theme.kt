@@ -1,6 +1,9 @@
 package com.techew.leaveapprovals.ui.theme
 
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.SelectableChipColors
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 
@@ -49,3 +52,22 @@ private val DarkColors = darkColorScheme(
 fun LeaveApprovalsTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = DarkColors, content = content)
 }
+
+// Material3's own FilterChip/NavigationBarItem selected-state defaults read
+// from secondaryContainer, which here is the orange brand tint (deliberately
+// kept muddy/dark so it doesn't compete with the real orange accent) - fine
+// for a tinted badge, but illegible/ugly as a "this is selected" fill. Every
+// selected toggle in the app instead uses this near-white/dark-text pairing
+// (same inverseSurface/inverseOnSurface tokens already used for solid CTAs).
+@Composable
+fun themedFilterChipColors(): SelectableChipColors = FilterChipDefaults.filterChipColors(
+    selectedContainerColor = MaterialTheme.colorScheme.inverseSurface,
+    selectedLabelColor = MaterialTheme.colorScheme.inverseOnSurface,
+    selectedLeadingIconColor = MaterialTheme.colorScheme.inverseOnSurface
+)
+
+@Composable
+fun themedNavigationBarItemColors() = NavigationBarItemDefaults.colors(
+    indicatorColor = MaterialTheme.colorScheme.inverseSurface,
+    selectedIconColor = MaterialTheme.colorScheme.inverseOnSurface
+)

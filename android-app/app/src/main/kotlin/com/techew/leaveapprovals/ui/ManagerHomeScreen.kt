@@ -46,6 +46,7 @@ import com.techew.leaveapprovals.ui.requests.RequestListScreen
 import com.techew.leaveapprovals.ui.requests.RequestListViewModel
 import com.techew.leaveapprovals.ui.summary.LeaveSummaryScreen
 import com.techew.leaveapprovals.ui.summary.LeaveSummaryViewModel
+import com.techew.leaveapprovals.ui.theme.themedNavigationBarItemColors
 
 private enum class ManagerTab(val title: String) {
     Requests("Leave Requests"),
@@ -156,25 +157,29 @@ fun ManagerHomeScreen(
                     selected = selectedTab == ManagerTab.Requests,
                     onClick = { selectedTab = ManagerTab.Requests },
                     icon = { Icon(Icons.Outlined.Assignment, contentDescription = null) },
-                    label = { Text("Requests") }
+                    label = { Text("Requests") },
+                    colors = themedNavigationBarItemColors()
                 )
                 NavigationBarItem(
                     selected = selectedTab == ManagerTab.Archived,
                     onClick = { selectedTab = ManagerTab.Archived },
                     icon = { Icon(Icons.Outlined.Archive, contentDescription = null) },
-                    label = { Text("Archived") }
+                    label = { Text("Archived") },
+                    colors = themedNavigationBarItemColors()
                 )
                 NavigationBarItem(
                     selected = selectedTab == ManagerTab.Summary,
                     onClick = { selectedTab = ManagerTab.Summary },
                     icon = { Icon(Icons.Outlined.Insights, contentDescription = null) },
-                    label = { Text("Summary") }
+                    label = { Text("Summary") },
+                    colors = themedNavigationBarItemColors()
                 )
                 NavigationBarItem(
                     selected = selectedTab == ManagerTab.Report,
                     onClick = { selectedTab = ManagerTab.Report },
                     icon = { Icon(Icons.Outlined.Flag, contentDescription = null) },
-                    label = { Text("Report") }
+                    label = { Text("Report") },
+                    colors = themedNavigationBarItemColors()
                 )
             }
         }

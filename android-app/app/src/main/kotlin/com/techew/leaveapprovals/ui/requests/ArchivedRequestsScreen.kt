@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.techew.leaveapprovals.data.LeaveRequest
+import com.techew.leaveapprovals.ui.theme.themedFilterChipColors
 import java.time.Instant
 import java.time.LocalDate
 import java.time.Year
@@ -137,7 +138,7 @@ fun ArchivedRequestsScreen(
                 }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(ArchiveGranularity.entries) { g ->
-                        FilterChip(selected = granularity == g, onClick = { granularity = g }, label = { Text(g.label) })
+                        FilterChip(selected = granularity == g, onClick = { granularity = g }, label = { Text(g.label) }, colors = themedFilterChipColors())
                     }
                 }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
@@ -145,14 +146,15 @@ fun ArchivedRequestsScreen(
                         FilterChip(
                             selected = selectedYear == year,
                             onClick = { selectedYear = year },
-                            label = { Text(year.toString()) }
+                            label = { Text(year.toString()) },
+                            colors = themedFilterChipColors()
                         )
                     }
                 }
                 if (granularity == ArchiveGranularity.QUARTER) {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                         items((1..4).toList()) { q ->
-                            FilterChip(selected = selectedQuarter == q, onClick = { selectedQuarter = q }, label = { Text("Q$q") })
+                            FilterChip(selected = selectedQuarter == q, onClick = { selectedQuarter = q }, label = { Text("Q$q") }, colors = themedFilterChipColors())
                         }
                     }
                 }
@@ -160,7 +162,7 @@ fun ArchivedRequestsScreen(
                     val monthListState = remember { androidx.compose.foundation.lazy.LazyListState(firstVisibleItemIndex = (selectedMonth - 1).coerceAtLeast(0)) }
                     LazyRow(state = monthListState, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                         items((1..12).toList()) { m ->
-                            FilterChip(selected = selectedMonth == m, onClick = { selectedMonth = m }, label = { Text(ARCHIVE_MONTH_LABELS[m - 1]) })
+                            FilterChip(selected = selectedMonth == m, onClick = { selectedMonth = m }, label = { Text(ARCHIVE_MONTH_LABELS[m - 1]) }, colors = themedFilterChipColors())
                         }
                     }
                 }
@@ -169,7 +171,7 @@ fun ArchivedRequestsScreen(
                     val weekListState = remember(availableWeeks) { androidx.compose.foundation.lazy.LazyListState(firstVisibleItemIndex = weekIndex) }
                     LazyRow(state = weekListState, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                         items(availableWeeks) { w ->
-                            FilterChip(selected = selectedWeek == w, onClick = { selectedWeek = w }, label = { Text("Week $w") })
+                            FilterChip(selected = selectedWeek == w, onClick = { selectedWeek = w }, label = { Text("Week $w") }, colors = themedFilterChipColors())
                         }
                     }
                 }

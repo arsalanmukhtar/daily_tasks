@@ -2,7 +2,6 @@ package com.techew.leaveapprovals.ui.summary
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -65,6 +64,7 @@ import com.techew.leaveapprovals.ui.theme.StatusRejected
 import com.techew.leaveapprovals.ui.theme.StatusRejectedBg
 import com.techew.leaveapprovals.ui.theme.StatusRequested
 import com.techew.leaveapprovals.ui.theme.StatusRequestedBg
+import com.techew.leaveapprovals.ui.theme.themedFilterChipColors
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.TextStyle
@@ -222,7 +222,8 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                 FilterChip(
                                     selected = granularity == g,
                                     onClick = { granularity = g },
-                                    label = { Text(g.label) }
+                                    label = { Text(g.label) },
+                                    colors = themedFilterChipColors()
                                 )
                             }
                         }
@@ -231,7 +232,8 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                 FilterChip(
                                     selected = selectedYear == year,
                                     onClick = { selectedYear = year },
-                                    label = { Text(year.toString()) }
+                                    label = { Text(year.toString()) },
+                                    colors = themedFilterChipColors()
                                 )
                             }
                         }
@@ -241,7 +243,8 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                     FilterChip(
                                         selected = selectedQuarter == q,
                                         onClick = { selectedQuarter = q },
-                                        label = { Text("Q$q") }
+                                        label = { Text("Q$q") },
+                                        colors = themedFilterChipColors()
                                     )
                                 }
                             }
@@ -253,7 +256,8 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                     FilterChip(
                                         selected = selectedMonth == m,
                                         onClick = { selectedMonth = m },
-                                        label = { Text(MONTH_LABELS[m - 1]) }
+                                        label = { Text(MONTH_LABELS[m - 1]) },
+                                        colors = themedFilterChipColors()
                                     )
                                 }
                             }
@@ -266,7 +270,8 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                     FilterChip(
                                         selected = selectedWeek == w,
                                         onClick = { selectedWeek = w },
-                                        label = { Text("Week $w") }
+                                        label = { Text("Week $w") },
+                                        colors = themedFilterChipColors()
                                     )
                                 }
                             }
@@ -744,11 +749,11 @@ private fun QuarterTile(
     onClick: (() -> Unit)? = null
 ) {
     val containerColor = when {
-        selected -> MaterialTheme.colorScheme.primaryContainer
+        selected -> MaterialTheme.colorScheme.inverseSurface
         else -> MaterialTheme.colorScheme.surfaceVariant
     }
     val contentColor = when {
-        selected -> MaterialTheme.colorScheme.onPrimaryContainer
+        selected -> MaterialTheme.colorScheme.inverseOnSurface
         count == 0 -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
@@ -756,10 +761,6 @@ private fun QuarterTile(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
             .background(containerColor)
-            .then(
-                if (selected) Modifier.border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
-                else Modifier
-            )
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(vertical = 10.dp),
         contentAlignment = Alignment.Center
@@ -770,7 +771,7 @@ private fun QuarterTile(
                 count.toString(),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                color = contentColor.takeIf { selected } ?: MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(top = 2.dp)
             )
         }
