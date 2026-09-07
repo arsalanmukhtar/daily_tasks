@@ -175,13 +175,14 @@ fun RequestCard(
                     "This withdrawn request will be permanently deleted after $daysLeft" +
                         if (daysLeft == 1L) " day." else " days.",
                     style = MaterialTheme.typography.bodySmall,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     color = StatusRejected,
                     modifier = Modifier
                         .padding(top = 8.dp)
                         .fillMaxWidth()
                         .background(StatusRejectedBg, RoundedCornerShape(8.dp))
-                        .padding(horizontal = 10.dp, vertical = 7.dp)
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
                 )
             }
 
