@@ -6,10 +6,13 @@ val TechEwOrange = Color(0xFFEA580C)
 val TechEwOrangeDark = Color(0xFFC2410C)
 val StatusRequested = Color(0xFF92400E)
 val StatusRequestedBg = Color(0xFFFEF3C7)
-// Success/positive - oklch(69.6% 0.17 162.48), a bright emerald, plus a
-// light pastel tint of the same hue for its badge background.
-val StatusApproved = Color(0xFF00BC7D)
-val StatusApprovedBg = Color(0xFFD7F3E4)
+// Success/positive. The original oklch(69.6% 0.17 162.48) bright emerald on
+// its own pastel tint measured a ~2.1:1 contrast ratio - well under WCAG
+// AA's 4.5:1 for normal text - so a "good" green on light gray-green paper
+// still read as illegible. This pairing (Tailwind's green-800 on green-100)
+// hits ~6.5:1 while staying clearly green, not just dark.
+val StatusApproved = Color(0xFF166534)
+val StatusApprovedBg = Color(0xFFDCFCE7)
 // Warning/alert - oklch(64.5% 0.246 16.439), a lighter red than the old
 // dark maroon, plus a light pastel tint of the same hue for its badge
 // background.
