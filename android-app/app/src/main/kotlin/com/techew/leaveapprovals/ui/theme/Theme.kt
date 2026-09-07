@@ -19,6 +19,18 @@ private val DarkColors = darkColorScheme(
     onSurface = SignInInk900Dark,
     surfaceVariant = SignInSurface2Dark,
     onSurfaceVariant = SignInInk700Dark,
+    // Material3's Card/Sheet/NavigationBar defaults read from these
+    // surfaceContainer* roles, NOT from `surface` above - left unset, they
+    // fall back to Material's own neutral-grey baseline tonal palette
+    // regardless of the `surface`/`background` overrides, which is exactly
+    // why cards were rendering a flat generic grey instead of this warm
+    // dark palette. Overriding them here fixes every Card/sheet/nav bar
+    // app-wide in one place.
+    surfaceContainerLowest = SignInBgDark,
+    surfaceContainerLow = SignInSurfaceDark,
+    surfaceContainer = SignInSurfaceDark,
+    surfaceContainerHigh = SignInSurface2Dark,
+    surfaceContainerHighest = SignInSurface3Dark,
     primary = SignInBrandOnDark,
     onPrimary = SignInInk900Light,
     primaryContainer = SignInBrandTintDark,

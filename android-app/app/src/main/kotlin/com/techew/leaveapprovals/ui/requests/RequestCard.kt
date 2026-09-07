@@ -1,5 +1,6 @@
 package com.techew.leaveapprovals.ui.requests
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -10,12 +11,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -98,7 +106,9 @@ fun RequestCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
 
@@ -143,7 +153,7 @@ fun RequestCard(
                 MetaChip(LeaveType.durationLabel(request.type), kind = ChipKind.DURATION, type = request.type)
                 MetaChip(
                     request.weekLabel,
-                    kind = ChipKind.META,
+                    kind = ChipKind.DATE,
                     onClick = if (request.startDate.isNotBlank()) { { showDateDialog = true } } else null
                 )
                 val time = formatTimeHHmm(request.requestedAt)
@@ -161,12 +171,19 @@ fun RequestCard(
             )
 
             if (request.status != "requested") {
-                Text(
-                    resolvedSummaryText(request),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(top = 8.dp)
-                )
+                ) {
+                    Icon(resolvedSummaryIcon(request.status), contentDescription = null, tint = statusColor, modifier = Modifier.size(14.dp))
+                    Text(
+                        resolvedSummaryText(request),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = statusColor
+                    )
+                }
             }
 
             val daysLeft = request.daysUntilPermanentDeletion()
@@ -188,6 +205,8 @@ fun RequestCard(
 
             OutlinedButton(
                 onClick = onViewDetails,
+                shape = RoundedCornerShape(50),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
             ) { Text("View details") }
         }
@@ -203,6 +222,12 @@ internal fun resolvedSummaryText(request: LeaveRequest): String = when (request.
     "rejected" -> "Rejected by ${request.resolvedBy}"
     "withdrawn" -> "Withdrawn by requester"
     else -> request.status.replaceFirstChar { it.uppercase() }
+}
+
+internal fun resolvedSummaryIcon(status: String): androidx.compose.ui.graphics.vector.ImageVector = when (status) {
+    "approved" -> Icons.Filled.CheckCircle
+    "rejected" -> Icons.Filled.Cancel
+    else -> Icons.AutoMirrored.Filled.Undo
 }
 
 @Composable
@@ -244,7 +269,7 @@ internal fun formatTimeHHmm(iso: String): String {
 }
 
 /** Which color pair (and lookup) a [MetaChip] should use. */
-internal enum class ChipKind { TYPE, DURATION, META }
+internal enum class ChipKind { TYPE, DURATION, META, DATE }
 
 @Composable
 internal fun MetaChip(
@@ -257,11 +282,18 @@ internal fun MetaChip(
         ChipKind.TYPE -> typeColors(type)
         ChipKind.DURATION -> durationColors(type)
         ChipKind.META -> Meta to MetaBg
+        // The week/date chip is the one that opens the read-only calendar
+        // popup - tinted with the brand accent (rather than the neutral
+        // Meta color) so it visibly reads as "tap for the calendar".
+        ChipKind.DATE -> MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.primaryContainer
     }
     var modifier = Modifier.clip(RoundedCornerShape(8.dp))
     if (onClick != null) modifier = modifier.clickable(onClick = onClick)
     modifier = modifier.background(background).padding(horizontal = 10.dp, vertical = 5.dp)
-    Box(modifier = modifier) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (kind == ChipKind.DATE) {
+            Icon(Icons.Filled.CalendarMonth, contentDescription = null, tint = color, modifier = Modifier.size(12.dp))
+        }
         Text(
             label,
             style = MaterialTheme.typography.labelMedium,

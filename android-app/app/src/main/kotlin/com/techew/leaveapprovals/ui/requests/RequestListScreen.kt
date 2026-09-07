@@ -1,14 +1,20 @@
 package com.techew.leaveapprovals.ui.requests
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -22,6 +28,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.techew.leaveapprovals.data.LeaveRequest
 import kotlinx.coroutines.launch
@@ -45,7 +52,8 @@ fun RequestListScreen(
         records = records,
         emptyMessage = "No leave requests yet.",
         highlightRequestId = highlightRequestId,
-        onHighlightHandled = onHighlightHandled
+        onHighlightHandled = onHighlightHandled,
+        metaLabel = { count -> "$count open · shared filters with Archived" }
     )
 }
 
@@ -65,7 +73,11 @@ internal fun LeaveRequestList(
     onHighlightHandled: () -> Unit,
     // When null, falls back to the plain centered message below (Requests
     // tab). Archived passes ArchivedEmptyState here instead.
-    emptySlot: (@Composable (hasActiveFilters: Boolean, onClearFilters: () -> Unit) -> Unit)? = null
+    emptySlot: (@Composable (hasActiveFilters: Boolean, onClearFilters: () -> Unit) -> Unit)? = null,
+    // Requests passes a "N open · shared filters with Archived" label;
+    // Archived leaves this null since its own Year/Quarter/Month/Week
+    // breadcrumb already gives the equivalent "what am I looking at" context.
+    metaLabel: ((count: Int) -> String)? = null
 ) {
     val isLoading by viewModel.isLoading.collectAsState()
     val isDeciding by viewModel.isDeciding.collectAsState()
@@ -125,6 +137,36 @@ internal fun LeaveRequestList(
             onStatusChange = viewModel::setStatusFilter,
             onEmailChange = viewModel::setEmailFilter
         )
+        if (metaLabel != null && records.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    metaLabel(records.size),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.Sort,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        "Newest first",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
         Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
             when {
                 // First load, nothing to show yet - skeleton cards instead of

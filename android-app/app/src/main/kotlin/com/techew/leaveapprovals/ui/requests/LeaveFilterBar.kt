@@ -1,5 +1,6 @@
 package com.techew.leaveapprovals.ui.requests
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -84,6 +86,7 @@ fun LeaveFilterBar(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             FilterDropdownButton(
                 label = statusFilter?.let { statusLabel(it) } ?: "All statuses",
+                active = statusFilter != null,
                 modifier = Modifier.weight(1f)
             ) { close ->
                 DropdownMenuItem(text = { Text("All statuses") }, onClick = { onStatusChange(null); close() })
@@ -93,6 +96,7 @@ fun LeaveFilterBar(
             }
             FilterDropdownButton(
                 label = typeFilter?.let { LeaveType.label(it) } ?: "All types",
+                active = typeFilter != null,
                 modifier = Modifier.weight(1f)
             ) { close ->
                 DropdownMenuItem(text = { Text("All types") }, onClick = { onTypeChange(null); close() })
@@ -102,15 +106,23 @@ fun LeaveFilterBar(
             }
 
             var sheetOpen by remember { mutableStateOf(false) }
+            val personActive = emailFilter != null
             val selectedName = roster.find { it.email == emailFilter }?.name ?: "Everyone"
             OutlinedButton(
                 onClick = { sheetOpen = true },
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                colors = if (personActive) {
+                    ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+                } else {
+                    ButtonDefaults.outlinedButtonColors()
+                },
+                border = BorderStroke(1.dp, if (personActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
                     selectedName, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f)
+                    style = MaterialTheme.typography.labelLarge, fontWeight = if (personActive) FontWeight.Bold else FontWeight.Normal,
+                    modifier = Modifier.weight(1f)
                 )
                 Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
             }
@@ -132,10 +144,13 @@ fun LeaveFilterBar(
  * A single compact "Label ▾" pill that opens a plain DropdownMenu - used for
  * the status/type pickers, which (unlike the person filter) are short,
  * static, unsearched lists where a full bottom sheet would be overkill.
+ * Picking an actual value (not "All ...") tints the pill so an active
+ * filter is visible at a glance, not just readable in the label text.
  */
 @Composable
 private fun FilterDropdownButton(
     label: String,
+    active: Boolean = false,
     modifier: Modifier = Modifier,
     items: @Composable (close: () -> Unit) -> Unit
 ) {
@@ -144,11 +159,18 @@ private fun FilterDropdownButton(
         OutlinedButton(
             onClick = { expanded = true },
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+            colors = if (active) {
+                ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+            } else {
+                ButtonDefaults.outlinedButtonColors()
+            },
+            border = BorderStroke(1.dp, if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
                 label, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f)
+                style = MaterialTheme.typography.labelLarge, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                modifier = Modifier.weight(1f)
             )
             Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, modifier = Modifier.size(18.dp))
         }

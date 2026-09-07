@@ -159,7 +159,7 @@ private fun DetailHeader(request: LeaveRequest) {
         MetaChip(LeaveType.durationLabel(request.type), kind = ChipKind.DURATION, type = request.type)
         MetaChip(
             request.weekLabel,
-            kind = ChipKind.META,
+            kind = ChipKind.DATE,
             onClick = if (request.startDate.isNotBlank()) { { showDateDialog = true } } else null
         )
     }
