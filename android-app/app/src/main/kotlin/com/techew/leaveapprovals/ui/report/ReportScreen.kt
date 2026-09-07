@@ -2,6 +2,7 @@ package com.techew.leaveapprovals.ui.report
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -263,10 +265,22 @@ private fun NewReportCard(
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(10.dp))
-            EditableDateField(dateMillis = dateMillis, onDateChange = { dateMillis = it })
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                EditableDateField(dateMillis = dateMillis, onDateChange = { dateMillis = it }, modifier = Modifier.weight(1f))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { dateMillis = System.currentTimeMillis() }
+                        .padding(horizontal = 14.dp, vertical = 14.dp)
+                ) {
+                    Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text("Today", modifier = Modifier.padding(start = 8.dp))
+                }
+            }
             Spacer(modifier = Modifier.height(14.dp))
-            Text("Reason", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(modifier = Modifier.height(4.dp))
             RichTextEditor(state = reasonState, placeholder = "Why is this being flagged?")
             Spacer(modifier = Modifier.height(14.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -274,12 +288,17 @@ private fun NewReportCard(
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
                     enabled = selectedEmail != null && !reasonState.isBlank && !isSubmitting,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.inverseSurface,
+                        contentColor = MaterialTheme.colorScheme.inverseOnSurface
+                    ),
+                    shape = RoundedCornerShape(50),
                     onClick = { onSubmit(selectedEmail!!, selectedName, dateMillis, reasonState.html) }
                 ) {
                     if (isSubmitting) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                     } else {
-                        Text("Submit")
+                        Text("Submit report", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -359,12 +378,17 @@ private fun OpenReportCard(
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         enabled = !resolutionState.isBlank && !isSubmitting,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.inverseSurface,
+                            contentColor = MaterialTheme.colorScheme.inverseOnSurface
+                        ),
+                        shape = RoundedCornerShape(50),
                         onClick = { onSubmitResolve(resolutionState.html) }
                     ) {
                         if (isSubmitting) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                         } else {
-                            Text("Save resolution")
+                            Text("Save resolution", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
