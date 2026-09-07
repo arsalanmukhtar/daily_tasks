@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.techew.leaveapprovals.data.LeaveRequest
 import com.techew.leaveapprovals.ui.common.PeriodChip
+import com.techew.leaveapprovals.ui.common.SegmentedControl
 import java.time.Instant
 import java.time.LocalDate
 import java.time.Year
@@ -135,11 +136,11 @@ fun ArchivedRequestsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(ArchiveGranularity.entries) { g ->
-                        PeriodChip(selected = granularity == g, onClick = { granularity = g }, label = g.label)
-                    }
-                }
+                SegmentedControl(
+                    options = ArchiveGranularity.entries.map { it.label },
+                    selectedIndex = ArchiveGranularity.entries.indexOf(granularity),
+                    onSelect = { granularity = ArchiveGranularity.entries[it] }
+                )
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
                     items(availableYears) { year ->
                         PeriodChip(selected = selectedYear == year, onClick = { selectedYear = year }, label = year.toString())

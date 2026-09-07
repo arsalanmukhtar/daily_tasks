@@ -58,6 +58,7 @@ import com.techew.leaveapprovals.data.UninformedLeave
 import com.techew.leaveapprovals.ui.charts.MonthlyTrendChart
 import com.techew.leaveapprovals.ui.common.Avatar
 import com.techew.leaveapprovals.ui.common.PeriodChip
+import com.techew.leaveapprovals.ui.common.SegmentedControl
 import com.techew.leaveapprovals.ui.requests.durationColors
 import com.techew.leaveapprovals.ui.theme.StatusApproved
 import com.techew.leaveapprovals.ui.theme.StatusApprovedBg
@@ -235,11 +236,11 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(Granularity.entries) { g ->
-                                PeriodChip(selected = granularity == g, onClick = { granularity = g }, label = g.label)
-                            }
-                        }
+                        SegmentedControl(
+                            options = Granularity.entries.map { it.label },
+                            selectedIndex = Granularity.entries.indexOf(granularity),
+                            onSelect = { granularity = Granularity.entries[it] }
+                        )
                         val ascendingYears = remember(availableYears) { availableYears.sorted() }
                         var yearsExpanded by remember { mutableStateOf(false) }
                         val visibleYears = if (yearsExpanded || ascendingYears.size <= 3) ascendingYears else ascendingYears.takeLast(3)
