@@ -5,6 +5,7 @@ import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
@@ -33,24 +34,39 @@ class AuthRepository(
 
     suspend fun signIn(context: Context): AuthState {
         return try {
-            val option = GetSignInWithGoogleOption.Builder(serverClientId = AppConfig.WEB_CLIENT_ID).build()
-            val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
-            val result = CredentialManager.create(context).getCredential(context, request)
-
-            val credential = result.credential
-            if (credential is CustomCredential &&
-                credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
-            ) {
-                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                val firebaseCredential = GoogleAuthProvider.getCredential(googleIdTokenCredential.idToken, null)
-                val authResult = auth.signInWithCredential(firebaseCredential).await()
-                val user = authResult.user ?: return AuthState.Error("Sign-in returned no user.")
-                stateFor(user)
-            } else {
-                AuthState.Error("Unexpected credential type from Credential Manager.")
+            attemptSignIn(context)
+        } catch (err: NoCredentialException) {
+            // Credential Manager's "Sign in with Google" flow has a known
+            // flaky first call - especially right after a fresh install on
+            // an emulator - where it throws NoCredentialException even
+            // though the account picker just succeeded, and an immediate
+            // retry works. Retry silently once before surfacing an error.
+            try {
+                attemptSignIn(context)
+            } catch (retryErr: Exception) {
+                AuthState.Error(retryErr.message ?: "Sign-in failed.")
             }
         } catch (err: Exception) {
             AuthState.Error(err.message ?: "Sign-in failed.")
+        }
+    }
+
+    private suspend fun attemptSignIn(context: Context): AuthState {
+        val option = GetSignInWithGoogleOption.Builder(serverClientId = AppConfig.WEB_CLIENT_ID).build()
+        val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
+        val result = CredentialManager.create(context).getCredential(context, request)
+
+        val credential = result.credential
+        return if (credential is CustomCredential &&
+            credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+        ) {
+            val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+            val firebaseCredential = GoogleAuthProvider.getCredential(googleIdTokenCredential.idToken, null)
+            val authResult = auth.signInWithCredential(firebaseCredential).await()
+            val user = authResult.user ?: return AuthState.Error("Sign-in returned no user.")
+            stateFor(user)
+        } else {
+            AuthState.Error("Unexpected credential type from Credential Manager.")
         }
     }
 
