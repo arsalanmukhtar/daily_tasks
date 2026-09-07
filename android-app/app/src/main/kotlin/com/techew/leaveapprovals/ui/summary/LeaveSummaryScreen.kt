@@ -78,6 +78,15 @@ private val MONTH_LABELS = (1..12).map {
     java.time.Month.of(it).getDisplayName(TextStyle.SHORT, Locale.getDefault())
 }
 
+// "By leave type" orders bars most-common-first per the mockup, not
+// LeaveType.ALL's declaration order (which drives the type filter dropdown
+// elsewhere and stays alphabetical-by-category there).
+private val SUMMARY_TYPE_ORDER = listOf(
+    LeaveType.CASUAL_FULL, LeaveType.CASUAL_SHORT, LeaveType.MEDICAL,
+    LeaveType.CASUAL_OUT_PASS, LeaveType.FOREIGN_TRIP, LeaveType.UMRAH,
+    LeaveType.UNINFORMED_ABSENCE
+)
+
 private fun LeaveRequest.dateOrNull(): java.time.ZonedDateTime? =
     runCatching { Instant.parse(requestedAt).atZone(ZoneId.systemDefault()) }.getOrNull()
 
@@ -367,12 +376,12 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                 // uninformedLeaves collection (see finalUninformed
                                 // above), not from finalRecords like every other type.
                                 val typeCounts = remember(finalRecords, finalUninformed) {
-                                    LeaveType.ALL.associateWith { t ->
+                                    SUMMARY_TYPE_ORDER.associateWith { t ->
                                         if (t == LeaveType.UNINFORMED_ABSENCE) finalUninformed.size else finalRecords.count { it.type == t }
                                     }
                                 }
                                 val maxTypeCount = (typeCounts.values.maxOrNull() ?: 0).coerceAtLeast(1)
-                                LeaveType.ALL.forEachIndexed { index, type ->
+                                SUMMARY_TYPE_ORDER.forEachIndexed { index, type ->
                                     if (index > 0) Box(Modifier.height(10.dp))
                                     val count = typeCounts[type] ?: 0
                                     val (barColor, _) = durationColors(type)
