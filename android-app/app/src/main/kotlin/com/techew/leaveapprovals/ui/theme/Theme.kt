@@ -5,13 +5,12 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 
 // The app's whole "main colors" - background/surface/text/borders - are
-// committed to the dark palette from screens/mobile/sign-in.html (the same
-// reference the Sign In/Restricted screens are built from), applied
-// app-wide rather than only on those two screens. Deliberately NOT the
-// same as the semantic accent colors elsewhere (StatusApproved/Rejected,
-// TypeCasual/Foreign/Umrah/Medical, DurationShort/Full/OutPass, chart bar
-// colors, etc. in Color.kt) - those stay exactly as they were, since they're
-// plain literal Color(...) values that never read from this colorScheme.
+// committed to a dark Tailwind Slate palette (see the SignIn*Dark constants
+// in Color.kt), applied app-wide. Deliberately NOT the same as the semantic
+// accent colors elsewhere (StatusApproved/Rejected, TypeCasual/Foreign/
+// Umrah/Medical, DurationShort/Full/OutPass, chart bar colors, etc. in
+// Color.kt) - those stay exactly as they were, since they're plain literal
+// Color(...) values that never read from this colorScheme.
 private val DarkColors = darkColorScheme(
     background = SignInBgDark,
     onBackground = SignInInk900Dark,
@@ -39,7 +38,10 @@ private val DarkColors = darkColorScheme(
     outline = SignInLineStrongDark,
     outlineVariant = SignInLineDark,
     inverseSurface = SignInInk900Dark,
-    inverseOnSurface = SignInBgDark
+    inverseOnSurface = SignInBgDark,
+    // Matches StatusRejected - every "this went wrong" red in the app
+    // (form validation here, request status elsewhere) is the same hue.
+    error = StatusRejected
 )
 
 @Composable
