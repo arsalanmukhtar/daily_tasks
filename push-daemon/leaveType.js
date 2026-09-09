@@ -7,7 +7,8 @@ const LABELS = {
   umrah: 'Umrah',
   medical: 'Medical',
   casualShort: 'Short Leave',
-  casualFull: 'Full Leave'
+  casualFull: 'Full Leave',
+  uninformedAbsence: 'Uninformed Leave'
 };
 const ALIASES = { short: 'casualShort', full: 'casualFull' };
 

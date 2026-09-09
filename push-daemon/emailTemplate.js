@@ -21,7 +21,9 @@ const TYPE_CHIP_STYLE = {
   umrah: 'background:#EAF3E6;color:#3F7D2C;border:1px solid #C7E0BB;',
   medical: 'background:#E4F2F9;color:#0B7FA8;border:1px solid #B2DAEA;',
   casualShort: 'background:#F0ECFB;color:#6C4CC4;border:1px solid #D3C8F0;',
-  casualFull: 'background:#F0ECFB;color:#6C4CC4;border:1px solid #D3C8F0;'
+  casualFull: 'background:#F0ECFB;color:#6C4CC4;border:1px solid #D3C8F0;',
+  // Same amber as the "UNINFORMED ABSENCE" pill in buildUninformedReportEmail.
+  uninformedAbsence: 'background:#FEF3C7;color:#92400E;border:1px solid #FDE68A;'
 };
 const DURATION_CHIP_STYLE = 'background:#ECEBFA;color:#3730A3;border:1px solid #CBC9F0;';
 
