@@ -106,6 +106,11 @@ private fun UninformedLeave.isoWeekOrNull(): Int? =
 
 private enum class Granularity(val label: String) { YEAR("Year"), QUARTER("Quarter"), MONTH("Month"), WEEK("Week") }
 
+// The Monthly trend chart's own bars-basis toggle, independent of the Period
+// card's Granularity above - only offered once a quarter is selected, since
+// showing weekly bars across a whole year would be ~52 cramped bars.
+private enum class ChartMode(val label: String) { MONTH("Month"), WEEK("Week") }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
@@ -121,6 +126,7 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
     var selectedQuarter by remember { mutableStateOf(((java.time.MonthDay.now().monthValue - 1) / 3) + 1) }
     var selectedMonth by remember { mutableStateOf(java.time.MonthDay.now().monthValue) }
     var selectedWeek by remember { mutableStateOf(java.time.LocalDate.now().get(WeekFields.ISO.weekOfWeekBasedYear())) }
+    var chartMode by remember { mutableStateOf(ChartMode.MONTH) }
 
     val scopedRecords = remember(records, selectedEmails) {
         if (selectedEmails.isEmpty()) records else records.filter { it.email in selectedEmails }
@@ -379,6 +385,28 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                     }
                                 }.toList()
                             }
+                            // Every ISO week the selected quarter's 3 calendar months touch,
+                            // walked day-by-day same as the "By week" card's monthWeeks below -
+                            // finalRecords is already quarter-scoped whenever granularity is
+                            // QUARTER, so counting against it (not yearRecords) needs no extra filter.
+                            val quarterWeeks = remember(selectedYear, selectedQuarter) {
+                                val firstDay = java.time.LocalDate.of(selectedYear, (selectedQuarter - 1) * 3 + 1, 1)
+                                val lastDay = firstDay.plusMonths(3).minusDays(1)
+                                val weeks = mutableListOf<Int>()
+                                var d = firstDay
+                                while (!d.isAfter(lastDay)) {
+                                    val w = d.get(WeekFields.ISO.weekOfWeekBasedYear())
+                                    if (weeks.isEmpty() || weeks.last() != w) weeks.add(w)
+                                    d = d.plusDays(1)
+                                }
+                                weeks
+                            }
+                            val quarterWeekValues = remember(finalRecords, quarterWeeks) {
+                                quarterWeeks.map { w -> finalRecords.count { it.isoWeekOrNull() == w } }
+                            }
+                            val showWeeklyChart = granularity == Granularity.QUARTER && chartMode == ChartMode.WEEK
+                            val chartValues = if (showWeeklyChart) quarterWeekValues else monthlyValues
+                            val chartLabels = if (showWeeklyChart) quarterWeeks.map { "W$it" } else MONTH_LABELS.map { it.take(1) }
                             Card(
                                 modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -391,16 +419,20 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         SectionLabel("Monthly trend", topPadding = 0.dp)
-                                        Text(
-                                            "Q1–Q4",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(50))
-                                                .background(MaterialTheme.colorScheme.primaryContainer)
-                                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                                        )
+                                        if (granularity == Granularity.QUARTER) {
+                                            ChartModeToggle(mode = chartMode, onSelect = { chartMode = it })
+                                        } else {
+                                            Text(
+                                                "Q1–Q4",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(50))
+                                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                                            )
+                                        }
                                     }
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
@@ -431,10 +463,11 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                         }
                                     }
                                     Box(Modifier.height(16.dp))
-                                    MonthlyTrendChart(values = monthlyValues, labels = MONTH_LABELS.map { it.take(1) })
-                                    val peakCount = monthlyValues.maxOrNull() ?: 0
+                                    MonthlyTrendChart(values = chartValues, labels = chartLabels)
+                                    val peakCount = chartValues.maxOrNull() ?: 0
                                     if (peakCount > 0) {
-                                        val peakMonth = MONTH_LABELS[monthlyValues.indexOf(peakCount)]
+                                        val peakIndex = chartValues.indexOf(peakCount)
+                                        val peakLabel = if (showWeeklyChart) "Week ${quarterWeeks[peakIndex]}" else MONTH_LABELS[peakIndex]
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -452,7 +485,7 @@ fun LeaveSummaryScreen(viewModel: LeaveSummaryViewModel) {
                                                 modifier = Modifier.size(15.dp)
                                             )
                                             Text(
-                                                "Busiest month: $peakMonth · $peakCount request${if (peakCount == 1) "" else "s"}",
+                                                "Busiest ${if (showWeeklyChart) "week" else "month"}: $peakLabel · $peakCount request${if (peakCount == 1) "" else "s"}",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
@@ -841,6 +874,36 @@ private fun QuarterTile(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(count.toString(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = valueColor)
             Text(label, style = MaterialTheme.typography.labelSmall, color = labelColor, modifier = Modifier.padding(top = 2.dp))
+        }
+    }
+}
+
+/**
+ * Compact Month/Week toggle for the Monthly trend card's top-right corner -
+ * sits where the static "Q1–Q4" pill normally does, but only once a quarter
+ * is actually selected (a whole year of weekly bars would be unreadable).
+ */
+@Composable
+private fun ChartModeToggle(mode: ChartMode, onSelect: (ChartMode) -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(2.dp)
+    ) {
+        ChartMode.entries.forEach { option ->
+            val selected = option == mode
+            Text(
+                option.label,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                    .clickable { onSelect(option) }
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            )
         }
     }
 }
