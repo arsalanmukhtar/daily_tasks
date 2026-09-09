@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import http from 'node:http';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import cors from 'cors';
 import express from 'express';
@@ -25,8 +26,6 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
-// Local/dev convenience only - in production nginx serves /files/* directly
-// out of UPLOAD_DIR (see PROJECT.md's deploy notes) without touching Node.
 app.use('/files', express.static(process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads')));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
@@ -38,6 +37,15 @@ app.use('/api/leave-requests', leaveRequestsRouter);
 app.use('/api/uninformed-leaves', uninformedLeavesRouter);
 app.use('/api/push-tokens', pushTokensRouter);
 app.use('/api/attachments', attachmentsRouter);
+
+// The web app's static files (index.html/app.js/styles.css) live one level
+// up from server/ in the same repo checkout - served directly here rather
+// than via nginx so the page, the API, and the WebSocket are all one
+// plain-HTTP origin (see PROJECT.md's web cutover notes on why: the bare-IP,
+// no-TLS deployment would otherwise trip the browser's mixed-content block
+// if the page were served from anywhere else).
+const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+app.use(express.static(REPO_ROOT));
 
 // Last resort - anything that reaches here is either a 404 or an unhandled
 // error from a route above; never leak a stack trace to the client.

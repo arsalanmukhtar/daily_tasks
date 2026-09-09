@@ -12,5 +12,15 @@ usersRouter.get('/', requireAuth, async (_req, res) => {
   const { rows } = await pool.query(
     'SELECT email, name, designation, reported_to, domain, is_owner, active FROM users ORDER BY name'
   );
-  res.json(rows);
+  res.json(
+    rows.map((u) => ({
+      email: u.email,
+      name: u.name,
+      designation: u.designation,
+      reportedTo: u.reported_to,
+      domain: u.domain,
+      isOwner: u.is_owner,
+      active: u.active
+    }))
+  );
 });

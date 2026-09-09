@@ -2,72 +2,102 @@
 // CONFIG
 // =====================================================
 
-// Firebase Web config - from Firebase console → Project settings → "Your apps" (Web)
-const FIREBASE_CONFIG = {
-  apiKey:     'AIzaSyA1exz20sN1WqLQdNkP986JX5wHuICYolg',
-  authDomain: 'devteam-daily-tasks.firebaseapp.com',
-  projectId:  'devteam-daily-tasks'
-};
+// Self-hosted REST + WebSocket API - replaces Firebase (Firestore + Auth)
+// entirely. Plain HTTP/WS by design: the API runs off a bare public IP with
+// no domain/TLS (small internal team, the IP itself is already reachable
+// from outside the VM's network), so the page is served from this exact
+// same origin (see server/src/index.js's express.static) rather than
+// GitHub Pages/Vercel - mixing an HTTPS page with a plain-HTTP API would
+// otherwise trip the browser's mixed-content block. See PROJECT.md's web
+// cutover notes for the full rationale.
+const API_BASE = 'http://182.188.28.163:4500/api';
+const WS_BASE = 'ws://182.188.28.163:4500/ws';
 
 // =====================================================
 
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-import {
-  getAuth,
-  GoogleAuthProvider,
-  signInWithPopup,
-  reauthenticateWithPopup,
-  signOut,
-  onAuthStateChanged,
-  setPersistence,
-  browserLocalPersistence
-} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import {
-  getFirestore,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  addDoc,
-  collection,
-  query,
-  where,
-  getDocs,
-  serverTimestamp,
-  Timestamp
-} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+const AUTH_TOKEN_KEY = 'techew_authToken';
 
-const firebaseApp = initializeApp(FIREBASE_CONFIG);
-const auth = getAuth(firebaseApp);
-const db = getFirestore(firebaseApp);
-setPersistence(auth, browserLocalPersistence);
-
-// drive.file: only lets this app see/manage files IT creates (leave
-// attachments) - not the user's whole Drive. Needed since attachments are
-// uploaded client-side directly to Drive now (no backend, no Firebase
-// Storage - see the migration plan for why).
-const provider = new GoogleAuthProvider();
-provider.setCustomParameters({ prompt: 'select_account' });
-provider.addScope('https://www.googleapis.com/auth/drive.file');
-
-// The Drive OAuth access token (distinct from the Firebase ID token) lives
-// only in memory - captured at sign-in, re-obtained via a near-silent
-// reauth right before an upload if it's more than ~50 minutes old (Google
-// access tokens last about an hour; Firebase doesn't auto-refresh this one
-// the way it does its own ID token).
-let driveAccessToken = null;
-let driveAccessTokenAt = 0;
-
-async function ensureDriveAccessToken_() {
-  const fresh = driveAccessToken && (Date.now() - driveAccessTokenAt) < 50 * 60 * 1000;
-  if (fresh) return driveAccessToken;
-  const result = await reauthenticateWithPopup(auth.currentUser, provider);
-  const credential = GoogleAuthProvider.credentialFromResult(result);
-  driveAccessToken = credential.accessToken;
-  driveAccessTokenAt = Date.now();
-  return driveAccessToken;
+function getStoredAuthToken_() {
+  try { return localStorage.getItem(AUTH_TOKEN_KEY) || null; } catch (_e) { return null; }
 }
+function setStoredAuthToken_(token) {
+  try { localStorage.setItem(AUTH_TOKEN_KEY, token); } catch (_e) {}
+}
+function clearStoredAuthToken_() {
+  try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch (_e) {}
+}
+
+// Thin fetch wrapper used by every API call in this file - attaches the
+// stored JWT, JSON in/out, and throws Error(json.error) on any non-2xx so
+// every existing `catch (err) { setStatus('error', err.message) }` call
+// site keeps working exactly as it did against Firestore's thrown errors.
+async function apiRequest_(method, path, body) {
+  const headers = {};
+  const token = getStoredAuthToken_();
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  let fetchBody;
+  if (body instanceof FormData) {
+    fetchBody = body; // let the browser set the multipart boundary itself
+  } else if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    fetchBody = JSON.stringify(body);
+  }
+  let res;
+  try {
+    res = await fetch(API_BASE + path, { method, headers, body: fetchBody });
+  } catch (_e) {
+    throw new Error('Could not reach the server. Check your connection and try again.');
+  }
+  const isJson = (res.headers.get('content-type') || '').includes('application/json');
+  const data = isJson ? await res.json().catch(() => ({})) : null;
+  if (!res.ok) throw new Error((data && data.error) || ('Request failed (' + res.status + ').'));
+  return data;
+}
+
+let realtimeSocket_ = null;
+let realtimeReconnectTimer_ = null;
+
+// Replaces Firestore's onSnapshot() - the server never pushes the changed
+// data itself, only a {resource, id} pointer, so every message just re-runs
+// whichever existing fetch-and-render function already owns that resource.
+// This file had zero onSnapshot listeners before this (every read was
+// already a one-shot fetch or a poll), so wiring this in is a pure additive
+// upgrade, not a rearchitecture of anything that worked differently before.
+function connectRealtime_() {
+  const token = getStoredAuthToken_();
+  if (!token) return;
+  if (realtimeReconnectTimer_) { clearTimeout(realtimeReconnectTimer_); realtimeReconnectTimer_ = null; }
+  if (realtimeSocket_) { realtimeSocket_.onclose = null; realtimeSocket_.close(); }
+
+  const ws = new WebSocket(WS_BASE + '?token=' + encodeURIComponent(token));
+  realtimeSocket_ = ws;
+  ws.onmessage = function (event) {
+    let msg;
+    try { msg = JSON.parse(event.data); } catch (_e) { return; }
+    if (msg.resource === 'leaveRequests' || msg.resource === 'uninformedLeaves') {
+      // Reuses the exact same full-refresh path already used at sign-in and
+      // by the periodic poller - re-fetches leave status + open uninformed
+      // reports and re-renders every dependent section/badge in one go.
+      loadMyLeavesData_().catch(function () {});
+    } else if (msg.resource === 'submissions') {
+      fetchUserSubmissions_().catch(function () {});
+    }
+  };
+  ws.onclose = function () {
+    if (realtimeSocket_ !== ws) return; // superseded by a newer connection
+    realtimeSocket_ = null;
+    realtimeReconnectTimer_ = setTimeout(connectRealtime_, 5000);
+  };
+  ws.onerror = function () { ws.close(); };
+}
+// A backgrounded tab suspends its WebSocket - reconnect the moment the tab
+// is visible again instead of waiting on the plain on-close retry.
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible' && getStoredAuthToken_() &&
+      (!realtimeSocket_ || realtimeSocket_.readyState === WebSocket.CLOSED)) {
+    connectRealtime_();
+  }
+});
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
@@ -75,7 +105,14 @@ const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const loadingState     = document.getElementById('loadingState');
 const authGate         = document.getElementById('authGate');
 const authError        = document.getElementById('authError');
-const signInBtn        = document.getElementById('signInBtn');
+const authGateFormState       = document.getElementById('authGateFormState');
+const authGateCheckEmailState = document.getElementById('authGateCheckEmailState');
+const authGateVerifyingState  = document.getElementById('authGateVerifyingState');
+const magicLinkForm       = document.getElementById('magicLinkForm');
+const magicLinkEmail      = document.getElementById('magicLinkEmail');
+const magicLinkSubmitBtn  = document.getElementById('magicLinkSubmitBtn');
+const authCheckEmailAddress = document.getElementById('authCheckEmailAddress');
+const authUseAnotherEmailBtn = document.getElementById('authUseAnotherEmailBtn');
 const signOutBtn       = document.getElementById('signOutBtn');
 const userChip         = document.getElementById('userChip');
 const userPhoto        = document.getElementById('userPhoto');
@@ -938,14 +975,14 @@ function currentUserEmail_() {
 }
 
 // Owner-only features (export, analytics) need the whole roster, which used
-// to be the hardcoded ALLOWLIST constant - now a Firestore read, cached for
-// this session since the roster rarely changes while someone's using the app.
+// to be the hardcoded ALLOWLIST constant - now an API read, cached for this
+// session since the roster rarely changes while someone's using the app.
 let allowlistMapCache = null;
 async function getAllowlistMap_() {
   if (allowlistMapCache) return allowlistMapCache;
-  const snap = await getDocs(collection(db, 'allowlist'));
+  const users = await apiRequest_('GET', '/users');
   const map = {};
-  snap.docs.forEach(function (d) { map[d.id] = d.data(); });
+  users.forEach(function (u) { map[u.email] = u; });
   allowlistMapCache = map;
   return map;
 }
@@ -981,33 +1018,35 @@ function updateNavStatBadges_() {
 async function fetchLeaveStatus_() {
   if (!currentUserContext) return null;
   try {
-    const email = currentUserEmail_();
-    const snap = await getDocs(query(collection(db, 'leaveRequests'), where('email', '==', email)));
-    const allDocs = snap.docs.map(function (d) { return { id: d.id, data: d.data() }; });
+    // Owners get everyone's requests from this same endpoint; this function
+    // is only ever called for "my own status" purposes, so that distinction
+    // doesn't matter here - every caller of fetchLeaveStatus_ is a
+    // non-owner-scoped view (My Leaves), never the owner-wide analytics read
+    // (that goes through renderLeaveKpis_() calling the same endpoint itself).
+    const items = await apiRequest_('GET', '/leave-requests');
 
+    // The API already returns plain ISO strings (Postgres, not Firestore
+    // Timestamps) - no .toDate() decoding needed any more.
     function toRecord(entry) {
-      const data = entry.data;
       return {
-        requestId: entry.id,
-        requestedAt: data.requestedAt && data.requestedAt.toDate ? data.requestedAt.toDate().toISOString() : '',
-        startDate: data.startDate && data.startDate.toDate ? data.startDate.toDate().toISOString() : '',
-        endDate: data.endDate && data.endDate.toDate ? data.endDate.toDate().toISOString() : '',
-        customDates: Array.isArray(data.customDates)
-          ? data.customDates.map(function (ts) { return ts && ts.toDate ? ts.toDate().toISOString() : null; }).filter(Boolean)
-          : [],
-        weekLabel: data.weekLabel || '',
-        type: normalizeLeaveType_(data.type),
-        halfDayPeriod: data.halfDayPeriod || '',
-        shortLeaveTime: data.shortLeaveTime || '',
-        checkOutTime: data.checkOutTime || '',
-        checkInTime: data.checkInTime || '',
-        reasonHtml: data.reasonHtml || '',
-        status: data.status || 'requested',
-        resolvedAt: data.resolvedAt && data.resolvedAt.toDate ? data.resolvedAt.toDate().toISOString() : '',
-        resolvedBy: data.resolvedBy || '',
-        attachments: normalizeLeaveAttachments_(data),
-        dismissed: data.dismissed === true,
-        withdrawnAt: data.withdrawnAt && data.withdrawnAt.toDate ? data.withdrawnAt.toDate().toISOString() : ''
+        requestId: entry.requestId,
+        requestedAt: entry.requestedAt || '',
+        startDate: entry.startDate || '',
+        endDate: entry.endDate || '',
+        customDates: Array.isArray(entry.customDates) ? entry.customDates.filter(Boolean) : [],
+        weekLabel: entry.weekLabel || '',
+        type: normalizeLeaveType_(entry.type),
+        halfDayPeriod: entry.halfDayPeriod || '',
+        shortLeaveTime: entry.shortLeaveTime || '',
+        checkOutTime: entry.checkOutTime || '',
+        checkInTime: entry.checkInTime || '',
+        reasonHtml: entry.reasonHtml || '',
+        status: entry.status || 'requested',
+        resolvedAt: entry.resolvedAt || '',
+        resolvedBy: entry.resolvedBy || '',
+        attachments: normalizeLeaveAttachments_(entry),
+        dismissed: entry.dismissed === true,
+        withdrawnAt: entry.withdrawnAt || ''
       };
     }
     const byNewest = function (a, b) { return new Date(b.requestedAt) - new Date(a.requestedAt); };
@@ -1017,11 +1056,11 @@ async function fetchLeaveStatus_() {
     // reset to idle for the same week/period. "allRecords" is the complete,
     // permanent history (dismissed included) - dismissing only acknowledges
     // a request, it never removes it from the employee's own tracking list.
-    const records = allDocs
-      .filter(function (entry) { return entry.data.dismissed !== true; })
+    const records = items
+      .filter(function (entry) { return entry.dismissed !== true; })
       .map(toRecord)
       .sort(byNewest);
-    const allRecords = allDocs.map(toRecord).sort(byNewest);
+    const allRecords = items.map(toRecord).sort(byNewest);
 
     return {
       status: 'ok',
@@ -1916,19 +1955,14 @@ async function loadMyLeavesData_() {
 // nav-card bell badge, so both reflect the same one Firestore read.
 async function fetchOpenUninformedReports_() {
   if (!currentUserContext) return [];
-  const email = currentUserEmail_();
-  const snap = await getDocs(query(
-    collection(db, 'uninformedLeaves'),
-    where('email', '==', email),
-    where('status', 'in', ['reported', 'explained'])
-  ));
-  return snap.docs
-    .map(function (d) { return Object.assign({ reportId: d.id }, d.data()); })
-    .sort(function (a, b) {
-      const at = a.reportedAt && a.reportedAt.toDate ? a.reportedAt.toDate() : 0;
-      const bt = b.reportedAt && b.reportedAt.toDate ? b.reportedAt.toDate() : 0;
-      return bt - at;
-    });
+  // GET /api/uninformed-leaves is already self-scoped to the signed-in
+  // user (non-owners never see anyone else's reports) - filter to the two
+  // "still open" statuses client-side, same result the old where('status',
+  // 'in', [...]) query produced.
+  const reports = await apiRequest_('GET', '/uninformed-leaves');
+  return reports
+    .filter(function (r) { return r.status === 'reported' || r.status === 'explained'; })
+    .sort(function (a, b) { return new Date(b.reportedAt) - new Date(a.reportedAt); });
 }
 
 // A second access path to the same resolution drawer the emailed "Resolve
@@ -1951,7 +1985,7 @@ function renderUninformedBanner_(report) {
   }
   uninformedBanner.classList.remove('hidden');
   uninformedBanner.dataset.reportId = report.reportId;
-  const d = report.date && report.date.toDate ? report.date.toDate() : null;
+  const d = report.date ? new Date(report.date) : null;
   if (report.status === 'explained') {
     uninformedBannerTitle.textContent = 'Explanation submitted' + (d ? ' — ' + fmtDateLocal_(d) : '');
     uninformedBannerMeta.textContent = 'Awaiting your manager’s review';
@@ -1982,7 +2016,7 @@ function openUninformedResolveDrawer_(report) {
   // Only one drawer open at a time - close My Leaves before opening on top of it.
   closeMyLeavesDrawer();
   currentUninformedReport = report;
-  const d = report.date && report.date.toDate ? report.date.toDate() : null;
+  const d = report.date ? new Date(report.date) : null;
   uninformedResolveDate.textContent = d ? fmtDateLocal_(d) : '-';
   uninformedResolveReportedReason.innerHTML = report.reasonHtml || '<i>No reason provided.</i>';
   uninformedResolveReportedBy.textContent = report.reportedBy ? 'Reported by ' + report.reportedBy : '';
@@ -2018,10 +2052,8 @@ async function submitUninformedResolution_() {
   const originalLabel = uninformedResolveSubmitBtn.textContent;
   uninformedResolveSubmitBtn.innerHTML = '<span class="loader loader-sm on-brand" style="vertical-align: middle; margin-right: 6px;"></span>Submitting…';
   try {
-    await updateDoc(doc(db, 'uninformedLeaves', currentUninformedReport.reportId), {
-      status: 'explained',
-      explanationHtml: html,
-      explainedAt: serverTimestamp()
+    await apiRequest_('PATCH', '/uninformed-leaves/' + currentUninformedReport.reportId + '/explain', {
+      explanationHtml: html
     });
     closeUninformedResolveDrawer_();
     // Strip the #resolve-uninformed=<id> hash left over from the email link -
@@ -2412,15 +2444,16 @@ async function dismissLeaveRequest_(requestId, buttonEl) {
     buttonEl.innerHTML = '<span class="loader loader-sm" style="vertical-align: middle; margin-right: 4px;"></span>Working...';
   }
   try {
-    await updateDoc(doc(db, 'leaveRequests', requestId), { dismissed: true });
+    await apiRequest_('PATCH', '/leave-requests/' + requestId + '/dismiss');
   } catch (_e) { /* best-effort */ }
   await refreshApplyLeaveButton();
   await loadMyLeavesData_();
 }
 
 // Requester-initiated withdraw of their own still-pending request - mirrors
-// dismissLeaveRequest_ above. Firestore rules only allow this transition
-// (requested -> withdrawn, that field alone) for the request's own owner.
+// dismissLeaveRequest_ above. The server only allows this transition
+// (requested -> withdrawn) for the request's own owner - see
+// leaveRequestsRouter.patch('/:id/withdraw') in server/src/routes/leaveRequests.js.
 async function withdrawLeaveRequest_(requestId, buttonEl) {
   if (!currentUserContext || !requestId) return;
   if (!confirm('Withdraw this leave request?')) return;
@@ -2429,24 +2462,19 @@ async function withdrawLeaveRequest_(requestId, buttonEl) {
     buttonEl.innerHTML = '<span class="loader loader-sm" style="vertical-align: middle; margin-right: 4px;"></span>Working...';
   }
   try {
-    await updateDoc(doc(db, 'leaveRequests', requestId), { status: 'withdrawn', withdrawnAt: serverTimestamp() });
+    await apiRequest_('PATCH', '/leave-requests/' + requestId + '/withdraw');
   } catch (_e) { /* best-effort */ }
   await refreshApplyLeaveButton();
   await loadMyLeavesData_();
 }
 
-// Best-effort cleanup for requests that have sat withdrawn past their 7-day
-// grace window - firestore.rules is what actually enforces the floor, this
-// just triggers the delete the next time either app happens to load the
-// list (no backend cron in this project, see the rules comment).
-async function cleanupExpiredWithdrawnRequests_(records) {
-  const expired = (records || []).filter(isPastWithdrawnRetention_);
-  for (const rec of expired) {
-    try {
-      await deleteDoc(doc(db, 'leaveRequests', rec.requestId));
-    } catch (_e) { /* another client may already have deleted it, or we're not the owner/requester */ }
-  }
-}
+// No server-side delete route exists for this yet (see the web cutover
+// plan) - the old Firestore-rules-enforced floor doesn't have a Postgres
+// equivalent in server/ yet, so this is intentionally a no-op for now
+// rather than a route invented without that same enforcement story.
+// Withdrawn requests past their 7-day window just stay visible; nothing is
+// silently dropped.
+async function cleanupExpiredWithdrawnRequests_(_records) {}
 
 function showToast_(message, tone) {
   const el = document.createElement('div');
@@ -2520,8 +2548,11 @@ uninformedBannerViewBtn.addEventListener('click', async () => {
   const reportId = uninformedBanner.dataset.reportId;
   if (!reportId) return;
   try {
-    const snap = await getDoc(doc(db, 'uninformedLeaves', reportId));
-    if (snap.exists()) openUninformedResolveDrawer_(Object.assign({ reportId: snap.id }, snap.data()));
+    // Same "find in the already-self-scoped list" approach as the deep-link
+    // opener - no dedicated single-report GET route exists or is needed.
+    const reports = await apiRequest_('GET', '/uninformed-leaves');
+    const report = reports.find(function (r) { return r.reportId === reportId; });
+    if (report) openUninformedResolveDrawer_(report);
   } catch (_e) { /* best-effort */ }
 });
 closeUninformedResolveDrawerBtn.addEventListener('click', closeUninformedResolveDrawer_);
@@ -2604,56 +2635,14 @@ leaveAttachmentList.addEventListener('click', (e) => {
   renderLeaveAttachmentList_();
 });
 
-// Uploads directly to the signed-in user's own Google Drive using the
-// drive.file OAuth scope granted at sign-in (see ensureDriveAccessToken_),
-// then shares it "anyone with the link can view" - replicates the old
-// Apps Script DriveApp behavior exactly, just executed client-side under the
-// requester's own account instead of one fixed server identity.
-async function uploadAttachmentToDrive_(file) {
-  const accessToken = await ensureDriveAccessToken_();
-  const mimeType = file.type || 'application/octet-stream';
-  const boundary = 'techew-' + Date.now();
-  const base64Data = arrayBufferToBase64_(await file.arrayBuffer());
-
-  const multipartBody =
-    '--' + boundary + '\r\n' +
-    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-    JSON.stringify({ name: file.name, mimeType: mimeType }) + '\r\n' +
-    '--' + boundary + '\r\n' +
-    'Content-Type: ' + mimeType + '\r\n' +
-    'Content-Transfer-Encoding: base64\r\n\r\n' +
-    base64Data + '\r\n' +
-    '--' + boundary + '--';
-
-  const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
-    method: 'POST',
-    headers: {
-      Authorization: 'Bearer ' + accessToken,
-      'Content-Type': 'multipart/related; boundary=' + boundary
-    },
-    body: multipartBody
-  });
-  if (!uploadRes.ok) {
-    const errBody = await uploadRes.text().catch(() => '');
-    console.error('Drive upload error body:', errBody);
-    let reason = '';
-    try { reason = JSON.parse(errBody).error.message; } catch (_e) { /* not JSON, ignore */ }
-    throw new Error('Drive upload failed (' + uploadRes.status + ')' + (reason ? ': ' + reason : ''));
-  }
-  const uploaded = await uploadRes.json();
-  const fileId = uploaded.id;
-
-  await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '/permissions', {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ role: 'reader', type: 'anyone' })
-  });
-
-  const metaRes = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?fields=webViewLink', {
-    headers: { Authorization: 'Bearer ' + accessToken }
-  });
-  const meta = await metaRes.json();
-  return { fileId: fileId, url: meta.webViewLink || ('https://drive.google.com/file/d/' + fileId + '/view') };
+// Uploads to the server's own disk via one multipart POST - replaces the
+// old direct-to-Drive flow (~55 lines, 3 raw Google API fetches, a whole
+// drive.file OAuth scope granted at sign-in) entirely. See
+// server/src/routes/attachments.js.
+async function uploadAttachment_(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  return apiRequest_('POST', '/attachments', formData);
 }
 
 leaveSendBtn.addEventListener('click', async () => {
@@ -2673,7 +2662,6 @@ leaveSendBtn.addEventListener('click', async () => {
   const weekLabel = weekLabelFromDate_(startDate);
 
   const reasonHtml = (leaveReasonEditor.innerHTML || '').trim();
-  const email = currentUserEmail_();
 
   leaveSendBtn.disabled = true;
   leaveCancelBtn.disabled = true;
@@ -2681,41 +2669,19 @@ leaveSendBtn.addEventListener('click', async () => {
   leaveSendBtn.innerHTML = '<span class="loader loader-sm on-brand" style="vertical-align: middle; margin-right: 6px;"></span>Sending...';
 
   try {
-    // Obtain the Drive access token BEFORE creating the request doc, while
-    // we're still as close as possible to the click's user-activation - if
-    // the session was restored from persistence rather than a fresh sign-in,
-    // this needs a reauth popup, and popups fired after an intervening
-    // network await (like addDoc) risk being silently blocked by the
-    // browser.
-    let driveTokenError = null;
-    if (leaveAttachmentFiles.length) {
-      try {
-        await ensureDriveAccessToken_();
-      } catch (tokenErr) {
-        driveTokenError = tokenErr;
-      }
-    }
-
     const leaveDocPayload = {
-      email: email,
       name: currentUserContext.displayName,
       weekLabel: weekLabel,
       type: selectedLeaveType,
-      startDate: Timestamp.fromDate(startDate),
-      endDate: Timestamp.fromDate(endDate),
-      reasonHtml: reasonHtml === '<br>' ? '' : reasonHtml,
-      status: 'requested',
-      requestedAt: serverTimestamp(),
-      resolvedAt: null,
-      resolvedBy: null,
-      attachments: [],
-      dismissed: false
+      startDate: fmtISO(startDate),
+      endDate: fmtISO(endDate),
+      reasonHtml: reasonHtml === '<br>' ? '' : reasonHtml
     };
     // Custom (non-contiguous) picks: startDate/endDate above still cover the
     // full span for backward-compat with archive/overlap logic elsewhere,
     // but the exact picked days are preserved here so nothing is lost.
     if (leaveDateMode === 'multiple' && leaveSelectedDates.length > 1) {
-      leaveDocPayload.customDates = leaveSelectedDates.map(function (d) { return Timestamp.fromDate(d); });
+      leaveDocPayload.customDates = leaveSelectedDates.map(fmtISO);
     }
     // Only Short Leave carries a half-day period / start time, and only Out
     // Pass carries a check-out/check-in pair - omit both entirely for Full
@@ -2727,23 +2693,21 @@ leaveSendBtn.addEventListener('click', async () => {
       leaveDocPayload.checkOutTime = leaveTimeLabel_(leaveOutPassCheckOutTime) + ' ' + leaveOutPassCheckOutTime.period;
       leaveDocPayload.checkInTime = leaveTimeLabel_(leaveOutPassCheckInTime) + ' ' + leaveOutPassCheckInTime.period;
     }
-    const docRef = await addDoc(collection(db, 'leaveRequests'), leaveDocPayload);
+    const created = await apiRequest_('POST', '/leave-requests', leaveDocPayload);
 
     if (leaveAttachmentFiles.length) {
       try {
-        if (driveTokenError) throw driveTokenError;
         const uploaded = [];
         for (const file of leaveAttachmentFiles) {
-          const result = await uploadAttachmentToDrive_(file);
+          const result = await uploadAttachment_(file);
           uploaded.push({ name: file.name, url: result.url, fileId: result.fileId });
         }
-        await updateDoc(docRef, { attachments: uploaded });
+        await apiRequest_('PATCH', '/leave-requests/' + created.requestId + '/attachments', { attachments: uploaded });
       } catch (attachErr) {
         // Best-effort, matching prior behavior - the leave request itself
         // still stands even if the attachment upload failed.
         console.error('Attachment upload failed:', attachErr);
-        const detail = attachErr && (attachErr.code || attachErr.message);
-        showToast_('Leave request sent, but attachments could not be uploaded' + (detail ? ' (' + detail + ')' : '.'), 'error');
+        showToast_('Leave request sent, but attachments could not be uploaded (' + attachErr.message + ').', 'error');
       }
     }
 
@@ -3115,8 +3079,29 @@ function showAuthGate(errMsg) {
   submissionsDrawer.classList.remove('open'); submissionsBackdrop.classList.remove('open');
   myLeavesDrawer.classList.remove('open'); myLeavesBackdrop.classList.remove('open');
   applyLeaveBtn.classList.add('hidden');
+  // Always reset to the email-entry sub-state - a stale "check your email"
+  // or "signing you in" state must never persist across a sign-out.
+  authGateFormState.classList.remove('hidden');
+  authGateCheckEmailState.classList.add('hidden');
+  authGateVerifyingState.classList.add('hidden');
   if (errMsg) { authError.textContent = errMsg; authError.classList.remove('hidden'); }
   else { authError.classList.add('hidden'); authError.textContent = ''; }
+}
+function showAuthGateVerifying_() {
+  loadingState.classList.add('hidden');
+  authGate.classList.remove('hidden');
+  form.classList.add('hidden');
+  authGateFormState.classList.add('hidden');
+  authGateCheckEmailState.classList.add('hidden');
+  authGateVerifyingState.classList.remove('hidden');
+  authError.classList.add('hidden');
+}
+function showAuthGateCheckEmail_(email) {
+  authGateFormState.classList.add('hidden');
+  authGateVerifyingState.classList.add('hidden');
+  authGateCheckEmailState.classList.remove('hidden');
+  authCheckEmailAddress.textContent = email;
+  authError.classList.add('hidden');
 }
 function showForm(user, displayName, designation, reportedTo) {
   loadingState.classList.add('hidden');
@@ -3213,9 +3198,9 @@ function onIdleCheck() {
   if (remaining > 0) { scheduleIdleCheck(); return; }
   stopInactivityTracking();
   stopLeaveStatusPolling_();
-  signOut(auth).finally(() => {
-    showAuthGate('Signed out after 8 hours of inactivity. Please sign in again.');
-  });
+  clearStoredActivity();
+  clearStoredAuthToken_();
+  showAuthGate('Signed out after 8 hours of inactivity. Please sign in again.');
 }
 
 function startInactivityTracking() {
@@ -3233,8 +3218,14 @@ function stopInactivityTracking() {
 
 let currentUserContext = null; // { user, displayName }
 
-onAuthStateChanged(auth, async (user) => {
-  if (!user) {
+// Replaces onAuthStateChanged - the once-per-page-load "session restore"
+// step. Firebase auto-restored a session from browserLocalPersistence and
+// re-ran this on every token refresh; a stateless JWT has no equivalent
+// refresh event, so this now runs exactly once, at page load, from
+// bootstrapAuth_() at the bottom of this section.
+async function restoreSession_() {
+  const token = getStoredAuthToken_();
+  if (!token) {
     currentUserContext = null;
     stopInactivityTracking();
     stopLeaveStatusPolling_();
@@ -3242,46 +3233,43 @@ onAuthStateChanged(auth, async (user) => {
     showAuthGate();
     return;
   }
-  const email = (user.email || '').toLowerCase();
-  let entrySnap;
+  let me;
   try {
-    entrySnap = await getDoc(doc(db, 'allowlist', email));
+    // GET /api/auth/me re-checks `active` server-side on every call - the
+    // same re-verification onAuthStateChanged used to do via a fresh
+    // getDoc(allowlist/email) on every restore, not just once at sign-in.
+    me = await apiRequest_('GET', '/auth/me');
   } catch (err) {
-    showAuthGate('Could not verify your account: ' + (err.message || err));
-    return;
-  }
-  const entry = entrySnap.exists() && entrySnap.data().active !== false ? entrySnap.data() : null;
-  if (!entry) {
     stopInactivityTracking();
     stopLeaveStatusPolling_();
-    signOut(auth).finally(() => {
-      showAuthGate(`The account ${user.email} isn't authorized. Contact your manager.`);
-    });
+    clearStoredAuthToken_();
+    showAuthGate(err.message || 'Please sign in again.');
     return;
   }
-  // Security: a session restored from persistence that has been idle beyond
-  // the 8-hour limit is signed out before the form is ever shown.
+  // Security: a restored session that has been idle beyond the 8-hour limit
+  // is signed out before the form is ever shown.
   if (isSessionIdleExpired()) {
     stopInactivityTracking();
     stopLeaveStatusPolling_();
     clearStoredActivity();
-    signOut(auth).finally(() => {
-      showAuthGate('Signed out after 8 hours of inactivity. Please sign in again.');
-    });
+    clearStoredAuthToken_();
+    showAuthGate('Signed out after 8 hours of inactivity. Please sign in again.');
     return;
   }
   submissionsCache = null;
+  const user = { email: me.email };
   currentUserContext = {
     user,
-    displayName: entry.name,
-    designation: entry.designation,
-    reportedTo: entry.reportedTo || '',
-    domain: entry.domain || 'GIS Developer',
-    isOwner: entry.isOwner === true
+    displayName: me.name,
+    designation: me.designation,
+    reportedTo: me.reportedTo || '',
+    domain: me.domain || 'GIS Developer',
+    isOwner: me.isOwner === true
   };
-  showForm(user, entry.name, entry.designation, entry.reportedTo);
+  showForm(user, me.name, me.designation, me.reportedTo);
   startInactivityTracking();
   startLeaveStatusPolling_();
+  connectRealtime_();
   // Pre-load this user's submissions, then reflect the current week's saved
   // content in the table - but only if they haven't already started typing.
   fetchUserSubmissions_()
@@ -3300,7 +3288,7 @@ onAuthStateChanged(auth, async (user) => {
     .catch(function () { /* offline - badge just stays hidden */ });
   openMyLeavesDeepLinkOnce_();
   openResolveUninformedDeepLinkOnce_();
-});
+}
 
 // Deep link used by the decision email's "View leave history" CTA
 // (https://arsalanmukhtar.github.io/daily_tasks/#my-leaves) - auto-opens the
@@ -3328,33 +3316,82 @@ async function openResolveUninformedDeepLinkOnce_() {
   resolveDeepLinkOpened_ = true;
   const reportId = decodeURIComponent(match[1]);
   try {
-    const snap = await getDoc(doc(db, 'uninformedLeaves', reportId));
-    if (!snap.exists()) return;
-    const data = snap.data();
+    // No single-report GET route exists (or is needed) server-side - the
+    // self-scoped list is already small, so find the one report client-side
+    // rather than adding a route for this one deep-link case.
+    const reports = await apiRequest_('GET', '/uninformed-leaves');
+    const data = reports.find(function (r) { return r.reportId === reportId; });
+    if (!data) return;
     if ((data.email || '').toLowerCase() !== currentUserEmail_()) return;
     // Only reopen while it's still actually open - the email link's hash
     // stays in the address bar after resolving, so a later refresh in the
     // same tab must not resurrect an already-resolved report.
     if (data.status !== 'reported') return;
-    openUninformedResolveDrawer_(Object.assign({ reportId: snap.id }, data));
+    openUninformedResolveDrawer_(data);
   } catch (_e) { /* offline or permission-denied - nothing to open */ }
 }
 
-signInBtn.addEventListener('click', async () => {
+// Magic-link sign-in: email -> POST /request-link -> "check your email" ->
+// the emailed link lands back here with #verify=<token> in the hash (parsed
+// by bootstrapAuth_() below) -> POST /verify -> store the JWT -> restore.
+magicLinkForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = magicLinkEmail.value.trim();
+  if (!email) return;
   authError.classList.add('hidden');
+  const originalLabel = magicLinkSubmitBtn.innerHTML;
+  magicLinkSubmitBtn.disabled = true;
+  magicLinkSubmitBtn.innerHTML = '<span class="loader loader-sm on-brand" style="vertical-align: middle; margin-right: 6px;"></span>Sending...';
   try {
-    const result = await signInWithPopup(auth, provider);
-    const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (credential && credential.accessToken) {
-      driveAccessToken = credential.accessToken;
-      driveAccessTokenAt = Date.now();
-    }
+    await apiRequest_('POST', '/auth/request-link', { email });
+    showAuthGateCheckEmail_(email);
   } catch (err) {
-    showAuthGate('Sign-in failed: ' + (err.message || err.code || err));
+    showAuthGate('Could not send the sign-in link: ' + err.message);
+  } finally {
+    magicLinkSubmitBtn.disabled = false;
+    magicLinkSubmitBtn.innerHTML = originalLabel;
   }
 });
 
-signOutBtn.addEventListener('click', () => signOut(auth));
+authUseAnotherEmailBtn.addEventListener('click', () => {
+  showAuthGate();
+  magicLinkEmail.value = '';
+  magicLinkEmail.focus();
+});
+
+signOutBtn.addEventListener('click', () => {
+  stopInactivityTracking();
+  stopLeaveStatusPolling_();
+  clearStoredActivity();
+  clearStoredAuthToken_();
+  if (realtimeSocket_) { realtimeSocket_.onclose = null; realtimeSocket_.close(); realtimeSocket_ = null; }
+  currentUserContext = null;
+  showAuthGate();
+});
+
+// Redeems a #verify=<token> hash left by the emailed sign-in link, then
+// restores the session exactly like any other page load. Runs once, at
+// startup - see the call to bootstrapAuth_() at the bottom of this file.
+async function bootstrapAuth_() {
+  const match = /^#verify=(.+)$/.exec(location.hash);
+  if (!match) {
+    restoreSession_();
+    return;
+  }
+  showAuthGateVerifying_();
+  const token = decodeURIComponent(match[1]);
+  history.replaceState(null, '', location.pathname + location.search);
+  try {
+    const result = await apiRequest_('POST', '/auth/verify', { token });
+    setStoredAuthToken_(result.token);
+  } catch (err) {
+    showAuthGate(err.message || 'This sign-in link is invalid or has expired.');
+    return;
+  }
+  restoreSession_();
+}
+
+bootstrapAuth_();
 
 // ---------- Form actions ----------
 // `kind` is one of: 'submitting' | 'ok' | 'error' | 'info'.
@@ -3443,16 +3480,6 @@ cancelEditBtn.addEventListener('click', () => {
   resetFormToFresh();
 });
 
-// Matches tools/import-from-sheets.js's sanitizeWeekLabel() exactly - both
-// must produce the same doc ID for the same weekLabel string.
-function sanitizeWeekLabel_(weekLabel) {
-  return String(weekLabel || '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-}
-
-function submissionDocId_(email, weekLabel) {
-  return `${email}_${sanitizeWeekLabel_(weekLabel)}`;
-}
-
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   setStatus('info', '');
@@ -3467,27 +3494,21 @@ form.addEventListener('submit', async (e) => {
   }
   if (isTaskTableEmpty()) return setStatus('error', 'Please enter your tasks.');
 
-  const email = currentUserEmail_();
   const weekLabel = `Week ${info.week}, ${info.year}`;
   const docData = {
-    email,
     name: currentUserContext.displayName,
     designation: currentUserContext.designation,
     reportedTo: currentUserContext.reportedTo,
     domain: currentUserContext.domain,
-    weekLabel,
     weekRange: `${fmtISO(info.days[0].date)} to ${fmtISO(info.days[4].date)}`,
-    taskFormat: TASK_FORMAT_VERSION,
-    taskRows: serializeTaskTable(),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
+    taskRows: serializeTaskTable()
   };
 
   submitBtn.disabled = true;
   setStatus('submitting');
 
   try {
-    await setDoc(doc(db, 'submissions', submissionDocId_(email, weekLabel)), docData);
+    await apiRequest_('PUT', '/submissions/' + encodeURIComponent(weekLabel), docData);
     setStatus('ok', '');
     exitEditMode();
     // Refresh the cache so a later week-switch reflects this submission.
@@ -3540,16 +3561,14 @@ function closeSubmissionsDrawer() {
 // Fetches the signed-in user's submissions and refreshes the cache. Throws on
 // failure so callers can surface it however they need.
 async function fetchUserSubmissions_() {
-  const email = currentUserEmail_();
-  const snap = await getDocs(query(collection(db, 'submissions'), where('email', '==', email)));
-  submissionsCache = snap.docs.map(function (d) {
-    const data = d.data();
+  const items = await apiRequest_('GET', '/submissions/mine');
+  submissionsCache = items.map(function (data) {
     return {
       weekLabel: data.weekLabel,
       weekRange: data.weekRange,
       designation: data.designation,
       taskRows: data.taskRows,
-      timestamp: data.updatedAt && data.updatedAt.toDate ? data.updatedAt.toDate().toISOString() : null
+      timestamp: data.updatedAt || null
     };
   });
   updateNavStatBadges_();
@@ -4065,8 +4084,7 @@ async function runExport() {
   try {
     const ExcelJSlib = await loadExcelJS();
     setExportStatus('loading', 'Fetching submissions…');
-    const snap = await getDocs(query(collection(db, 'submissions'), where('weekLabel', '==', weekLabel)));
-    const submissions = snap.docs.map(function (d) { return d.data(); });
+    const submissions = await apiRequest_('GET', '/submissions?weekLabel=' + encodeURIComponent(weekLabel));
     const allowlistMap = await getAllowlistMap_();
     setExportStatus('loading', 'Building the workbook…');
     const blob = await buildExportWorkbook(ExcelJSlib, info, weekLabel, submissions, allowlistMap);
@@ -4233,12 +4251,11 @@ function countDayItems_(html) {
 
 async function fetchAnalyticsData_() {
   const allowlistMap = await getAllowlistMap_();
-  const snap = await getDocs(collection(db, 'submissions'));
+  const allData = await apiRequest_('GET', '/submissions');
   const dayKeys = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
   const submissions = [];
 
-  snap.docs.forEach(function (d) {
-    const data = d.data();
+  allData.forEach(function (data) {
     const subEmail = (data.email || '').toLowerCase();
     const allowEntry = allowlistMap[subEmail];
     if (!allowEntry) return; // orphaned row from a removed team member
@@ -4778,11 +4795,13 @@ async function renderLeaveKpis_() {
   analyticsLeaveKpis.innerHTML = '<div class="text-xs text-slate-400 col-span-2 sm:col-span-4">Loading...</div>';
   try {
     if (!currentUserContext) throw new Error('Not signed in.');
-    const snap = await getDocs(collection(db, 'leaveRequests'));
+    // Owner-aware - GET /api/leave-requests returns everyone's requests to
+    // an owner caller, same unrestricted whole-collection read Firestore
+    // used to serve here.
+    const items = await apiRequest_('GET', '/leave-requests');
     const typeCounts = { foreignTrip: 0, umrah: 0, medical: 0, casualShort: 0, casualFull: 0, casualOutPass: 0 };
     const counts = { approved: 0, rejected: 0 };
-    snap.docs.forEach(function (d) {
-      const data = d.data();
+    items.forEach(function (data) {
       const type = normalizeLeaveType_(data.type);
       if (typeCounts.hasOwnProperty(type)) typeCounts[type]++;
       if (data.status === 'approved') counts.approved++;
@@ -5113,14 +5132,16 @@ function setDevDetailExportStatus_(kind, msg) {
 }
 
 // Fetches ONE developer's raw submission (with the actual taskRows HTML, not
-// just counts) for a specific week - a direct doc read by the same
-// deterministic ID the submit handler writes to. Returns null if they didn't
-// submit that week (or the request fails - Security Rules let the owner read
-// any submission doc).
+// just counts) for a specific week, via the owner-only filtered endpoint.
+// Returns null if they didn't submit that week (or the request fails - the
+// server only lets an owner read anyone else's submissions).
 async function fetchDevWeekSubmission_(email, weekLabel) {
   try {
-    const snap = await getDoc(doc(db, 'submissions', submissionDocId_(email, weekLabel)));
-    return snap.exists() ? snap.data() : null;
+    const items = await apiRequest_(
+      'GET',
+      '/submissions?email=' + encodeURIComponent(email) + '&weekLabel=' + encodeURIComponent(weekLabel)
+    );
+    return items[0] || null;
   } catch (_e) {
     return null;
   }
@@ -5923,6 +5944,3 @@ document.addEventListener('keydown', function (e) {
   if (devDetailPanel.classList.contains('open')) { closeDevDetail_(); return; }
   if (!analyticsPanel.classList.contains('hidden')) closeAnalyticsPanel();
 });
-
-// Initial UI state
-showLoading();
