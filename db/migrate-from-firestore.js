@@ -29,11 +29,16 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const crypto = require('node:crypto');
 const admin = require('firebase-admin');
+const { getFirestore } = require('firebase-admin/firestore');
 const { Pool } = require('pg');
 
 const serviceAccount = require('./service-account.json');
-admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-const fsDb = admin.firestore();
+// firebase-admin@14's CommonJS export moved cert() to the top level
+// (admin.cert, not admin.credential.cert like older versions/tools/'s
+// scripts, which still pin firebase-admin@13) and dropped admin.firestore()
+// in favor of the modular getFirestore() from firebase-admin/firestore.
+admin.initializeApp({ credential: admin.cert(serviceAccount) });
+const fsDb = getFirestore();
 
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
