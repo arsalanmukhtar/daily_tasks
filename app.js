@@ -3287,8 +3287,14 @@ onAuthStateChanged(auth, async (user) => {
   fetchUserSubmissions_()
     .then(function () { if (isTaskTableEmpty()) syncTableToSelectedWeek(); })
     .catch(function () { /* offline - the form still works */ });
-  // So the "My Leaves" bell badge is live from first load, not only after
-  // the drawer has been opened once (which is what actually fetches it).
+  // So the "My Leaves" nav-card chips are live from first load, not only
+  // after the drawer has been opened once (which is what actually fetches
+  // them today) - refreshApplyLeaveButton() also calls fetchLeaveStatus_(),
+  // but only once a week is selected, which isn't guaranteed to have
+  // happened yet at sign-in.
+  fetchLeaveStatus_()
+    .then(function (data) { if (data) { latestLeaveStatusData = data; updateNavStatBadges_(); } })
+    .catch(function () { /* offline - chips just stay at 0 */ });
   fetchOpenUninformedReports_()
     .then(updateUninformedNavBadge_)
     .catch(function () { /* offline - badge just stays hidden */ });
