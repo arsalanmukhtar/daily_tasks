@@ -1,0 +1,10 @@
+{
+  "name": "daily-tasks-migration",
+  "private": true,
+  "description": "One-time script: copies every Firestore collection into the Postgres schema in db/schema.sql. Not part of the shipped app, never deployed anywhere - see tools/README.md for the same service-account.json setup this reuses.",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "firebase-admin": "^14.3.0",
+    "pg": "^8.16.3"
+  }
+}
