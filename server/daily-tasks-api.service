@@ -1,0 +1,19 @@
+[Unit]
+Description=daily_tasks REST + WebSocket API (replaces Firebase + push-daemon)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gtechapp
+WorkingDirectory=/home/gtechapp/daily_tasks/server
+# DB_*, JWT_SECRET, GMAIL_* all live in .env, not inline here - this unit
+# file is world-readable at /etc/systemd/system/, same reasoning as
+# push-daemon's leaveapprovals-push.service.
+EnvironmentFile=-/home/gtechapp/daily_tasks/server/.env
+ExecStart=/usr/bin/node src/index.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
