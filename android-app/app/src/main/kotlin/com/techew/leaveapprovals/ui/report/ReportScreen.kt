@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Button
@@ -62,6 +63,8 @@ import com.techew.leaveapprovals.ui.common.RichTextEditor
 import com.techew.leaveapprovals.ui.common.rememberRichTextState
 import com.techew.leaveapprovals.ui.theme.StatusApproved
 import com.techew.leaveapprovals.ui.theme.StatusApprovedBg
+import com.techew.leaveapprovals.ui.theme.StatusRequested
+import com.techew.leaveapprovals.ui.theme.StatusRequestedBg
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -86,6 +89,7 @@ private fun String.toFriendlyDateTime(): String =
 fun ReportScreen(viewModel: ReportViewModel) {
     val roster by viewModel.roster.collectAsState()
     val openReports by viewModel.openReports.collectAsState()
+    val explainedReports by viewModel.explainedReports.collectAsState()
     val resolvedReports by viewModel.resolvedReports.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val isSubmitting by viewModel.isSubmitting.collectAsState()
@@ -93,13 +97,16 @@ fun ReportScreen(viewModel: ReportViewModel) {
 
     var showNewReportForm by remember { mutableStateOf(false) }
     var resolvingReportId by remember { mutableStateOf<String?>(null) }
+    var decidingReportId by remember { mutableStateOf<String?>(null) }
+    var decidingInRejectMode by remember { mutableStateOf(false) }
     var filterEmail by remember { mutableStateOf<String?>(null) }
 
     val visibleOpenReports = if (filterEmail == null) openReports else openReports.filter { it.email == filterEmail }
+    val visibleExplainedReports = if (filterEmail == null) explainedReports else explainedReports.filter { it.email == filterEmail }
     val visibleResolvedReports = if (filterEmail == null) resolvedReports else resolvedReports.filter { it.email == filterEmail }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (isLoading && openReports.isEmpty() && resolvedReports.isEmpty()) {
+        if (isLoading && openReports.isEmpty() && explainedReports.isEmpty() && resolvedReports.isEmpty()) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         } else {
             Column(
@@ -165,6 +172,54 @@ fun ReportScreen(viewModel: ReportViewModel) {
 
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Needs your decision · ${visibleExplainedReports.size}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (visibleExplainedReports.isNotEmpty()) {
+                        Text(
+                            "Accept or reject",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                if (visibleExplainedReports.isEmpty()) {
+                    Text(
+                        if (filterEmail == null) "Nothing awaiting your decision." else "Nothing awaiting your decision for this developer.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                } else {
+                    visibleExplainedReports.forEach { report ->
+                        ExplainedReportCard(
+                            report = report,
+                            isDeciding = decidingReportId == report.reportId,
+                            startInRejectMode = decidingInRejectMode,
+                            isSubmitting = isSubmitting,
+                            onStartDecide = { rejecting -> decidingReportId = report.reportId; decidingInRejectMode = rejecting },
+                            onCancelDecide = { decidingReportId = null },
+                            onAccept = { html ->
+                                viewModel.resolve(report.reportId, html) { success ->
+                                    if (success) decidingReportId = null
+                                }
+                            },
+                            onReject = { note ->
+                                viewModel.reject(report.reportId, note) { success ->
+                                    if (success) decidingReportId = null
+                                }
+                            }
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -331,15 +386,20 @@ private fun OpenReportCard(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .background(MaterialTheme.colorScheme.primaryContainer)
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
-                    Text(report.date.toFriendlyDate(), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        report.date.toFriendlyDate(),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                     Text(
                         "ABSENCE",
                         style = MaterialTheme.typography.labelSmall,
                         letterSpacing = 0.5.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
             }
@@ -360,9 +420,33 @@ private fun OpenReportCard(
                 modifier = Modifier.padding(top = 8.dp)
             )
 
+            if (report.rejectionNote.isNotBlank()) {
+                Column(
+                    modifier = Modifier
+                        .padding(top = 10.dp)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(StatusRequestedBg)
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        "SENT BACK BY YOU",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp,
+                        color = StatusRequested
+                    )
+                    HtmlText(report.rejectionNote, modifier = Modifier.padding(top = 4.dp))
+                }
+            }
+
             if (!isResolving) {
-                OutlinedButton(
+                Button(
                     onClick = onStartResolve,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
                     shape = RoundedCornerShape(50),
                     modifier = Modifier.fillMaxWidth().padding(top = 10.dp)
                 ) {
@@ -391,6 +475,158 @@ private fun OpenReportCard(
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                         } else {
                             Text("Save resolution", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A report the developer has explained, awaiting the manager's Accept
+ * (-> resolved, converted into an approved leave by push-daemon) or Reject
+ * (-> bounced back to "reported" with a note, so the developer re-explains).
+ */
+@Composable
+private fun ExplainedReportCard(
+    report: UninformedLeave,
+    isDeciding: Boolean,
+    startInRejectMode: Boolean,
+    isSubmitting: Boolean,
+    onStartDecide: (rejecting: Boolean) -> Unit,
+    onCancelDecide: () -> Unit,
+    onAccept: (String) -> Unit,
+    onReject: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(report.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(report.email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        report.date.toFriendlyDate(),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        "ABSENCE",
+                        style = MaterialTheme.typography.labelSmall,
+                        letterSpacing = 0.5.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+            Text(
+                "REPORTED REASON", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 12.dp)
+            )
+            Box(
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(12.dp)
+            ) {
+                HtmlText(report.reasonHtml)
+            }
+            Text(
+                "DEVELOPER'S EXPLANATION", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 12.dp)
+            )
+            Box(
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(StatusApprovedBg.copy(alpha = 0.5f))
+                    .padding(12.dp)
+            ) {
+                HtmlText(report.explanationHtml)
+            }
+            Text(
+                "Explained ${report.explainedAt.toFriendlyDateTime()}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+
+            if (!isDeciding) {
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(onClick = { onStartDecide(false) }, shape = RoundedCornerShape(50), modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Text("Accept", modifier = Modifier.padding(start = 8.dp))
+                    }
+                    OutlinedButton(onClick = { onStartDecide(true) }, shape = RoundedCornerShape(50), modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Text("Reject", modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
+            } else {
+                var isRejecting by remember { mutableStateOf(startInRejectMode) }
+                val noteState = rememberRichTextState()
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { isRejecting = false },
+                        shape = RoundedCornerShape(50),
+                        colors = if (!isRejecting) ButtonDefaults.buttonColors(
+                            containerColor = StatusApproved, contentColor = MaterialTheme.colorScheme.surface
+                        ) else ButtonDefaults.outlinedButtonColors(),
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Accept") }
+                    Button(
+                        onClick = { isRejecting = true },
+                        shape = RoundedCornerShape(50),
+                        colors = if (isRejecting) ButtonDefaults.buttonColors(
+                            containerColor = StatusRequested, contentColor = MaterialTheme.colorScheme.surface
+                        ) else ButtonDefaults.outlinedButtonColors(),
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Reject") }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    if (isRejecting) "Reason for sending this back" else "Note (optional)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                RichTextEditor(
+                    state = noteState,
+                    placeholder = if (isRejecting) "What still needs explaining..." else "Explain what happened..."
+                )
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onCancelDecide) { Text("Cancel") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        enabled = (!isRejecting || !noteState.isBlank) && !isSubmitting,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.inverseSurface,
+                            contentColor = MaterialTheme.colorScheme.inverseOnSurface
+                        ),
+                        shape = RoundedCornerShape(50),
+                        onClick = { if (isRejecting) onReject(noteState.html) else onAccept(noteState.html) }
+                    ) {
+                        if (isSubmitting) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text(if (isRejecting) "Send back" else "Accept & approve", fontWeight = FontWeight.Bold)
                         }
                     }
                 }

@@ -183,6 +183,8 @@ const uninformedResolveDate          = document.getElementById('uninformedResolv
 const closeUninformedResolveDrawerBtn = document.getElementById('closeUninformedResolveDrawerBtn');
 const uninformedResolveReportedReason = document.getElementById('uninformedResolveReportedReason');
 const uninformedResolveReportedBy    = document.getElementById('uninformedResolveReportedBy');
+const uninformedResolveRejectionBlock = document.getElementById('uninformedResolveRejectionBlock');
+const uninformedResolveRejectionNote = document.getElementById('uninformedResolveRejectionNote');
 const uninformedResolveToolbar       = document.getElementById('uninformedResolveToolbar');
 const uninformedResolveEditor        = document.getElementById('uninformedResolveEditor');
 const uninformedResolveError         = document.getElementById('uninformedResolveError');
@@ -191,8 +193,10 @@ const uninformedResolveSubmitBtn     = document.getElementById('uninformedResolv
 // Nav-card stat badges (updateNavStatBadges_)
 const navSubWeeksTag      = document.getElementById('navSubWeeksTag');
 const navSubDraftTag      = document.getElementById('navSubDraftTag');
-const navLeavePendingTag  = document.getElementById('navLeavePendingTag');
-const navLeaveApprovedTag = document.getElementById('navLeaveApprovedTag');
+const navApprovedBadge  = document.getElementById('navApprovedBadge');
+const navRejectedBadge  = document.getElementById('navRejectedBadge');
+const navWithdrawnBadge = document.getElementById('navWithdrawnBadge');
+const navNeedsYouBadge  = document.getElementById('navNeedsYouBadge');
 // Leave drawer: Short Leave's + Out Pass's timer-selection timelines
 // (timebar-3.html-style scaled bar + stepper/typed-input/AM-PM-wheel
 // controls, no drag slider), inline-calendar picked summary, live footer
@@ -969,12 +973,9 @@ function updateNavStatBadges_() {
   navSubDraftTag.classList.toggle('hidden', !hasDraft);
 
   const leaveRecords = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
-  const pendingCount = leaveRecords.filter(function (r) { return r.status === 'requested'; }).length;
-  const approvedCount = leaveRecords.filter(function (r) { return r.status === 'approved'; }).length;
-  navLeavePendingTag.innerHTML = '<i class="dot"></i>' + pendingCount + ' pending';
-  navLeavePendingTag.classList.toggle('hidden', pendingCount === 0);
-  navLeaveApprovedTag.innerHTML = '<i class="dot"></i>' + approvedCount + ' approved';
-  navLeaveApprovedTag.classList.toggle('hidden', approvedCount === 0);
+  navApprovedBadge.textContent = leaveRecords.filter(function (r) { return r.status === 'approved'; }).length;
+  navRejectedBadge.textContent = leaveRecords.filter(function (r) { return r.status === 'rejected'; }).length;
+  navWithdrawnBadge.textContent = leaveRecords.filter(function (r) { return r.status === 'withdrawn'; }).length;
 }
 
 async function fetchLeaveStatus_() {
@@ -1909,26 +1910,35 @@ async function loadMyLeavesData_() {
   loadUninformedBanner_();
 }
 
-// The signed-in user's own still-open uninformed-leave report, if any - a
-// second access path to the same resolution drawer the emailed "Resolve the
-// Issue" link opens, since an email can get lost/deleted but My Leaves is
-// checked regularly anyway.
+// The signed-in user's own still-open uninformed-leave reports (either
+// awaiting their explanation, or already explained and awaiting their
+// manager's decision) - shared by the banner (below) and the My Leaves
+// nav-card bell badge, so both reflect the same one Firestore read.
+async function fetchOpenUninformedReports_() {
+  if (!currentUserContext) return [];
+  const email = currentUserEmail_();
+  const snap = await getDocs(query(
+    collection(db, 'uninformedLeaves'),
+    where('email', '==', email),
+    where('status', 'in', ['reported', 'explained'])
+  ));
+  return snap.docs
+    .map(function (d) { return Object.assign({ reportId: d.id }, d.data()); })
+    .sort(function (a, b) {
+      const at = a.reportedAt && a.reportedAt.toDate ? a.reportedAt.toDate() : 0;
+      const bt = b.reportedAt && b.reportedAt.toDate ? b.reportedAt.toDate() : 0;
+      return bt - at;
+    });
+}
+
+// A second access path to the same resolution drawer the emailed "Resolve
+// the Issue" link opens, since an email can get lost/deleted but My Leaves
+// is checked regularly anyway.
 async function loadUninformedBanner_() {
   if (!currentUserContext) return;
   try {
-    const email = currentUserEmail_();
-    const snap = await getDocs(query(
-      collection(db, 'uninformedLeaves'),
-      where('email', '==', email),
-      where('status', '==', 'reported')
-    ));
-    const reports = snap.docs
-      .map(function (d) { return Object.assign({ reportId: d.id }, d.data()); })
-      .sort(function (a, b) {
-        const at = a.reportedAt && a.reportedAt.toDate ? a.reportedAt.toDate() : 0;
-        const bt = b.reportedAt && b.reportedAt.toDate ? b.reportedAt.toDate() : 0;
-        return bt - at;
-      });
+    const reports = await fetchOpenUninformedReports_();
+    updateUninformedNavBadge_(reports);
     renderUninformedBanner_(reports[0] || null);
   } catch (_e) { /* offline - banner just stays hidden */ }
 }
@@ -1942,8 +1952,24 @@ function renderUninformedBanner_(report) {
   uninformedBanner.classList.remove('hidden');
   uninformedBanner.dataset.reportId = report.reportId;
   const d = report.date && report.date.toDate ? report.date.toDate() : null;
-  uninformedBannerTitle.textContent = 'Uninformed absence flagged' + (d ? ' — ' + fmtDateLocal_(d) : '');
-  uninformedBannerMeta.textContent = report.reportedBy ? 'Reported by ' + report.reportedBy : 'Explain what happened';
+  if (report.status === 'explained') {
+    uninformedBannerTitle.textContent = 'Explanation submitted' + (d ? ' — ' + fmtDateLocal_(d) : '');
+    uninformedBannerMeta.textContent = 'Awaiting your manager’s review';
+    uninformedBannerViewBtn.classList.add('hidden');
+  } else {
+    uninformedBannerTitle.textContent = 'Uninformed absence flagged' + (d ? ' — ' + fmtDateLocal_(d) : '');
+    uninformedBannerMeta.textContent = report.rejectionNote
+      ? 'Sent back by ' + (report.reportedBy || 'your manager') + ' — please re-explain'
+      : (report.reportedBy ? 'Reported by ' + report.reportedBy : 'Explain what happened');
+    uninformedBannerViewBtn.classList.remove('hidden');
+  }
+}
+
+// "Needs you" chip on the "My Leaves" dashboard nav-card - live the moment
+// there's anything open (reported or explained), without the user having to
+// open the drawer first.
+function updateUninformedNavBadge_(reports) {
+  navNeedsYouBadge.textContent = reports.length;
 }
 
 // ---------- Resolve Uninformed Leave drawer ----------
@@ -1960,6 +1986,12 @@ function openUninformedResolveDrawer_(report) {
   uninformedResolveDate.textContent = d ? fmtDateLocal_(d) : '-';
   uninformedResolveReportedReason.innerHTML = report.reasonHtml || '<i>No reason provided.</i>';
   uninformedResolveReportedBy.textContent = report.reportedBy ? 'Reported by ' + report.reportedBy : '';
+  if (report.rejectionNote) {
+    uninformedResolveRejectionNote.innerHTML = report.rejectionNote;
+    uninformedResolveRejectionBlock.classList.remove('hidden');
+  } else {
+    uninformedResolveRejectionBlock.classList.add('hidden');
+  }
   uninformedResolveEditor.innerHTML = '';
   uninformedResolveError.classList.add('hidden');
   uninformedResolveDrawer.classList.add('open');
@@ -1987,17 +2019,16 @@ async function submitUninformedResolution_() {
   uninformedResolveSubmitBtn.innerHTML = '<span class="loader loader-sm on-brand" style="vertical-align: middle; margin-right: 6px;"></span>Submitting…';
   try {
     await updateDoc(doc(db, 'uninformedLeaves', currentUninformedReport.reportId), {
-      status: 'resolved',
-      resolvedAt: serverTimestamp(),
-      resolvedBy: (currentUserContext && currentUserContext.displayName) || currentUserEmail_(),
-      resolutionHtml: html
+      status: 'explained',
+      explanationHtml: html,
+      explainedAt: serverTimestamp()
     });
     closeUninformedResolveDrawer_();
     // Strip the #resolve-uninformed=<id> hash left over from the email link -
     // otherwise a later refresh in this same tab still points at a report
-    // that's now resolved.
+    // that's no longer waiting on this developer.
     if (/^#resolve-uninformed=/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search);
-    showToast_('Resolution submitted.', 'success');
+    showToast_('Explanation submitted — your manager will review it.', 'success');
     loadUninformedBanner_();
   } catch (_e) {
     uninformedResolveError.textContent = 'Could not submit - please try again.';
@@ -3256,6 +3287,11 @@ onAuthStateChanged(auth, async (user) => {
   fetchUserSubmissions_()
     .then(function () { if (isTaskTableEmpty()) syncTableToSelectedWeek(); })
     .catch(function () { /* offline - the form still works */ });
+  // So the "My Leaves" bell badge is live from first load, not only after
+  // the drawer has been opened once (which is what actually fetches it).
+  fetchOpenUninformedReports_()
+    .then(updateUninformedNavBadge_)
+    .catch(function () { /* offline - badge just stays hidden */ });
   openMyLeavesDeepLinkOnce_();
   openResolveUninformedDeepLinkOnce_();
 });

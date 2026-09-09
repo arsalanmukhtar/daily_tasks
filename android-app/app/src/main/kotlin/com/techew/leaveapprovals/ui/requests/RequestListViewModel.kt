@@ -80,6 +80,14 @@ class RequestListViewModel(
         .map { list -> list.filter { it.isArchived() } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    // Drives the Requests tab's notification-count badge in ManagerHomeScreen -
+    // deliberately derived from the raw, unfiltered _records (not `filtered`/
+    // `activeRecords`) so it reflects the true pending count regardless of
+    // whatever type/status/email filter the manager currently has selected.
+    val pendingCount: StateFlow<Int> = _records
+        .map { list -> list.count { it.status == "requested" && !it.isArchived() } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
     private var listenerRegistration: ListenerRegistration? = null
 
     init {

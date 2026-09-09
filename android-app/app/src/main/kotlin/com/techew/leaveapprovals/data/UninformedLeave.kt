@@ -2,10 +2,12 @@ package com.techew.leaveapprovals.data
 
 /**
  * A manager-filed report that a developer was absent without ever applying
- * for leave (see firestore.rules' uninformedLeaves block). Resolving one -
- * by the developer explaining themselves, or the owner overriding directly -
- * is the only client write; push-daemon's Admin SDK then creates the actual
- * approved leaveRequests doc and stamps linkedRequestId back here.
+ * for leave (see firestore.rules' uninformedLeaves block). The developer
+ * explains themselves (reported -> explained); the owner then accepts
+ * (explained -> resolved, which push-daemon converts into an approved
+ * leaveRequests doc) or rejects (explained -> reported, bouncing it back
+ * with a note for the developer to try again) - or can resolve a fresh
+ * report directly, skipping the developer entirely.
  */
 data class UninformedLeave(
     val reportId: String,
@@ -15,7 +17,11 @@ data class UninformedLeave(
     val reasonHtml: String = "",
     val reportedBy: String = "",
     val reportedAt: String = "",
-    val status: String = "reported", // "reported" | "resolved"
+    val status: String = "reported", // "reported" | "explained" | "resolved"
+    val explanationHtml: String = "",
+    val explainedAt: String = "",
+    val rejectionNote: String = "",
+    val rejectionNoteAt: String = "",
     val resolvedAt: String = "",
     val resolvedBy: String = "",
     val resolutionHtml: String = "",

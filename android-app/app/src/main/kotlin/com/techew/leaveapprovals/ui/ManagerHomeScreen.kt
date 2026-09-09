@@ -17,6 +17,8 @@ import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Assignment
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Insights
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -74,6 +76,8 @@ fun ManagerHomeScreen(
     var selectedTab by remember { mutableStateOf(ManagerTab.Requests) }
     var overflowMenuExpanded by remember { mutableStateOf(false) }
     val allRecords by requestListViewModel.records.collectAsState()
+    val pendingRequestsCount by requestListViewModel.pendingCount.collectAsState()
+    val actionableReportsCount by reportViewModel.actionableCount.collectAsState()
 
     // A notification tap always means "show me that request" - route to
     // whichever tab it actually lives in. A request can age into Archived
@@ -156,7 +160,13 @@ fun ManagerHomeScreen(
                 NavigationBarItem(
                     selected = selectedTab == ManagerTab.Requests,
                     onClick = { selectedTab = ManagerTab.Requests },
-                    icon = { Icon(Icons.Outlined.Assignment, contentDescription = null) },
+                    icon = {
+                        BadgedBox(badge = {
+                            if (pendingRequestsCount > 0) Badge { Text(pendingRequestsCount.toString()) }
+                        }) {
+                            Icon(Icons.Outlined.Assignment, contentDescription = null)
+                        }
+                    },
                     label = { Text("Requests") },
                     colors = themedNavigationBarItemColors()
                 )
@@ -177,7 +187,13 @@ fun ManagerHomeScreen(
                 NavigationBarItem(
                     selected = selectedTab == ManagerTab.Report,
                     onClick = { selectedTab = ManagerTab.Report },
-                    icon = { Icon(Icons.Outlined.Flag, contentDescription = null) },
+                    icon = {
+                        BadgedBox(badge = {
+                            if (actionableReportsCount > 0) Badge { Text(actionableReportsCount.toString()) }
+                        }) {
+                            Icon(Icons.Outlined.Flag, contentDescription = null)
+                        }
+                    },
                     label = { Text("Report") },
                     colors = themedNavigationBarItemColors()
                 )

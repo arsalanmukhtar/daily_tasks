@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -42,9 +43,21 @@ class ReportViewModel(
         .map { list -> list.filter { it.status == "reported" }.sortedBy { it.reportedAt } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    // Explained but not yet accepted/rejected - the manager's actual decision
+    // queue, oldest first same as openReports.
+    val explainedReports: StateFlow<List<UninformedLeave>> = reports
+        .map { list -> list.filter { it.status == "explained" }.sortedBy { it.explainedAt } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     val resolvedReports: StateFlow<List<UninformedLeave>> = reports
         .map { list -> list.filter { it.status == "resolved" }.sortedByDescending { it.resolvedAt } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    // Everything needing a manager's attention - drives the Report tab's
+    // notification-count badge in ManagerHomeScreen.
+    val actionableCount: StateFlow<Int> = combine(openReports, explainedReports) { open, explained ->
+        open.size + explained.size
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
     private var listenerRegistration: ListenerRegistration? = null
 
@@ -103,6 +116,20 @@ class ReportViewModel(
                 apiClient.resolveUninformedLeave(reportId, resolutionHtml)
             }.onFailure {
                 _errorMessage.value = it.message ?: "Could not save the resolution."
+            }.isSuccess
+            _isSubmitting.value = false
+            onDone(success)
+        }
+    }
+
+    fun reject(reportId: String, rejectionNote: String, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            _isSubmitting.value = true
+            _errorMessage.value = null
+            val success = runCatching {
+                apiClient.rejectExplanation(reportId, rejectionNote)
+            }.onFailure {
+                _errorMessage.value = it.message ?: "Could not send this back."
             }.isSuccess
             _isSubmitting.value = false
             onDone(success)

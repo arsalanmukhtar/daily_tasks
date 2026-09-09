@@ -237,12 +237,11 @@ function buildDecisionEmail(data) {
   const decidedMetaHtml = decidedMetaText
     ? `<div style="margin-top:2px;font:400 12px/1.35 ${FONT};color:${decidedNoteColor};">${escapeHtml(decidedMetaText)}</div>`
     : '';
-  const decidedNoteHtml =
-    data.decisionNote && String(data.decisionNote).trim()
-      ? `<div style="margin-top:3px;font:400 12.5px/1.5 ${FONT};color:${decidedNoteColor};">&#8220;${escapeHtml(
-          String(data.decisionNote).trim()
-        )}&#8221;</div>`
-      : '';
+  const decidedNoteHtml = !isVisiblyEmpty(data.decisionNote)
+    ? `<div style="margin-top:3px;font:400 12.5px/1.5 ${FONT};color:${decidedNoteColor};">&#8220;${escapeHtml(
+        String(data.decisionNote).trim()
+      )}&#8221;</div>`
+    : '';
 
   const primaryCta = approved
     ? { href: APP_URL, label: 'Open in Tech EW', bg: '#E8590C', color: '#FFFFFF' }
@@ -346,7 +345,7 @@ function buildDecisionEmail(data) {
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
             <tr><td style="border-left:3px solid #E3E8EF;padding:2px 0 2px 14px;
                            font:400 14px/1.6 ${FONT};color:#334155;">
-              ${data.reasonHtml || '<i>No reason provided.</i>'}
+              ${htmlOrFallback(data.reasonHtml, '<i>No reason provided.</i>')}
             </td></tr>
           </table>
         </td>
@@ -382,13 +381,13 @@ function buildDecisionEmail(data) {
         <td class="gut" style="padding:20px 32px 26px;">
           <table role="presentation" cellpadding="0" cellspacing="0" class="btn"><tr>
             <td style="background:${primaryCta.bg};border-radius:9px;">
-              <a href="${escapeAttr(primaryCta.href)}" style="display:inline-block;padding:12px 22px;font:600 14px/1 ${FONT};color:${primaryCta.color};">${escapeHtml(
+              <a href="${escapeAttr(primaryCta.href)}" style="display:inline-block;padding:12px 22px;font:600 14px/1 ${FONT};color:${primaryCta.color};text-decoration:none;">${escapeHtml(
     primaryCta.label
   )}</a>
             </td>
             <td width="10" style="font-size:0;line-height:0;">&nbsp;</td>
             <td style="border:1px solid #DDE3EB;border-radius:9px;">
-              <a href="${escapeAttr(HISTORY_URL)}" style="display:inline-block;padding:11px 20px;font:600 14px/1 ${FONT};color:#475569;">View leave history</a>
+              <a href="${escapeAttr(HISTORY_URL)}" style="display:inline-block;padding:11px 20px;font:600 14px/1 ${FONT};color:#475569;text-decoration:none;">View leave history</a>
             </td>
           </tr></table>
         </td>
@@ -481,7 +480,7 @@ function buildUninformedReportEmail(data, reportId) {
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
             <tr><td style="border-left:3px solid #E3E8EF;padding:2px 0 2px 14px;
                            font:400 14px/1.6 ${FONT};color:#334155;">
-              ${data.reasonHtml || '<i>No reason provided.</i>'}
+              ${htmlOrFallback(data.reasonHtml, '<i>No reason provided.</i>')}
             </td></tr>
           </table>
         </td>
@@ -492,7 +491,7 @@ function buildUninformedReportEmail(data, reportId) {
         <td class="gut" style="padding:22px 32px 26px;">
           <table role="presentation" cellpadding="0" cellspacing="0" class="btn"><tr>
             <td style="background:#E8590C;border-radius:9px;">
-              <a href="${escapeAttr(resolveUrl)}" style="display:inline-block;padding:12px 22px;font:600 14px/1 ${FONT};color:#FFFFFF;">Resolve the Issue</a>
+              <a href="${escapeAttr(resolveUrl)}" style="display:inline-block;padding:12px 22px;font:600 14px/1 ${FONT};color:#FFFFFF;text-decoration:none;">Resolve the Issue</a>
             </td>
           </tr></table>
         </td>
@@ -518,6 +517,138 @@ function buildUninformedReportEmail(data, reportId) {
   return { subject, html };
 }
 
+// Sent when the manager reviews a developer's explanation and sends it back
+// (explained -> reported) rather than accepting it - same shape/CTA as
+// buildUninformedReportEmail, but surfacing the manager's note instead of
+// the original reason, since that's what needs a response now.
+function buildExplanationRejectedEmail(data, reportId) {
+  const name = data.name || 'there';
+  const firstName = String(name).trim().split(/\s+/)[0] || name;
+  const reportedByName = data.reportedBy || 'your manager';
+  const dateText = formatWeekdayDayMonthYear(data.date) || formatDayMonthYear(data.date);
+  const resolveUrl = RESOLVE_URL_PREFIX + encodeURIComponent(reportId);
+
+  const html = `
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(
+    `Your explanation for the ${dateText} absence was sent back — please explain again.`
+  )}</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF0F4;">
+<tr><td align="center" style="padding:32px 12px;">
+
+  <table role="presentation" class="wrap" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;">
+
+    <!-- masthead -->
+    <tr><td style="padding:0 4px 12px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td style="font:700 13px/1.2 ${FONT};color:#0F172A;letter-spacing:-.01em;">
+          <span style="display:inline-block;width:9px;height:9px;background:#E8590C;border-radius:2px;margin-right:8px;"></span>Tech EW
+        </td>
+        <td align="right" style="font:400 12px/1.2 ${FONT};color:#7A8698;">Uninformed leave</td>
+      </tr></table>
+    </td></tr>
+
+    <!-- card -->
+    <tr><td style="background:#FFFFFF;border:1px solid #E3E8EF;border-radius:14px;overflow:hidden;">
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td height="4" style="height:4px;line-height:4px;font-size:0;background:#D97706;">&nbsp;</td>
+      </tr></table>
+
+      <!-- headline -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:26px 32px 0;">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+            <td style="background:#FEF3C7;border:1px solid #FDE68A;color:#92400E;border-radius:999px;padding:5px 12px;
+                       font:700 11px/1 ${FONT};letter-spacing:.06em;">SENT BACK</td>
+          </tr></table>
+
+          <p style="margin:16px 0 0;font:700 23px/1.3 ${FONT};color:#0F172A;letter-spacing:-.02em;">
+            Your explanation for ${escapeHtml(dateText)} needs another look
+          </p>
+          <p style="margin:9px 0 0;font:400 14px/1.6 ${FONT};color:#5A6879;">
+            Hello ${escapeHtml(firstName)} — ${escapeHtml(reportedByName)} reviewed what you sent and needs more detail. See their note below, then explain again.
+          </p>
+        </td>
+      </tr></table>
+
+      <!-- note -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:22px 32px 0;">
+          <div style="font:700 10px/1 ${FONT};color:#93A0B0;letter-spacing:.07em;">MANAGER'S NOTE</div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
+            <tr><td style="border-left:3px solid #E3E8EF;padding:2px 0 2px 14px;
+                           font:400 14px/1.6 ${FONT};color:#334155;">
+              ${htmlOrFallback(data.rejectionNote, '<i>No note provided.</i>')}
+            </td></tr>
+          </table>
+        </td>
+      </tr></table>
+
+      <!-- cta -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:22px 32px 26px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" class="btn"><tr>
+            <td style="background:#E8590C;border-radius:9px;">
+              <a href="${escapeAttr(resolveUrl)}" style="display:inline-block;padding:12px 22px;font:600 14px/1 ${FONT};color:#FFFFFF;text-decoration:none;">Resolve the Issue</a>
+            </td>
+          </tr></table>
+        </td>
+      </tr></table>
+
+    </td></tr>
+
+    <!-- footer -->
+    <tr><td class="gut" style="padding:16px 8px 0;">
+      <p style="margin:0;font:400 11.5px/1.7 ${FONT};color:#8593A5;">
+        Sent by Tech EW because your explanation for a flagged absence was sent back. Internal use only.<br>
+        Replies to this address are not monitored — raise anything else with ${escapeHtml(reportedByName)}.
+      </p>
+    </td></tr>
+
+  </table>
+
+</td></tr>
+</table>`.trim();
+
+  const subject = `Your explanation for ${dateText} needs another look`;
+
+  return { subject, html };
+}
+
+// A rich-text field with no real content isn't always an empty string - a
+// contenteditable box that was focused and left untouched can save as
+// "<br>", "<p></p>" or "<p><br></p>". Left unguarded, `data.x || fallback`
+// treats any of those as "has content" (truthy) and drops the literal empty
+// tag straight into the email instead of the intended placeholder text.
+function isVisiblyEmpty(html) {
+  return !html || !String(html).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim();
+}
+
+function htmlOrFallback(html, fallback) {
+  return isVisiblyEmpty(html) ? fallback : html;
+}
+
+// `decisionNote` on a leaveRequests doc is plain text everywhere it's read
+// (Android's RequestDetailSheet renders it with a plain Text(), and
+// buildDecisionEmail below escapes it as text) - the uninformed-leave
+// conversion in index.js needs this to turn a resolution's rich-text HTML
+// into that same plain-text shape, rather than leaking raw tags through.
+function htmlToPlainText(html) {
+  return String(html || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+}
+
 function escapeHtml(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;')
@@ -529,4 +660,4 @@ function escapeAttr(s) {
   return escapeHtml(s).replace(/"/g, '&quot;');
 }
 
-module.exports = { buildDecisionEmail, buildUninformedReportEmail };
+module.exports = { buildDecisionEmail, buildUninformedReportEmail, buildExplanationRejectedEmail, htmlToPlainText };

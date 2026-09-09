@@ -234,10 +234,25 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
                   </svg>
                 </div>
-                <!-- Stat badges: live counts kept in sync by updateNavStatBadges_() in app.js -->
-                <div class="nc-stats">
-                  <span id="navLeavePendingTag" class="tag wait hidden"><i class="dot"></i>0 pending</span>
-                  <span id="navLeaveApprovedTag" class="tag ok hidden"><i class="dot"></i>0 approved</span>
+                <!-- Icon chips: live counts kept in sync by updateNavStatBadges_()/
+                     updateUninformedNavBadge_() in app.js. Always all 4, count-only badge. -->
+                <div class="nc-stats nc-stats-icons">
+                  <span class="ic-chip ic-ok" title="Approved">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                    <b id="navApprovedBadge" class="ic-badge">0</b>
+                  </span>
+                  <span class="ic-chip ic-no" title="Rejected">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                    <b id="navRejectedBadge" class="ic-badge">0</b>
+                  </span>
+                  <span class="ic-chip ic-neutral" title="Withdrawn">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+                    <b id="navWithdrawnBadge" class="ic-badge">0</b>
+                  </span>
+                  <span class="ic-chip ic-wait" title="Needs you">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                    <b id="navNeedsYouBadge" class="ic-badge">0</b>
+                  </span>
                 </div>
               </button>
             </div>
@@ -756,7 +771,7 @@
   <aside id="uninformedResolveDrawer" class="drawer-panel fixed top-0 right-0 h-full w-full sm:w-[30rem] lg:w-[34rem] max-w-full bg-white shadow-2xl ring-1 ring-slate-200 z-50 flex flex-col">
     <header class="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-slate-200 flex items-start justify-between gap-3 shrink-0 bg-gradient-to-r from-slate-50 to-amber-50/60">
       <div class="min-w-0">
-        <h2 class="text-base font-semibold text-slate-800">Resolve Uninformed Leave</h2>
+        <h2 class="text-base font-semibold text-slate-800">Explain the Absence</h2>
         <p id="uninformedResolveDate" class="text-xs text-slate-500 mt-0.5">-</p>
       </div>
       <div class="flex items-center gap-1 shrink-0">
@@ -775,6 +790,11 @@
         <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Reported reason</div>
         <div id="uninformedResolveReportedReason" class="rich-text text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-3"></div>
         <p id="uninformedResolveReportedBy" class="text-xs text-slate-400 mt-2"></p>
+      </div>
+
+      <div id="uninformedResolveRejectionBlock" class="hidden">
+        <div class="text-[10px] uppercase tracking-wider text-amber-600 font-bold mb-2">Sent back by your manager</div>
+        <div id="uninformedResolveRejectionNote" class="rich-text text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-3"></div>
       </div>
 
       <div>

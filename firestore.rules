@@ -125,18 +125,32 @@ service cloud.firestore {
 
       allow create: if isOwner() && request.resource.data.status == 'reported';
 
-      // Two disjoint resolvers - the reported developer explaining
-      // themselves, or the owner resolving it directly - both touching only
-      // the same specific fields.
+      // Four disjoint transitions - the developer only ever explains
+      // themselves (never resolves outright); the owner reviews that
+      // explanation and either accepts (-> resolved) or rejects it (bounces
+      // back to 'reported' with a note), or can still resolve a fresh report
+      // directly, skipping the developer entirely.
       allow update: if
-        (
+        ( // developer explains
           isAllowlisted() &&
           resource.data.email == emailLower() &&
           resource.data.status == 'reported' &&
+          request.resource.data.status == 'explained' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'explanationHtml', 'explainedAt'])
+        ) || ( // owner accepts an explanation
+          isOwner() &&
+          resource.data.status == 'explained' &&
           request.resource.data.status == 'resolved' &&
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['status', 'resolvedAt', 'resolvedBy', 'resolutionHtml'])
-        ) || (
+        ) || ( // owner rejects an explanation, sends it back
+          isOwner() &&
+          resource.data.status == 'explained' &&
+          request.resource.data.status == 'reported' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'rejectionNote', 'rejectionNoteAt'])
+        ) || ( // owner resolves a fresh report directly, skipping the developer
           isOwner() &&
           resource.data.status == 'reported' &&
           request.resource.data.status == 'resolved' &&

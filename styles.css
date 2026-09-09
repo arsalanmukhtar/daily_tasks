@@ -1532,6 +1532,10 @@ textarea {
    parent's display mode. */
 #leaveReasonEditor { flex: 1; overflow-y: auto; }
 
+/* Resolve Uninformed Leave side panel: a full explanation/rejection note
+   needs more room than the compact apply-for-leave reason box. */
+#uninformedResolveEditor { min-height: 14rem; }
+
 /* Applied wherever a leave request's rich-text `reasonHtml` is shown
    read-only (My Leaves history cards) - without this, the contenteditable
    editor's raw output (lists, bold/colour spans) renders as an unstyled
@@ -1621,6 +1625,26 @@ textarea {
 .tag.wait { background: var(--wait-50); color: var(--wait-800); border-color: var(--wait-200); }
 .tag.wait .dot { background: var(--wait-600); }
 .tag.neutral { background: var(--meta-bg); color: var(--meta); border-color: var(--meta-bd); }
+
+/* ---------- My Leaves nav-card icon chips: always 4 (Approved/Rejected/
+   Withdrawn/Needs you), icon-only with a solid semantic-color round
+   background, plus a black/white notification-count badge overlapping the
+   top-right corner - counts kept live by updateNavStatBadges_()/
+   updateUninformedNavBadge_() in app.js. ---------- */
+.nc-stats-icons { gap: 12px; }
+.ic-chip {
+  position: relative; width: 30px; height: 30px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0;
+}
+.ic-chip.ic-ok { background: var(--ok-600); }
+.ic-chip.ic-no { background: var(--no-600); }
+.ic-chip.ic-neutral { background: var(--meta); }
+.ic-chip.ic-wait { background: var(--wait-600); }
+.ic-badge {
+  position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 3px;
+  border-radius: 999px; background: #0F172A; color: #fff; font-size: 9.5px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; line-height: 1; border: 1.5px solid #fff;
+}
 
 /* ---------- Apply-for-leave: Leave type + Reason on top, Attachments under
    Leave type, the calendar spanning full width underneath. ---------- */

@@ -8,7 +8,7 @@ const { initializeApp, applicationDefault } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 const { leaveTypeLabel } = require('./leaveType');
-const { buildDecisionEmail, buildUninformedReportEmail } = require('./emailTemplate');
+const { buildDecisionEmail, buildUninformedReportEmail, buildExplanationRejectedEmail, htmlToPlainText } = require('./emailTemplate');
 
 initializeApp({
   credential: applicationDefault()
@@ -145,6 +145,31 @@ async function handleReportedUninformedLeave(doc) {
   log(`Sent uninformed-leave report email for ${doc.id} to ${data.email}.`);
 }
 
+// Emails the developer when the manager reviews their explanation and sends
+// it back rather than accepting it - a 'reported' doc only ever gets
+// *modified* (as opposed to freshly 'added') via this reported<-explained
+// bounce, since create() always starts a doc at 'reported' in the first
+// place, so change.type === 'modified' is exactly "this is a rejection".
+async function handleRejectedExplanation(doc) {
+  const data = doc.data();
+  if (!mailer) {
+    log('Uninformed leave', doc.id, 'rejected - GMAIL_USER/GMAIL_APP_PASSWORD not set, skipping email.');
+    return;
+  }
+  if (!data.email) {
+    log('Uninformed leave', doc.id, 'rejected - no email on the report, skipping.');
+    return;
+  }
+  const { subject, html } = buildExplanationRejectedEmail(data, doc.id);
+  await mailer.sendMail({
+    from: `"Tech EW - Leave Approvals" <${process.env.GMAIL_USER}>`,
+    to: data.email,
+    subject,
+    html
+  });
+  log(`Sent explanation-rejected email for ${doc.id} to ${data.email}.`);
+}
+
 // The privileged conversion step: once a developer (or the owner directly)
 // resolves an uninformed-leave report, this is what actually turns it into
 // a real approved leaveRequests doc - firestore.rules deliberately doesn't
@@ -168,7 +193,11 @@ async function handleResolvedUninformedLeave(doc) {
     startDate: data.date,
     endDate: data.date,
     reasonHtml: data.reasonHtml || '',
-    decisionNote: data.resolutionHtml || '',
+    // decisionNote is plain text everywhere it's read (RequestDetailSheet's
+    // plain Text(), buildDecisionEmail's escapeHtml()) - resolutionHtml is
+    // rich HTML from the resolve editor, so it has to be flattened here or
+    // the decision email/app would show raw <p>/<b> tags as visible text.
+    decisionNote: htmlToPlainText(data.resolutionHtml),
     resolvedAt: data.resolvedAt,
     resolvedBy: data.resolvedBy || ''
   });
@@ -256,10 +285,19 @@ const unsubscribeReported = db
         return;
       }
       snapshot.docChanges().forEach((change) => {
-        if (change.type !== 'added') return;
-        handleReportedUninformedLeave(change.doc).catch((err) => {
-          logError('Error handling reported uninformed leave', change.doc.id, err);
-        });
+        if (change.type === 'added') {
+          handleReportedUninformedLeave(change.doc).catch((err) => {
+            logError('Error handling reported uninformed leave', change.doc.id, err);
+          });
+        } else if (change.type === 'modified' && change.doc.data().rejectionNoteAt) {
+          // The only way a doc already matching status=='reported' is ever
+          // *modified* rather than freshly created is the explained->reported
+          // rejection bounce (see firestore.rules - nothing else can write to
+          // a 'reported' doc while it stays 'reported').
+          handleRejectedExplanation(change.doc).catch((err) => {
+            logError('Error handling rejected explanation', change.doc.id, err);
+          });
+        }
       });
     },
     (err) => {

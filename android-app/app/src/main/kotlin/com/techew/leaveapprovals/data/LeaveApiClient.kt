@@ -127,10 +127,11 @@ class LeaveApiClient(
         ).await()
     }
 
-    // Used both by the developer explaining themselves (web) and the owner
-    // overriding directly (Android) - firestore.rules' two update disjuncts
-    // allow either, both writing exactly these fields. push-daemon's Admin
-    // SDK is what actually converts this into an approved leaveRequests doc.
+    // Accepts an explanation (explained -> resolved), or resolves a fresh
+    // report directly (reported -> resolved, skipping the developer) - same
+    // write shape either way, firestore.rules allows both transitions for
+    // the owner. push-daemon's Admin SDK is what actually converts this into
+    // an approved leaveRequests doc.
     suspend fun resolveUninformedLeave(reportId: String, resolutionHtml: String) {
         val resolvedBy = auth.currentUser?.displayName ?: auth.currentUser?.email ?: "Unknown"
         db.collection("uninformedLeaves").document(reportId).update(
@@ -139,6 +140,19 @@ class LeaveApiClient(
                 "resolvedAt" to FieldValue.serverTimestamp(),
                 "resolvedBy" to resolvedBy,
                 "resolutionHtml" to resolutionHtml
+            )
+        ).await()
+    }
+
+    // Rejects a developer's explanation, bouncing the report back to
+    // "reported" with a note - the developer sees the note and must
+    // re-explain via the same web flow. Owner-only per firestore.rules.
+    suspend fun rejectExplanation(reportId: String, rejectionNote: String) {
+        db.collection("uninformedLeaves").document(reportId).update(
+            mapOf(
+                "status" to "reported",
+                "rejectionNote" to rejectionNote,
+                "rejectionNoteAt" to FieldValue.serverTimestamp()
             )
         ).await()
     }
@@ -176,6 +190,10 @@ private fun DocumentSnapshot.toUninformedLeave(): UninformedLeave = UninformedLe
     reportedBy = getString("reportedBy") ?: "",
     reportedAt = getTimestamp("reportedAt").toIsoStringOrEmpty(),
     status = getString("status") ?: "reported",
+    explanationHtml = getString("explanationHtml") ?: "",
+    explainedAt = getTimestamp("explainedAt").toIsoStringOrEmpty(),
+    rejectionNote = getString("rejectionNote") ?: "",
+    rejectionNoteAt = getTimestamp("rejectionNoteAt").toIsoStringOrEmpty(),
     resolvedAt = getTimestamp("resolvedAt").toIsoStringOrEmpty(),
     resolvedBy = getString("resolvedBy") ?: "",
     resolutionHtml = getString("resolutionHtml") ?: "",
