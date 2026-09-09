@@ -7,9 +7,10 @@ export const authRouter = Router();
 
 authRouter.post('/request-link', async (req, res) => {
   const email = String(req.body?.email || '');
+  const platform = req.body?.platform === 'mobile' ? 'mobile' : 'web';
   if (!email.includes('@')) return res.status(400).json({ error: 'Please enter a valid email address.' });
   try {
-    await requestMagicLink(email);
+    await requestMagicLink(email, platform);
   } catch (err) {
     console.error('request-link failed:', err);
     // Still respond success-shaped - see requestMagicLink's doc comment on
