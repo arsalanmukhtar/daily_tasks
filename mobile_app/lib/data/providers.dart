@@ -56,10 +56,16 @@ final rosterProvider = FutureProvider<List<AllowlistEntry>>((ref) {
   return ref.watch(usersRepositoryProvider).listAll();
 });
 
-/// Set by DeepLinkListener when a techewapp://verify link fails to redeem
-/// (invalid/expired token) - SignInScreen watches this to show the error,
-/// since the listener itself has no screen of its own to display one on.
+/// Set by DeepLinkListener when a techewapp://reset link is malformed
+/// (missing its token) - SignInScreen watches this to show the error, since
+/// the listener itself has no screen of its own to display one on.
 final deepLinkErrorProvider = StateProvider<String?>((ref) => null);
+
+/// Set by DeepLinkListener when a techewapp://reset?token=... link arrives -
+/// SignInScreen watches this and switches to the "set a new password" form.
+/// The token itself isn't redeemed until that form is submitted (unlike the
+/// old magic-link flow, which exchanged its token immediately on catch).
+final pendingResetTokenProvider = StateProvider<String?>((ref) => null);
 
 /// The signed-in user's profile - null once signed out. Replaces the old
 /// two-step "raw Firebase auth state -> allowlist lookup" chain: the new

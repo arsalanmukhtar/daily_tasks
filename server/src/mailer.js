@@ -18,5 +18,5 @@ export async function sendMail({ to, subject, html }) {
     console.log(`[mailer] GMAIL_USER/GMAIL_APP_PASSWORD not set - skipping email to ${to}: ${subject}`);
     return;
   }
-  await mailer.sendMail({ from: `"Tech EW" <${process.env.GMAIL_USER}>`, to, subject, html });
+  await mailer.sendMail({ from: `"Daily Tasks" <${process.env.GMAIL_USER}>`, to, subject, html });
 }

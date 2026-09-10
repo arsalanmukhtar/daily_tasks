@@ -1,5 +1,5 @@
 name: dailytasks
-description: "Tech EW mobile app for developers: weekly task submissions and leave management."
+description: "Daily Tasks mobile app: weekly task submissions and leave management."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -42,8 +42,8 @@ dependencies:
   # Realtime - the server broadcasts {resource,id} pointer events over a
   # plain WebSocket (replaces Firestore's onSnapshot listeners).
   web_socket_channel: ^3.0.1
-  # Catches the techewapp://verify?token=... custom-scheme link emailed by
-  # the magic-link sign-in flow (see server/src/auth.js) - a custom scheme
+  # Catches the techewapp://reset?token=... custom-scheme link emailed by
+  # the forgot-password flow (see server/src/auth.js) - a custom scheme
   # is used instead of Android App Links/iOS Universal Links since those
   # require a real HTTPS domain with a signed verification file, which this
   # bare-IP, no-TLS deployment doesn't have.

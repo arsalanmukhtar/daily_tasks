@@ -9,17 +9,17 @@ import 'features/manager/manager_home_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const ProviderScope(child: TechEwApp()));
+  runApp(const ProviderScope(child: DailyTasksApp()));
 }
 
-class TechEwApp extends StatelessWidget {
-  const TechEwApp({super.key});
+class DailyTasksApp extends StatelessWidget {
+  const DailyTasksApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return DeepLinkListener(
       child: MaterialApp(
-        title: 'Tech EW',
+        title: 'Daily Tasks',
         debugShowCheckedModeBanner: false,
         theme: appTheme,
         home: const AuthGate(developerChild: HomeScreen(), managerChild: ManagerHomeScreen()),

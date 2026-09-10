@@ -12,20 +12,22 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- The single source of truth for who can sign in and what they're allowed
 -- to do - same fields/semantics as allowlist/{email} today.
 CREATE TABLE users (
-    email        TEXT PRIMARY KEY,           -- always stored lowercase
-    name         TEXT NOT NULL DEFAULT '',
-    designation  TEXT NOT NULL DEFAULT '',
-    reported_to  TEXT NOT NULL DEFAULT '',
-    domain       TEXT NOT NULL DEFAULT 'GIS Developer',
-    is_owner     BOOLEAN NOT NULL DEFAULT FALSE,
-    active       BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    email          TEXT PRIMARY KEY,           -- always stored lowercase
+    name           TEXT NOT NULL DEFAULT '',
+    designation    TEXT NOT NULL DEFAULT '',
+    reported_to    TEXT NOT NULL DEFAULT '',
+    domain         TEXT NOT NULL DEFAULT 'GIS Developer',
+    is_owner       BOOLEAN NOT NULL DEFAULT FALSE,
+    active         BOOLEAN NOT NULL DEFAULT TRUE,
+    password_hash  TEXT,                       -- bcrypt hash; NULL until the user registers/resets
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- ---------- magic_links ----------
--- Short-lived, single-use sign-in tokens - see server/src/auth.js. A row is
--- consumed (used_at set) the first time it's verified; expired/used rows
--- are rejected. No password ever exists in this system.
+-- Short-lived, single-use password-reset tokens - see server/src/auth.js.
+-- A row is consumed (used_at set) the first time it's redeemed; expired/used
+-- rows are rejected. Table name kept from the old magic-link sign-in era -
+-- it's now exclusively the "forgot password" / initial-password-set flow.
 CREATE TABLE magic_links (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email       TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,

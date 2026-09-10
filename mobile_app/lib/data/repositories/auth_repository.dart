@@ -4,11 +4,12 @@ import '../../core/api/api_client.dart';
 import '../../core/api/auth_token_store.dart';
 import '../models/allowlist_entry.dart';
 
-/// Magic-link auth against the self-hosted API that replaced Firebase Auth
-/// (see server/src/auth.js, and PROJECT.md's web-cutover/Flutter-unification
-/// notes). Exposes [authStateChanges] the same way the old Firebase-backed
-/// repository did, so AuthGate/providers.dart need no structural change -
-/// only how that stream gets its values changes.
+/// Email + password auth against the self-hosted API that replaced Firebase
+/// Auth (see server/src/auth.js, and PROJECT.md's auth notes). A password
+/// reset (never routine sign-in) still goes out as an emailed link, caught
+/// by DeepLinkListener. Exposes [authStateChanges] the same way the old
+/// Firebase-backed repository did, so AuthGate/providers.dart need no
+/// structural change - only how that stream gets its values changes.
 class AuthRepository {
   AuthRepository({required ApiClient apiClient, required this._tokenStore})
     : _api = apiClient;
@@ -23,23 +24,31 @@ class AuthRepository {
   AllowlistEntry? get currentUser => _current;
   String currentEmail() => _current?.email.toLowerCase() ?? '';
 
-  /// Emails a sign-in link for [email] (always resolves the same way,
-  /// whether or not the email is allowlisted - see the server's doc comment
-  /// on anti-enumeration). `platform: 'mobile'` gets a techewapp:// deep
-  /// link instead of the web's #verify= hash URL.
-  Future<void> requestMagicLink(String email) async {
-    await _api.post('/auth/request-link', {
+  Future<AllowlistEntry> login(String email, String password) async {
+    final result = await _api.post('/auth/login', {'email': email, 'password': password}) as Map<String, dynamic>;
+    await _tokenStore.write(result['token'] as String);
+    return _refreshProfile();
+  }
+
+  /// Emails a password-reset link for [email] (always resolves the same
+  /// way, whether or not the email is allowlisted - see the server's doc
+  /// comment on anti-enumeration). Always requests the mobile link format
+  /// (a `techewapp://reset?token=...` deep link) instead of the web's
+  /// `#reset=` hash URL.
+  Future<void> requestPasswordReset(String email) async {
+    await _api.post('/auth/forgot-password', {
       'email': email,
       'platform': 'mobile',
     });
   }
 
-  /// Redeems a magic-link token (from the techewapp://verify?token=...
-  /// deep link), stores the JWT, and fetches the full profile. Throws
-  /// ApiException with a human-readable message on failure.
-  Future<AllowlistEntry> verifyToken(String token) async {
-    final result = await _api.post('/auth/verify', {
+  /// Redeems a password-reset token (from the techewapp://reset?token=...
+  /// deep link), sets the new password, stores the JWT, and signs in.
+  /// Throws ApiException with a human-readable message on failure.
+  Future<AllowlistEntry> resetPassword(String token, String newPassword) async {
+    final result = await _api.post('/auth/reset-password', {
       'token': token,
+      'password': newPassword,
     }) as Map<String, dynamic>;
     await _tokenStore.write(result['token'] as String);
     return _refreshProfile();

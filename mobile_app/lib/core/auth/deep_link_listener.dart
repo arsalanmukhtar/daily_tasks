@@ -6,8 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 
-/// Catches the `techewapp://verify?token=...` deep link emailed by the
-/// magic-link sign-in flow (see server/src/auth.js's `platform: 'mobile'`
+/// Catches the `techewapp://reset?token=...` deep link emailed by the
+/// forgot-password flow (see server/src/auth.js's `platform: 'mobile'`
 /// branch) - both a cold-start link and one received while already
 /// running, on Android and iOS. A custom scheme is used instead of
 /// Android App Links / iOS Universal Links since those need a real HTTPS
@@ -35,15 +35,16 @@ class _DeepLinkListenerState extends ConsumerState<DeepLinkListener> {
     });
   }
 
-  Future<void> _handleUri(Uri uri) async {
-    if (uri.scheme != 'techewapp' || uri.host != 'verify') return;
+  void _handleUri(Uri uri) {
+    if (uri.scheme != 'techewapp' || uri.host != 'reset') return;
     final token = uri.queryParameters['token'];
-    if (token == null) return;
-    try {
-      await ref.read(authRepositoryProvider).verifyToken(token);
-    } catch (error) {
-      ref.read(deepLinkErrorProvider.notifier).state = error.toString();
+    if (token == null) {
+      ref.read(deepLinkErrorProvider.notifier).state = 'This reset link is missing its token.';
+      return;
     }
+    // SignInScreen watches this and shows the "set a new password" form -
+    // the token itself isn't redeemed until that form is submitted.
+    ref.read(pendingResetTokenProvider.notifier).state = token;
   }
 
   @override

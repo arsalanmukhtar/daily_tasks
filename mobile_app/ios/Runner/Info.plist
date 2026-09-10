@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Dailytasks</string>
+	<string>Daily Tasks</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>dailytasks</string>
+	<string>Daily Tasks</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -49,8 +49,8 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<!-- Catches the techewapp://verify?token=... magic-link deep link (see
-	     server/src/auth.js's platform:'mobile' branch and
+	<!-- Catches the techewapp://reset?token=... password-reset deep link
+	     (see server/src/auth.js's platform:'mobile' branch and
 	     lib/core/auth/deep_link_listener.dart). A custom scheme is used
 	     instead of an iOS Universal Link since those need a real HTTPS
 	     domain with a signed apple-app-site-association file, which this
@@ -59,7 +59,7 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.techew.dailytasks.magiclink</string>
+			<string>com.techew.dailytasks.passwordreset</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>techewapp</string>

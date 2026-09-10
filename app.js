@@ -15,7 +15,7 @@ const WS_BASE = 'ws://182.188.28.163:4500/ws';
 
 // =====================================================
 
-const AUTH_TOKEN_KEY = 'techew_authToken';
+const AUTH_TOKEN_KEY = 'daily_tasks_authToken';
 
 function getStoredAuthToken_() {
   try { return localStorage.getItem(AUTH_TOKEN_KEY) || null; } catch (_e) { return null; }
@@ -105,12 +105,23 @@ const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const loadingState     = document.getElementById('loadingState');
 const authGate         = document.getElementById('authGate');
 const authError        = document.getElementById('authError');
-const authGateFormState       = document.getElementById('authGateFormState');
+const authGateSignInState     = document.getElementById('authGateSignInState');
+const authGateForgotState     = document.getElementById('authGateForgotState');
 const authGateCheckEmailState = document.getElementById('authGateCheckEmailState');
-const authGateVerifyingState  = document.getElementById('authGateVerifyingState');
-const magicLinkForm       = document.getElementById('magicLinkForm');
-const magicLinkEmail      = document.getElementById('magicLinkEmail');
-const magicLinkSubmitBtn  = document.getElementById('magicLinkSubmitBtn');
+const authGateResetState      = document.getElementById('authGateResetState');
+const signInForm          = document.getElementById('signInForm');
+const signInEmail         = document.getElementById('signInEmail');
+const signInPassword      = document.getElementById('signInPassword');
+const signInSubmitBtn     = document.getElementById('signInSubmitBtn');
+const forgotForm          = document.getElementById('forgotForm');
+const forgotEmail         = document.getElementById('forgotEmail');
+const forgotSubmitBtn     = document.getElementById('forgotSubmitBtn');
+const resetForm           = document.getElementById('resetForm');
+const resetNewPassword    = document.getElementById('resetNewPassword');
+const resetNewPasswordConfirm = document.getElementById('resetNewPasswordConfirm');
+const resetSubmitBtn      = document.getElementById('resetSubmitBtn');
+const authShowForgotBtn   = document.getElementById('authShowForgotBtn');
+const authShowSignInFromForgotBtn   = document.getElementById('authShowSignInFromForgotBtn');
 const authCheckEmailAddress = document.getElementById('authCheckEmailAddress');
 const authUseAnotherEmailBtn = document.getElementById('authUseAnotherEmailBtn');
 const signOutBtn       = document.getElementById('signOutBtn');
@@ -3066,7 +3077,19 @@ function showLoading()  {
   myLeavesDrawer.classList.remove('open'); myLeavesBackdrop.classList.remove('open');
   applyLeaveBtn.classList.add('hidden');
 }
-function showAuthGate(errMsg) {
+// One of: 'signIn' | 'forgot' | 'checkEmail' | 'reset'.
+const AUTH_GATE_STATES_ = {
+  signIn: authGateSignInState,
+  forgot: authGateForgotState,
+  checkEmail: authGateCheckEmailState,
+  reset: authGateResetState
+};
+function setAuthGateState_(state) {
+  Object.keys(AUTH_GATE_STATES_).forEach((key) => {
+    AUTH_GATE_STATES_[key].classList.toggle('hidden', key !== state);
+  });
+}
+function showAuthGate(errMsg, state) {
   loadingState.classList.add('hidden');
   authGate.classList.remove('hidden');
   form.classList.add('hidden');
@@ -3079,28 +3102,22 @@ function showAuthGate(errMsg) {
   submissionsDrawer.classList.remove('open'); submissionsBackdrop.classList.remove('open');
   myLeavesDrawer.classList.remove('open'); myLeavesBackdrop.classList.remove('open');
   applyLeaveBtn.classList.add('hidden');
-  // Always reset to the email-entry sub-state - a stale "check your email"
-  // or "signing you in" state must never persist across a sign-out.
-  authGateFormState.classList.remove('hidden');
-  authGateCheckEmailState.classList.add('hidden');
-  authGateVerifyingState.classList.add('hidden');
+  // Defaults to the sign-in sub-state - a stale "check your email" or
+  // "reset password" state must never persist across a sign-out.
+  setAuthGateState_(state || 'signIn');
   if (errMsg) { authError.textContent = errMsg; authError.classList.remove('hidden'); }
   else { authError.classList.add('hidden'); authError.textContent = ''; }
 }
-function showAuthGateVerifying_() {
+function showAuthGateCheckEmail_(email) {
+  setAuthGateState_('checkEmail');
+  authCheckEmailAddress.textContent = email;
+  authError.classList.add('hidden');
+}
+function showAuthGateReset_() {
   loadingState.classList.add('hidden');
   authGate.classList.remove('hidden');
   form.classList.add('hidden');
-  authGateFormState.classList.add('hidden');
-  authGateCheckEmailState.classList.add('hidden');
-  authGateVerifyingState.classList.remove('hidden');
-  authError.classList.add('hidden');
-}
-function showAuthGateCheckEmail_(email) {
-  authGateFormState.classList.add('hidden');
-  authGateVerifyingState.classList.add('hidden');
-  authGateCheckEmailState.classList.remove('hidden');
-  authCheckEmailAddress.textContent = email;
+  setAuthGateState_('reset');
   authError.classList.add('hidden');
 }
 function showForm(user, displayName, designation, reportedTo) {
@@ -3331,32 +3348,83 @@ async function openResolveUninformedDeepLinkOnce_() {
   } catch (_e) { /* offline or permission-denied - nothing to open */ }
 }
 
-// Magic-link sign-in: email -> POST /request-link -> "check your email" ->
-// the emailed link lands back here with #verify=<token> in the hash (parsed
-// by bootstrapAuth_() below) -> POST /verify -> store the JWT -> restore.
-magicLinkForm.addEventListener('submit', async (e) => {
+// Email + password sign-in: POST /auth/login -> store the JWT -> restore.
+signInForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const email = magicLinkEmail.value.trim();
-  if (!email) return;
+  const email = signInEmail.value.trim();
+  const password = signInPassword.value;
+  if (!email || !password) return;
   authError.classList.add('hidden');
-  const originalLabel = magicLinkSubmitBtn.innerHTML;
-  magicLinkSubmitBtn.disabled = true;
-  magicLinkSubmitBtn.innerHTML = '<span class="loader loader-sm on-brand" style="vertical-align: middle; margin-right: 6px;"></span>Sending...';
+  const originalLabel = signInSubmitBtn.innerHTML;
+  signInSubmitBtn.disabled = true;
+  signInSubmitBtn.innerHTML = '<span class="loader loader-sm on-brand" style="vertical-align: middle; margin-right: 6px;"></span>Signing in...';
   try {
-    await apiRequest_('POST', '/auth/request-link', { email });
-    showAuthGateCheckEmail_(email);
+    const result = await apiRequest_('POST', '/auth/login', { email, password });
+    setStoredAuthToken_(result.token);
+    signInPassword.value = '';
+    restoreSession_();
   } catch (err) {
-    showAuthGate('Could not send the sign-in link: ' + err.message);
+    showAuthGate(err.message, 'signIn');
   } finally {
-    magicLinkSubmitBtn.disabled = false;
-    magicLinkSubmitBtn.innerHTML = originalLabel;
+    signInSubmitBtn.disabled = false;
+    signInSubmitBtn.innerHTML = originalLabel;
   }
 });
 
+// Forgot password: email -> POST /auth/forgot-password -> "check your
+// email" -> the emailed link lands back here with #reset=<token> in the
+// hash (parsed by bootstrapAuth_() below).
+forgotForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = forgotEmail.value.trim();
+  if (!email) return;
+  authError.classList.add('hidden');
+  const originalLabel = forgotSubmitBtn.innerHTML;
+  forgotSubmitBtn.disabled = true;
+  forgotSubmitBtn.innerHTML = '<span class="loader loader-sm on-brand" style="vertical-align: middle; margin-right: 6px;"></span>Sending...';
+  try {
+    await apiRequest_('POST', '/auth/forgot-password', { email });
+    showAuthGateCheckEmail_(email);
+  } catch (err) {
+    showAuthGate('Could not send the reset link: ' + err.message, 'forgot');
+  } finally {
+    forgotSubmitBtn.disabled = false;
+    forgotSubmitBtn.innerHTML = originalLabel;
+  }
+});
+
+// Redeemed via the #reset=<token> hash (see bootstrapAuth_ below) - sets a
+// new password and, on success, signs the user straight in.
+resetForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const password = resetNewPassword.value;
+  const confirm = resetNewPasswordConfirm.value;
+  if (!password || !pendingResetToken_) return;
+  authError.classList.add('hidden');
+  if (password !== confirm) { showAuthGateReset_(); showAuthGate('Passwords do not match.', 'reset'); return; }
+  const originalLabel = resetSubmitBtn.innerHTML;
+  resetSubmitBtn.disabled = true;
+  resetSubmitBtn.innerHTML = '<span class="loader loader-sm on-brand" style="vertical-align: middle; margin-right: 6px;"></span>Saving...';
+  try {
+    const result = await apiRequest_('POST', '/auth/reset-password', { token: pendingResetToken_, password });
+    pendingResetToken_ = null;
+    setStoredAuthToken_(result.token);
+    restoreSession_();
+  } catch (err) {
+    showAuthGate(err.message, 'reset');
+  } finally {
+    resetSubmitBtn.disabled = false;
+    resetSubmitBtn.innerHTML = originalLabel;
+  }
+});
+
+authShowForgotBtn.addEventListener('click', () => showAuthGate(null, 'forgot'));
+authShowSignInFromForgotBtn.addEventListener('click', () => showAuthGate(null, 'signIn'));
+
 authUseAnotherEmailBtn.addEventListener('click', () => {
-  showAuthGate();
-  magicLinkEmail.value = '';
-  magicLinkEmail.focus();
+  showAuthGate(null, 'forgot');
+  forgotEmail.value = '';
+  forgotEmail.focus();
 });
 
 signOutBtn.addEventListener('click', () => {
@@ -3369,26 +3437,25 @@ signOutBtn.addEventListener('click', () => {
   showAuthGate();
 });
 
-// Redeems a #verify=<token> hash left by the emailed sign-in link, then
-// restores the session exactly like any other page load. Runs once, at
-// startup - see the call to bootstrapAuth_() at the bottom of this file.
-async function bootstrapAuth_() {
-  const match = /^#verify=(.+)$/.exec(location.hash);
+// Holds the token from a #reset=<token> hash between page load and the
+// reset-password form's submit - the token isn't redeemed until the user
+// actually chooses a new password (unlike the old magic-link flow, which
+// exchanged its token immediately on load).
+let pendingResetToken_ = null;
+
+// Picks up a #reset=<token> hash left by the emailed password-reset link
+// and shows the "set a new password" form; otherwise restores any existing
+// session exactly like any other page load. Runs once, at startup - see the
+// call to bootstrapAuth_() at the bottom of this file.
+function bootstrapAuth_() {
+  const match = /^#reset=(.+)$/.exec(location.hash);
   if (!match) {
     restoreSession_();
     return;
   }
-  showAuthGateVerifying_();
-  const token = decodeURIComponent(match[1]);
+  pendingResetToken_ = decodeURIComponent(match[1]);
   history.replaceState(null, '', location.pathname + location.search);
-  try {
-    const result = await apiRequest_('POST', '/auth/verify', { token });
-    setStoredAuthToken_(result.token);
-  } catch (err) {
-    showAuthGate(err.message || 'This sign-in link is invalid or has expired.');
-    return;
-  }
-  restoreSession_();
+  showAuthGateReset_();
 }
 
 bootstrapAuth_();
@@ -3932,7 +3999,7 @@ function loadExcelJS() {
 // title block and a five-column day grid. Non-submitters get a marked sheet.
 async function buildExportWorkbook(ExcelJSlib, info, weekLabel, submissions, allowlistMap) {
   const wb = new ExcelJSlib.Workbook();
-  wb.creator = 'Tech EW Weekly Time Sheet';
+  wb.creator = 'Daily Tasks Weekly Time Sheet';
   wb.created = new Date();
 
   const byEmail = {};
@@ -5730,7 +5797,7 @@ async function buildDevPerformancePdf_(email) {
     setPdfFont_(doc, 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(148, 163, 184);
-    doc.text('Tech EW  ·  Internal use only', marginX, doc.internal.pageSize.getHeight() - 8);
+    doc.text('Daily Tasks  ·  Internal use only', marginX, doc.internal.pageSize.getHeight() - 8);
     doc.text('Page ' + i + ' of ' + totalPages, pageW - marginX, doc.internal.pageSize.getHeight() - 8, { align: 'right' });
   }
 

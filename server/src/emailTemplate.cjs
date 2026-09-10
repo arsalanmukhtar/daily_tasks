@@ -261,7 +261,7 @@ function buildDecisionEmail(data) {
     : '';
 
   const primaryCta = approved
-    ? { href: APP_URL, label: 'Open in Tech EW', bg: '#E8590C', color: '#FFFFFF' }
+    ? { href: APP_URL, label: 'Open in Daily Tasks', bg: '#E8590C', color: '#FFFFFF' }
     : { href: APP_URL, label: 'Request different dates', bg: '#E8590C', color: '#FFFFFF' };
 
   const html = `
@@ -278,7 +278,7 @@ function buildDecisionEmail(data) {
     <tr><td style="padding:0 4px 12px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
         <td style="font:700 13px/1.2 ${FONT};color:#0F172A;letter-spacing:-.01em;">
-          <span style="display:inline-block;width:9px;height:9px;background:#E8590C;border-radius:2px;margin-right:8px;"></span>Tech EW
+          <span style="display:inline-block;width:9px;height:9px;background:#E8590C;border-radius:2px;margin-right:8px;"></span>Daily Tasks
         </td>
         <td align="right" style="font:400 12px/1.2 ${FONT};color:#7A8698;">Leave decision</td>
       </tr></table>
@@ -415,7 +415,7 @@ function buildDecisionEmail(data) {
     <!-- footer -->
     <tr><td class="gut" style="padding:16px 8px 0;">
       <p style="margin:0;font:400 11.5px/1.7 ${FONT};color:#8593A5;">
-        Sent by Tech EW because you submitted a leave request. Internal use only.<br>
+        Sent by Daily Tasks because you submitted a leave request. Internal use only.<br>
         Replies to this address are not monitored — raise anything else with ${escapeHtml(resolvedByName)}.
       </p>
     </td></tr>
@@ -460,7 +460,7 @@ function buildUninformedReportEmail(data, reportId) {
     <tr><td style="padding:0 4px 12px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
         <td style="font:700 13px/1.2 ${FONT};color:#0F172A;letter-spacing:-.01em;">
-          <span style="display:inline-block;width:9px;height:9px;background:#E8590C;border-radius:2px;margin-right:8px;"></span>Tech EW
+          <span style="display:inline-block;width:9px;height:9px;background:#E8590C;border-radius:2px;margin-right:8px;"></span>Daily Tasks
         </td>
         <td align="right" style="font:400 12px/1.2 ${FONT};color:#7A8698;">Uninformed leave</td>
       </tr></table>
@@ -519,7 +519,7 @@ function buildUninformedReportEmail(data, reportId) {
     <!-- footer -->
     <tr><td class="gut" style="padding:16px 8px 0;">
       <p style="margin:0;font:400 11.5px/1.7 ${FONT};color:#8593A5;">
-        Sent by Tech EW because an absence was flagged against you. Internal use only.<br>
+        Sent by Daily Tasks because an absence was flagged against you. Internal use only.<br>
         Replies to this address are not monitored — raise anything else with ${escapeHtml(reportedByName)}.
       </p>
     </td></tr>
@@ -559,7 +559,7 @@ function buildExplanationRejectedEmail(data, reportId) {
     <tr><td style="padding:0 4px 12px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
         <td style="font:700 13px/1.2 ${FONT};color:#0F172A;letter-spacing:-.01em;">
-          <span style="display:inline-block;width:9px;height:9px;background:#E8590C;border-radius:2px;margin-right:8px;"></span>Tech EW
+          <span style="display:inline-block;width:9px;height:9px;background:#E8590C;border-radius:2px;margin-right:8px;"></span>Daily Tasks
         </td>
         <td align="right" style="font:400 12px/1.2 ${FONT};color:#7A8698;">Uninformed leave</td>
       </tr></table>
@@ -618,7 +618,7 @@ function buildExplanationRejectedEmail(data, reportId) {
     <!-- footer -->
     <tr><td class="gut" style="padding:16px 8px 0;">
       <p style="margin:0;font:400 11.5px/1.7 ${FONT};color:#8593A5;">
-        Sent by Tech EW because your explanation for a flagged absence was sent back. Internal use only.<br>
+        Sent by Daily Tasks because your explanation for a flagged absence was sent back. Internal use only.<br>
         Replies to this address are not monitored — raise anything else with ${escapeHtml(reportedByName)}.
       </p>
     </td></tr>
