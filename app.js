@@ -2194,8 +2194,7 @@ async function submitUninformedResolution_() {
   if (!currentUninformedReport) return;
   const html = uninformedResolveEditor.innerHTML.trim();
   if (!html || uninformedResolveEditor.textContent.trim() === '') {
-    uninformedResolveError.textContent = 'Please explain what happened before submitting.';
-    uninformedResolveError.classList.remove('hidden');
+    showErrorToast_('Please explain what happened before submitting.');
     return;
   }
   uninformedResolveSubmitBtn.disabled = true;
@@ -2213,8 +2212,7 @@ async function submitUninformedResolution_() {
     showToast_('Explanation submitted — your manager will review it.', 'success');
     loadUninformedBanner_();
   } catch (_e) {
-    uninformedResolveError.textContent = 'Could not submit - please try again.';
-    uninformedResolveError.classList.remove('hidden');
+    showErrorToast_('Could not submit - please try again.');
   } finally {
     uninformedResolveSubmitBtn.disabled = false;
     uninformedResolveSubmitBtn.textContent = originalLabel;
@@ -2837,21 +2835,29 @@ async function withdrawLeaveRequest_(requestId, buttonEl) {
 // silently dropped.
 async function cleanupExpiredWithdrawnRequests_(_records) {}
 
+const TOAST_ICONS_ = {
+  success: '<svg class="toast-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>',
+  error: '<svg class="toast-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>',
+  warning: '<svg class="toast-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>'
+};
+
+// The single channel for transient feedback. `tone` is 'success' | 'error' |
+// 'warning' (or omitted for a plain slate toast). Slides up from the bottom,
+// holds 5s, fades out. Every error/warning in the app routes through here
+// rather than an inline red message.
 function showToast_(message, tone) {
   const el = document.createElement('div');
   el.className = 'toast' + (tone ? ' is-' + tone : '');
-  el.innerHTML =
-    (tone === 'success'
-      ? '<svg class="toast-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'
-      : '') +
-    '<span>' + escapeHtml(message) + '</span>';
+  el.setAttribute('role', tone === 'error' || tone === 'warning' ? 'alert' : 'status');
+  el.innerHTML = (TOAST_ICONS_[tone] || '') + '<span>' + escapeHtml(message) + '</span>';
   toastContainer.appendChild(el);
   requestAnimationFrame(() => el.classList.add('is-visible'));
   setTimeout(() => {
     el.classList.remove('is-visible');
-    setTimeout(() => el.remove(), 250);
-  }, 3000);
+    setTimeout(() => el.remove(), 350);
+  }, 5000);
 }
+function showErrorToast_(message) { showToast_(message, 'error'); }
 
 applyLeaveBtn.addEventListener('click', openApplyLeaveTab_);
 leaveCancelBtn.addEventListener('click', () => switchLeavesTab_('overview'));
@@ -2960,25 +2966,21 @@ function renderLeaveAttachmentList_() {
 
 leaveAttachmentInput.addEventListener('change', () => {
   const files = Array.from(leaveAttachmentInput.files || []);
-  leaveAttachmentError.classList.add('hidden');
   leaveAttachmentInput.value = '';
   if (!files.length) return;
 
   for (const file of files) {
     if (leaveAttachmentFiles.length >= LEAVE_ATTACHMENT_MAX_FILES) {
-      leaveAttachmentError.textContent = 'You can attach up to ' + LEAVE_ATTACHMENT_MAX_FILES + ' files.';
-      leaveAttachmentError.classList.remove('hidden');
+      showToast_('You can attach up to ' + LEAVE_ATTACHMENT_MAX_FILES + ' files.', 'warning');
       break;
     }
     const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
     if (LEAVE_ATTACHMENT_EXTS.indexOf(ext) === -1) {
-      leaveAttachmentError.textContent = 'Unsupported file type: ' + file.name + ' - use PDF, DOC, DOCX, TXT, or ZIP.';
-      leaveAttachmentError.classList.remove('hidden');
+      showToast_('Unsupported file type: ' + file.name + ' - use PDF, DOC, DOCX, TXT, or ZIP.', 'warning');
       continue;
     }
     if (file.size > LEAVE_ATTACHMENT_MAX_BYTES) {
-      leaveAttachmentError.textContent = file.name + ' is too large - max 8MB.';
-      leaveAttachmentError.classList.remove('hidden');
+      showToast_(file.name + ' is too large - max 8MB.', 'warning');
       continue;
     }
     leaveAttachmentFiles.push(file);
@@ -3005,13 +3007,11 @@ async function uploadAttachment_(file) {
 leaveSendBtn.addEventListener('click', async () => {
   if (!currentUserContext) return;
   if (!leaveSelectedDates.length) {
-    leaveDateRangeError.textContent = 'Please select a date (or date range) for this leave.';
-    leaveDateRangeError.classList.remove('hidden');
+    showErrorToast_('Please select a date (or date range) for this leave.');
     return;
   }
   if (selectedLeaveType === 'casualOutPass' && leaveTimeTo24_(leaveOutPassCheckOutTime) >= leaveTimeTo24_(leaveOutPassCheckInTime)) {
-    leaveOutPassTimeError.textContent = 'Check-in time must be after check-out time.';
-    leaveOutPassTimeError.classList.remove('hidden');
+    showErrorToast_('Check-in time must be after check-out time.');
     return;
   }
   const startDate = leaveSelectedDates[0];
@@ -3451,8 +3451,9 @@ function showAuthGate(errMsg, state) {
   // Defaults to the sign-in sub-state - a stale "check your email" or
   // "reset password" state must never persist across a sign-out.
   setAuthGateState_(state || 'signIn');
-  if (errMsg) { authError.textContent = errMsg; authError.classList.remove('hidden'); }
-  else { authError.classList.add('hidden'); authError.textContent = ''; }
+  authError.classList.add('hidden');
+  authError.textContent = '';
+  if (errMsg) showErrorToast_(errMsg);
 }
 function showAuthGateCheckEmail_(email) {
   setAuthGateState_('checkEmail');
@@ -3870,11 +3871,8 @@ changePasswordForm.addEventListener('submit', async (e) => {
   const newPassword = newPasswordInput.value;
   const confirm = confirmNewPasswordInput.value;
   if (!currentPassword || !newPassword) return;
-  changePasswordError.classList.add('hidden');
-  changePasswordSuccess.classList.add('hidden');
   if (newPassword !== confirm) {
-    changePasswordError.textContent = 'Passwords do not match.';
-    changePasswordError.classList.remove('hidden');
+    showErrorToast_('Passwords do not match.');
     return;
   }
   const originalLabel = changePasswordSubmitBtn.innerHTML;
@@ -3883,11 +3881,10 @@ changePasswordForm.addEventListener('submit', async (e) => {
   try {
     await apiRequest_('PATCH', '/auth/change-password', { currentPassword, newPassword });
     changePasswordForm.reset();
-    changePasswordSuccess.classList.remove('hidden');
-    setTimeout(closeChangePasswordModal_, 1200);
+    closeChangePasswordModal_();
+    showToast_('Password updated.', 'success');
   } catch (err) {
-    changePasswordError.textContent = err.message;
-    changePasswordError.classList.remove('hidden');
+    showErrorToast_(err.message);
   } finally {
     changePasswordSubmitBtn.disabled = false;
     changePasswordSubmitBtn.innerHTML = originalLabel;
@@ -4001,7 +3998,7 @@ bootstrapAuth_();
 // `kind` is one of: 'submitting' | 'ok' | 'error' | 'info'.
 // 'submitting' shows the dark-pill loader, no text.
 // 'ok'         shows the green tick (fades over 5s) + optional message.
-// 'error'      shows the message in red, no icon.
+// 'error'      routes the message to a bottom toast (showErrorToast_), no inline text.
 // 'info'       clears icons + message; used to reset between states.
 let statusClearTimer = null;
 function setStatus(kind, msg) {
@@ -4014,17 +4011,14 @@ function setStatus(kind, msg) {
   statusTick.classList.remove('status-tick-fade');
   statusText.textContent = msg || '';
 
-  // Errors get the red left-bar callout; other kinds are plain status text.
+  // Errors go to a toast now, not an inline red callout.
   if (kind === 'error') {
-    statusText.className = 'error-callout';
-    // Force a reflow so the fade restarts when errors fire back-to-back.
-    void statusText.offsetWidth;
-    statusText.classList.add('error-callout-fade');
-    statusClearTimer = setTimeout(() => {
-      statusText.textContent = '';
-      statusText.className = 'text-sm text-slate-500';
-    }, 5000);
-  } else if (kind === 'ok') {
+    statusText.textContent = '';
+    statusText.className = 'text-sm text-slate-500';
+    showErrorToast_(msg);
+    return;
+  }
+  if (kind === 'ok') {
     statusText.className = 'text-sm text-orange-600 font-semibold';
   } else {
     statusText.className = 'text-sm text-slate-500';
@@ -4191,9 +4185,8 @@ async function fetchSubmissions() {
     renderSubmissions(submissionsCache || []);
   } catch (err) {
     submissionsList.innerHTML =
-      '<div class="error-callout">' +
-      escapeHtml(err.message || 'Failed to load submissions.') +
-      '</div>';
+      '<div class="text-sm text-slate-400 text-center py-6">Couldn’t load your submissions — close and reopen to retry.</div>';
+    showErrorToast_(err.message || 'Failed to load submissions.');
   }
 }
 
@@ -4493,10 +4486,15 @@ function setExportStatus(kind, msg) {
     exportStatus.querySelector('.ew-status-text').textContent = msg;
     return;
   }
+  if (kind === 'error') {
+    exportStatus.className = 'hidden';
+    exportStatus.textContent = '';
+    showErrorToast_(msg);
+    return;
+  }
   exportStatus.textContent = msg;
-  if (kind === 'error')   exportStatus.className = 'error-callout';
-  else if (kind === 'ok') exportStatus.className = 'text-xs text-orange-600 font-semibold';
-  else                    exportStatus.className = 'text-xs text-slate-500';
+  if (kind === 'ok') exportStatus.className = 'text-xs text-orange-600 font-semibold';
+  else               exportStatus.className = 'text-xs text-slate-500';
 }
 
 function openExportModal() {
@@ -5434,7 +5432,8 @@ async function renderLeaveKpis_() {
         '</div>';
     }).join('');
   } catch (err) {
-    analyticsLeaveKpis.innerHTML = '<div class="text-xs text-red-500 col-span-2 sm:col-span-4">' + escapeHtml(err.message || 'Could not load leave activity.') + '</div>';
+    analyticsLeaveKpis.innerHTML = '<div class="text-xs text-slate-400 col-span-2 sm:col-span-4">Couldn’t load leave activity.</div>';
+    showErrorToast_(err.message || 'Could not load leave activity.');
   }
 }
 
@@ -5468,7 +5467,8 @@ function setAnalyticsStatus_(kind, msg) {
     return;
   }
   if (!msg) { analyticsStatus.className = 'hidden'; analyticsStatus.innerHTML = ''; return; }
-  analyticsStatus.className = kind === 'error' ? 'error-callout mb-4' : 'text-sm text-slate-500 mb-4';
+  if (kind === 'error') { analyticsStatus.className = 'hidden'; analyticsStatus.innerHTML = ''; showErrorToast_(msg); return; }
+  analyticsStatus.className = 'text-sm text-slate-500 mb-4';
   analyticsStatus.textContent = msg;
 }
 
@@ -5737,7 +5737,8 @@ function setDevDetailExportStatus_(kind, msg) {
   const el = document.getElementById('devDetailExportStatus');
   if (!el) return;
   if (!msg) { el.className = 'hidden'; el.textContent = ''; return; }
-  el.className = kind === 'error' ? 'error-callout mt-2' : 'text-xs text-slate-500 mt-2 text-center';
+  if (kind === 'error') { el.className = 'hidden'; el.textContent = ''; showErrorToast_(msg); return; }
+  el.className = 'text-xs text-slate-500 mt-2 text-center';
   el.textContent = msg;
 }
 
@@ -6439,7 +6440,8 @@ async function exportDevPerformancePdfFromPanel_(email) {
 
 function setAnalyticsExportStatus_(kind, msg) {
   if (!msg) { analyticsExportStatus.className = 'hidden'; analyticsExportStatus.textContent = ''; return; }
-  analyticsExportStatus.className = kind === 'error' ? 'error-callout mt-2' : 'text-xs text-slate-500 mt-2';
+  if (kind === 'error') { analyticsExportStatus.className = 'hidden'; analyticsExportStatus.textContent = ''; showErrorToast_(msg); return; }
+  analyticsExportStatus.className = 'text-xs text-slate-500 mt-2';
   analyticsExportStatus.textContent = msg;
 }
 

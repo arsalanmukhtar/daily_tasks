@@ -1566,7 +1566,10 @@ textarea {
 .lv-filter-btn:hover { background: #f8fafc; border-color: #94a3b8; }
 .lv-filter-btn.is-selected { background: #1e293b; border-color: #1e293b; color: #ffffff; }
 
-/* ---------- Toast notifications ---------- */
+/* ---------- Toast notifications ----------
+   Every transient success / error / warning in the app funnels through
+   showToast_() - they stack bottom-centre, slide up from below the viewport
+   edge, hold ~5s, then fade out. */
 .toast-container {
   position: fixed;
   left: 50%;
@@ -1577,26 +1580,35 @@ textarea {
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
+  width: max-content;
+  max-width: min(92vw, 28rem);
   pointer-events: none;
 }
 .toast {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.5rem;
-  padding: 0.65rem 1rem;
+  padding: 0.7rem 1rem;
   border-radius: 0.75rem;
   background: #1e293b;
   color: #f8fafc;
   font-size: 0.8125rem;
   font-weight: 600;
-  box-shadow: 0 10px 30px -8px rgba(15, 23, 42, 0.45);
+  line-height: 1.35;
+  box-shadow: 0 12px 34px -10px rgba(15, 23, 42, 0.5);
   opacity: 0;
-  transform: translateY(8px);
-  transition: opacity 250ms ease, transform 250ms ease;
+  transform: translateY(28px);
+  transition: opacity 300ms ease, transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .toast.is-visible { opacity: 1; transform: translateY(0); }
 .toast.is-success { background: #166534; }
-.toast-icon { width: 1rem; height: 1rem; flex-shrink: 0; }
+.toast.is-error   { background: #b42318; }
+.toast.is-warning { background: #b54708; }
+.toast-icon { width: 1rem; height: 1rem; flex-shrink: 0; margin-top: 0.06rem; }
+@media (prefers-reduced-motion: reduce) {
+  .toast { transition: opacity 200ms ease; transform: none; }
+  .toast.is-visible { transform: none; }
+}
 
 /* =========================================================
    Web redesign: nav-card stat badges, two-column Apply-for-
