@@ -170,6 +170,18 @@ const closeDrawerBtn     = document.getElementById('closeDrawerBtn');
 const submissionsList    = document.getElementById('submissionsList');
 const applyLeaveBtn      = document.getElementById('applyLeaveBtn');
 const applyLeaveBtnLabel = document.getElementById('applyLeaveBtnLabel');
+const upcomingLeaveEmpty = document.getElementById('upcomingLeaveEmpty');
+const upcomingLeaveBtn   = document.getElementById('upcomingLeaveBtn');
+const upcomingLeaveType  = document.getElementById('upcomingLeaveType');
+const upcomingLeaveDates = document.getElementById('upcomingLeaveDates');
+const leaveCalendarModal    = document.getElementById('leaveCalendarModal');
+const leaveCalendarBackdrop = document.getElementById('leaveCalendarBackdrop');
+const closeLeaveCalendarBtn = document.getElementById('closeLeaveCalendarBtn');
+const leaveCalendarSubtitle = document.getElementById('leaveCalendarSubtitle');
+const leaveCalPrevBtn       = document.getElementById('leaveCalPrevBtn');
+const leaveCalNextBtn       = document.getElementById('leaveCalNextBtn');
+const leaveCalMonthYearLabel = document.getElementById('leaveCalMonthYearLabel');
+const leaveCalGrid          = document.getElementById('leaveCalGrid');
 const leaveCategoryForeignTripBtn = document.getElementById('leaveCategoryForeignTripBtn');
 const leaveCategoryUmrahBtn       = document.getElementById('leaveCategoryUmrahBtn');
 const leaveCategoryMedicalBtn     = document.getElementById('leaveCategoryMedicalBtn');
@@ -1166,7 +1178,7 @@ async function refreshApplyLeaveButton() {
   } else if (rec.status === 'approved') {
     applyLeaveBtn.classList.add('is-approved');
     applyLeaveBtn.disabled = true;
-    applyLeaveBtnLabel.textContent = 'Approved';
+    applyLeaveBtnLabel.textContent = 'Upcoming Leave';
   } else if (rec.status === 'rejected') {
     applyLeaveBtn.classList.add('is-rejected');
     applyLeaveBtn.disabled = true;
@@ -1963,6 +1975,7 @@ async function loadMyLeavesData_() {
   // so an employee can always track everything they've ever applied for.
   const records = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
   renderMyLeavesBanner_(records);
+  renderUpcomingLeaveCard_(records);
   renderMyLeavesKpis_(records);
   renderMyLeavesYearChips_(records);
   renderMyLeavesQuarterTiles_(records);
@@ -2116,6 +2129,40 @@ function renderMyLeavesBanner_(records) {
   const approver = (currentUserContext && currentUserContext.reportedTo) || '';
   if (approver) bits.push('with ' + approver);
   myLeavesBannerMeta.textContent = bits.join(' · ');
+}
+
+// The overview's right-column card - the closest approved leave that hasn't
+// fully passed yet (still ongoing counts as "upcoming" too), independent of
+// whatever week happens to be picked on the main timesheet. Kept on the
+// module scope so the calendar modal (opened by clicking this card) knows
+// what to highlight without re-deriving it.
+let upcomingLeave_ = null;
+function nearestUpcomingApprovedLeave_(records) {
+  const todayKey = lcalKey_(lcalToday0_());
+  let best = null;
+  records.forEach(function (r) {
+    if (r.status !== 'approved') return;
+    const span = leaveRecordDateSpan_(r);
+    if (!span || lcalKey_(span.end) < todayKey) return; // no dates, or already fully passed
+    if (!best || span.start < best.span.start) best = { record: r, span: span };
+  });
+  return best;
+}
+
+function renderUpcomingLeaveCard_(records) {
+  upcomingLeave_ = nearestUpcomingApprovedLeave_(records);
+  if (!upcomingLeave_) {
+    upcomingLeaveBtn.classList.add('hidden');
+    upcomingLeaveEmpty.classList.remove('hidden');
+    return;
+  }
+  upcomingLeaveEmpty.classList.add('hidden');
+  upcomingLeaveBtn.classList.remove('hidden');
+  const { record, span } = upcomingLeave_;
+  upcomingLeaveType.textContent = leaveTypeLabel_(record.type);
+  upcomingLeaveDates.textContent = lcalKey_(span.start) === lcalKey_(span.end)
+    ? fmtDateLocal_(span.start)
+    : fmtDateLocal_(span.start) + ' – ' + fmtDateLocal_(span.end);
 }
 
 function renderMyLeavesKpis_(records) {
@@ -2385,6 +2432,26 @@ function leaveDatesSummaryForRecord_(rec) {
   }
   if (s) return { dateLabel: fmtDateLocal_(s), days: 1 };
   return { dateLabel: '', days: 1 };
+}
+
+// Same customDates-first precedence as leaveDatesSummaryForRecord_ above,
+// but returns actual Date objects (start/end span, plus the individual
+// customDates when the pick wasn't contiguous) instead of a display string -
+// what the "nearest upcoming leave" search and its calendar highlight need.
+function leaveRecordDateSpan_(rec) {
+  if (rec.customDates && rec.customDates.length) {
+    const dates = rec.customDates
+      .map(function (iso) { return new Date(iso); })
+      .filter(function (d) { return !isNaN(d.getTime()); })
+      .sort(function (a, b) { return a - b; });
+    if (dates.length) {
+      return { start: dates[0], end: dates[dates.length - 1], customDates: dates };
+    }
+  }
+  const s = rec.startDate && !isNaN(new Date(rec.startDate).getTime()) ? new Date(rec.startDate) : null;
+  if (!s) return null;
+  const e = rec.endDate && !isNaN(new Date(rec.endDate).getTime()) ? new Date(rec.endDate) : s;
+  return { start: s, end: e, customDates: null };
 }
 
 function renderMyLeaveCard_(rec) {
@@ -3563,6 +3630,86 @@ changePasswordForm.addEventListener('submit', async (e) => {
     changePasswordSubmitBtn.disabled = false;
     changePasswordSubmitBtn.innerHTML = originalLabel;
   }
+});
+
+// ---------- Upcoming leave calendar modal ----------
+// Read-only "view on calendar" for the nearest upcoming approved leave card
+// (My Leaves overview, right column). Reuses the same cal2-* look as the
+// Apply-for-Leave date picker's calendar for visual consistency, but every
+// day cell is rendered disabled - there's nothing to pick here, just a
+// highlighted leave span and prev/next month browsing.
+let leaveCalModalViewYear_ = new Date().getFullYear();
+let leaveCalModalViewMonth_ = new Date().getMonth();
+
+function leaveCalRenderModalGrid_() {
+  leaveCalMonthYearLabel.textContent = LCAL_MONTHS_[leaveCalModalViewMonth_] + ' ' + leaveCalModalViewYear_;
+  const span = upcomingLeave_ && upcomingLeave_.span;
+  const highlightSet = new Set();
+  if (span) {
+    if (span.customDates) {
+      span.customDates.forEach(function (d) { highlightSet.add(lcalKey_(d)); });
+    } else {
+      for (let d = new Date(span.start); d <= span.end; d = lcalAddDays_(d, 1)) highlightSet.add(lcalKey_(d));
+    }
+  }
+  const startKey = span ? lcalKey_(span.start) : null;
+  const endKey = span ? lcalKey_(span.end) : null;
+  const todayKey = lcalKey_(lcalToday0_());
+  const lead = new Date(leaveCalModalViewYear_, leaveCalModalViewMonth_, 1).getDay();
+
+  let html = '';
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(leaveCalModalViewYear_, leaveCalModalViewMonth_, 1 - lead + i);
+    const dKey = lcalKey_(d);
+    const isHighlighted = highlightSet.has(dKey);
+    const isEdge = span && !span.customDates && (dKey === startKey || dKey === endKey);
+    const isMid = isHighlighted && !isEdge;
+
+    let links = '';
+    if (span && !span.customDates && isHighlighted) {
+      const col = d.getDay();
+      if (highlightSet.has(lcalKey_(lcalAddDays_(d, -1))) && col !== 0) links += '<span class="cal2-link l"></span>';
+      if (highlightSet.has(lcalKey_(lcalAddDays_(d, 1))) && col !== 6) links += '<span class="cal2-link r"></span>';
+    }
+
+    const classes = ['cal2-day'];
+    if (d.getMonth() !== leaveCalModalViewMonth_) classes.push('is-adjacent');
+    if (d.getDay() === 0 || d.getDay() === 6) classes.push('is-weekend');
+    if (dKey === todayKey) classes.push('is-today');
+    if (isEdge || (span && span.customDates && isHighlighted)) classes.push('is-edge');
+    else if (isMid) classes.push('is-mid');
+
+    html += '<div class="cal2-cell">' + links +
+      '<button type="button" class="' + classes.join(' ') + '" disabled tabindex="-1">' + d.getDate() + '</button></div>';
+  }
+  leaveCalGrid.innerHTML = html;
+}
+
+function openLeaveCalendarModal_() {
+  if (!upcomingLeave_) return;
+  const { record, span } = upcomingLeave_;
+  leaveCalModalViewYear_ = span.start.getFullYear();
+  leaveCalModalViewMonth_ = span.start.getMonth();
+  leaveCalendarSubtitle.textContent = leaveTypeLabel_(record.type) + ' · ' +
+    (lcalKey_(span.start) === lcalKey_(span.end) ? fmtDateLocal_(span.start) : fmtDateLocal_(span.start) + ' – ' + fmtDateLocal_(span.end));
+  leaveCalRenderModalGrid_();
+  leaveCalendarModal.classList.remove('hidden');
+}
+function closeLeaveCalendarModal_() {
+  leaveCalendarModal.classList.add('hidden');
+}
+upcomingLeaveBtn.addEventListener('click', openLeaveCalendarModal_);
+closeLeaveCalendarBtn.addEventListener('click', closeLeaveCalendarModal_);
+leaveCalendarBackdrop.addEventListener('click', closeLeaveCalendarModal_);
+leaveCalPrevBtn.addEventListener('click', function () {
+  leaveCalModalViewMonth_--;
+  if (leaveCalModalViewMonth_ < 0) { leaveCalModalViewMonth_ = 11; leaveCalModalViewYear_--; }
+  leaveCalRenderModalGrid_();
+});
+leaveCalNextBtn.addEventListener('click', function () {
+  leaveCalModalViewMonth_++;
+  if (leaveCalModalViewMonth_ > 11) { leaveCalModalViewMonth_ = 0; leaveCalModalViewYear_++; }
+  leaveCalRenderModalGrid_();
 });
 
 // Holds the token from a #reset=<token> hash between page load and the

@@ -2019,3 +2019,11 @@ textarea {
 .mini:hover:not(:disabled) { background: var(--surface-2); }
 .mini.brand { border-color: var(--brand-200); color: var(--brand-700); background: var(--brand-50); }
 .mini:disabled { opacity: .6; cursor: not-allowed; }
+
+/* Auth/change-password inputs use a 14px (.text-sm) font, which renders the
+   browser's native password-mask dots too small to read as dots rather than
+   a faint dashed line. Scoped to [type="password"] specifically (higher
+   specificity than .text-sm - a type+attribute selector beats a class one)
+   so revealing the value via the eye toggle (which flips type to "text")
+   drops back to the normal size instead of carrying oversized characters. */
+input[type="password"] { font-size: 20px; letter-spacing: 2px; }
