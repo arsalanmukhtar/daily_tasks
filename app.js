@@ -3492,10 +3492,37 @@ signOutBtn.addEventListener('click', () => {
   showAuthGate();
 });
 
+// ---------- Password visibility toggles ----------
+// Wires every ".pw-toggle-btn" (sign-in, reset, and change-password fields)
+// to flip its sibling input between type="password"/"text" and swap the
+// eye/eye-off icon. Delegated at document level since some of these fields
+// (change-password modal) don't exist in a fixed DOM subtree at load time.
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.pw-toggle-btn');
+  if (!btn) return;
+  const input = btn.closest('.pw-field')?.querySelector('input');
+  if (!input) return;
+  const showing = input.type === 'text';
+  input.type = showing ? 'password' : 'text';
+  btn.querySelector('.pw-eye-icon')?.classList.toggle('hidden', !showing);
+  btn.querySelector('.pw-eye-off-icon')?.classList.toggle('hidden', showing);
+  btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+});
+function resetPasswordVisibility_(form) {
+  form.querySelectorAll('.pw-field').forEach((field) => {
+    field.querySelector('input').type = 'password';
+    field.querySelector('.pw-eye-icon')?.classList.remove('hidden');
+    field.querySelector('.pw-eye-off-icon')?.classList.add('hidden');
+    const btn = field.querySelector('.pw-toggle-btn');
+    if (btn) btn.setAttribute('aria-label', 'Show password');
+  });
+}
+
 // ---------- Change password modal ----------
 function openChangePasswordModal_() {
   closeSettingsMenu_();
   changePasswordForm.reset();
+  resetPasswordVisibility_(changePasswordForm);
   changePasswordError.classList.add('hidden');
   changePasswordSuccess.classList.add('hidden');
   changePasswordModal.classList.remove('hidden');
