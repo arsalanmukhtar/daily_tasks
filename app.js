@@ -772,7 +772,7 @@ wireColorButtons_(uninformedResolveToolbar);
 uninformedResolveEditor.addEventListener('focus', () => { activeCell = uninformedResolveEditor; activeToolbarEl = uninformedResolveToolbar; });
 uninformedResolveEditor.addEventListener('beforeinput', handleListAutoformat);
 
-// ---------- Rich-text paste sanitizing (shared by every .cell-editor) ----------
+// ---------- Rich-text sanitizing (paste-in and display-out) ----------
 // Every contenteditable in this app (daily-task cells, the leave-reason box,
 // the uninformed-explanation box) shares this one toolbar/execCommand
 // plumbing. Pasting from Word, a browser tab, or even this app's own
@@ -784,9 +784,15 @@ uninformedResolveEditor.addEventListener('beforeinput', handleListAutoformat);
 // external stylesheet rule), which is what made some pasted reasons render
 // as a dense, inconsistently-styled block instead of the clean bold/list
 // formatting .rich-text already provides for content typed via the toolbar.
-// Paste is intercepted here and rebuilt down to a plain semantic subset.
-const RICH_TEXT_PASTE_ALLOWED_TAGS_ = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'UL', 'OL', 'LI', 'P', 'DIV', 'A']);
-function sanitizeRichTextPasteInto_(sourceNode, targetParent) {
+//
+// So it's cleaned at both ends: on paste (below), and again on display
+// (sanitizeStoredRichTextHtml_) - the display pass also cleans up records
+// that were saved before paste-cleaning existed, and, since stored reason/
+// explanation/rejection HTML is otherwise injected raw via innerHTML,
+// doubles as the XSS guard for that content (no <script>, no event-handler
+// attributes, no javascript: URLs survive the allowlist rebuild).
+const RICH_TEXT_ALLOWED_TAGS_ = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'UL', 'OL', 'LI', 'P', 'DIV', 'A']);
+function sanitizeRichTextInto_(sourceNode, targetParent) {
   sourceNode.childNodes.forEach(function (node) {
     if (node.nodeType === Node.TEXT_NODE) {
       targetParent.appendChild(document.createTextNode(node.textContent));
@@ -794,17 +800,40 @@ function sanitizeRichTextPasteInto_(sourceNode, targetParent) {
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return;
     if (node.tagName === 'BR') { targetParent.appendChild(document.createElement('br')); return; }
-    if (RICH_TEXT_PASTE_ALLOWED_TAGS_.has(node.tagName)) {
+    if (node.tagName === 'SCRIPT' || node.tagName === 'STYLE') return; // drop contents entirely
+    if (RICH_TEXT_ALLOWED_TAGS_.has(node.tagName)) {
       const clean = document.createElement(node.tagName);
-      if (node.tagName === 'A' && node.getAttribute('href')) clean.setAttribute('href', node.getAttribute('href'));
-      sanitizeRichTextPasteInto_(node, clean);
+      if (node.tagName === 'A') {
+        const href = node.getAttribute('href') || '';
+        if (/^(https?:|mailto:)/i.test(href.trim())) {
+          clean.setAttribute('href', href.trim());
+          clean.setAttribute('target', '_blank');
+          clean.setAttribute('rel', 'noopener noreferrer');
+        }
+      }
+      sanitizeRichTextInto_(node, clean);
       targetParent.appendChild(clean);
     } else {
       // Unwrap anything not on the allowlist (span, font, a styled div,
       // etc.) - keep its text/children, drop the wrapper itself.
-      sanitizeRichTextPasteInto_(node, targetParent);
+      sanitizeRichTextInto_(node, targetParent);
     }
   });
+}
+// Parse an untrusted HTML string into an inert tree. A <template>'s content
+// is a DocumentFragment with no browsing context, so - unlike div.innerHTML -
+// <script> never runs and <img>/<iframe>/etc. never start loading, so an
+// "<img src=x onerror=...>" payload can't fire during sanitizing itself.
+function parseInertHtml_(html) {
+  const tpl = document.createElement('template');
+  tpl.innerHTML = String(html || '');
+  return tpl.content;
+}
+// Stored reason/explanation/rejection HTML -> a clean string safe to inject.
+function sanitizeStoredRichTextHtml_(html) {
+  const clean = document.createElement('div');
+  sanitizeRichTextInto_(parseInertHtml_(html), clean);
+  return clean.innerHTML;
 }
 document.addEventListener('paste', function (e) {
   const editor = e.target.closest && e.target.closest('.cell-editor');
@@ -812,11 +841,15 @@ document.addEventListener('paste', function (e) {
   e.preventDefault();
   const clipboard = e.clipboardData || window.clipboardData;
   const html = clipboard.getData('text/html');
-  const wrapper = document.createElement('div');
-  if (html) wrapper.innerHTML = html;
-  else wrapper.textContent = clipboard.getData('text/plain');
+  let source;
+  if (html) {
+    source = parseInertHtml_(html);
+  } else {
+    source = document.createElement('div');
+    source.textContent = clipboard.getData('text/plain');
+  }
   const clean = document.createElement('div');
-  sanitizeRichTextPasteInto_(wrapper, clean);
+  sanitizeRichTextInto_(source, clean);
 
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return;
@@ -2132,10 +2165,10 @@ function openUninformedResolveDrawer_(report) {
   currentUninformedReport = report;
   const d = report.date ? new Date(report.date) : null;
   uninformedResolveDate.textContent = d ? fmtDateLocal_(d) : '-';
-  uninformedResolveReportedReason.innerHTML = report.reasonHtml || '<i>No reason provided.</i>';
+  uninformedResolveReportedReason.innerHTML = sanitizeStoredRichTextHtml_(report.reasonHtml) || '<i>No reason provided.</i>';
   uninformedResolveReportedBy.textContent = report.reportedBy ? 'Reported by ' + report.reportedBy : '';
   if (report.rejectionNote) {
-    uninformedResolveRejectionNote.innerHTML = report.rejectionNote;
+    uninformedResolveRejectionNote.innerHTML = sanitizeStoredRichTextHtml_(report.rejectionNote);
     uninformedResolveRejectionBlock.classList.remove('hidden');
   } else {
     uninformedResolveRejectionBlock.classList.add('hidden');
@@ -2686,7 +2719,8 @@ function renderMyLeaveCard_(rec) {
     ? '<span class="mchip n">' + rec.attachments.length + (rec.attachments.length === 1 ? ' file' : ' files') + '</span>'
     : '';
 
-  const reasonHtml = rec.reasonHtml && rec.reasonHtml.trim() ? rec.reasonHtml : '<i class="text-slate-400">No reason provided.</i>';
+  const cleanReason = rec.reasonHtml && rec.reasonHtml.trim() ? sanitizeStoredRichTextHtml_(rec.reasonHtml) : '';
+  const reasonHtml = cleanReason.trim() ? cleanReason : '<i class="text-slate-400">No reason provided.</i>';
 
   let filesHtml = '';
   if (rec.attachments && rec.attachments.length) {

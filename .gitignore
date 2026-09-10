@@ -3,6 +3,9 @@
 .vscode/
 .idea/
 
+# Graphify knowledge-graph output (regenerated locally from source)
+graphify-out/
+
 # OS detritus
 .DS_Store
 Thumbs.db
