@@ -5,6 +5,7 @@
 
 # Graphify knowledge-graph output (regenerated locally from source)
 graphify-out/
+graphify-build.py
 
 # OS detritus
 .DS_Store

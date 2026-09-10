@@ -1,0 +1,26 @@
+# Graphify: keep the graph to the actual application source.
+# (node_modules, build, dist, .git, __pycache__ etc. are skipped by default.)
+
+# Retired native Kotlin manager app - being replaced by the Flutter app
+android-app/
+
+# Flutter platform shells and generated tooling (not app logic - that's mobile_app/lib)
+mobile_app/android/
+mobile_app/ios/
+mobile_app/.dart_tool/
+mobile_app/.idea/
+mobile_app/windows/
+mobile_app/linux/
+mobile_app/macos/
+mobile_app/web/
+mobile_app/test/
+
+# Local-only / non-source
+keys/
+screens/
+assets/
+graphify-out/
+.claude/
+
+# this runner itself
+graphify-build.py
