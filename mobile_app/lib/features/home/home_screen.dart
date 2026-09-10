@@ -21,11 +21,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Register this device's push token once signed in - see
-    // PushRepository's doc comment for why this doesn't wait for a
-    // dedicated "enable notifications" screen.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final entry = ref.read(currentAllowlistEntryProvider).value;
+      // Realtime updates (WebSocket) - replaces Firestore's onSnapshot.
+      ref.read(realtimeClientProvider).start();
+      // Register this device's push token once signed in - see
+      // PushRepository's doc comment for why this doesn't wait for a
+      // dedicated "enable notifications" screen.
+      final entry = ref.read(authStateProvider).value;
       if (entry != null) {
         ref.read(pushRepositoryProvider).requestPermissionAndRegister(entry.email).catchError((_) {});
       }
@@ -34,7 +36,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final entry = ref.watch(currentAllowlistEntryProvider).value;
+    final entry = ref.watch(authStateProvider).value;
 
     return Scaffold(
       appBar: AppBar(

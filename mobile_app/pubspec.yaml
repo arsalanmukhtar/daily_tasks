@@ -35,18 +35,22 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
-  # Firebase - same project (devteam-daily-tasks) the web app and the
-  # native Kotlin manager app already use. See PROJECT.md.
-  firebase_core: ^3.8.0
-  firebase_auth: ^5.3.3
-  cloud_firestore: ^5.5.0
-  firebase_messaging: ^15.1.5
-
-  # Google Sign-In with the same `drive.file` scope the web app requests
-  # (app.js:52) so leave attachments upload straight to the requester's
-  # own Drive, same as today - no Firebase Storage, no billing plan.
-  google_sign_in: ^6.2.2
+  # REST client for the self-hosted API (server/) that replaced Firebase -
+  # see PROJECT.md's web-cutover/Flutter-unification notes. Also used
+  # directly for the attachment upload multipart POST.
   http: ^1.2.2
+  # Realtime - the server broadcasts {resource,id} pointer events over a
+  # plain WebSocket (replaces Firestore's onSnapshot listeners).
+  web_socket_channel: ^3.0.1
+  # Catches the techewapp://verify?token=... custom-scheme link emailed by
+  # the magic-link sign-in flow (see server/src/auth.js) - a custom scheme
+  # is used instead of Android App Links/iOS Universal Links since those
+  # require a real HTTPS domain with a signed verification file, which this
+  # bare-IP, no-TLS deployment doesn't have.
+  app_links: ^6.3.2
+  # Stores the signed-in JWT - the mobile equivalent of the web app's
+  # localStorage.
+  shared_preferences: ^2.3.3
 
   # State management - StreamProvider/AsyncNotifier are the direct
   # equivalent of the Kotlin app's ViewModel + StateFlow pattern.

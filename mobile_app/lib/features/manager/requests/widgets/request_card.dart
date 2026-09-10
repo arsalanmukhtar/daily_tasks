@@ -1,0 +1,109 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
+import 'package:intl/intl.dart';
+
+import '../../../../core/theme/app_colors.dart';
+import '../../../../data/models/leave_request.dart';
+import '../../../../widgets/avatar.dart';
+import '../../../../widgets/status_chip.dart';
+
+final _dateFmt = DateFormat('d MMM yyyy');
+final _timeFmt = DateFormat('d MMM, h:mm a');
+
+String _leaveDateLabel(LeaveRequest r) {
+  if (r.customDates.length > 1) return '${r.customDates.length} days (custom)';
+  final start = r.startDate;
+  final end = r.endDate;
+  if (start == null) return '-';
+  if (end == null || start.difference(end).inDays == 0) return _dateFmt.format(start);
+  return '${_dateFmt.format(start)} - ${_dateFmt.format(end)}';
+}
+
+/// One row in the Requests/Archived list - avatar, status badge, type/
+/// duration/week chips, a short reason preview, and a resolved-by summary
+/// once decided. Mirrors the Kotlin app's RequestCard.kt.
+class RequestCard extends StatelessWidget {
+  const RequestCard({required this.request, required this.onTap, super.key});
+
+  final LeaveRequest request;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final (statusFg, statusBg) = AppColors.forStatus(request.status);
+    final (typeFg, typeBg) = AppColors.forType(request.type.value);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Avatar(name: request.name, email: request.email, size: 36),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(request.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+                        Text(request.email, style: TextStyle(color: AppColors.ink500, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  StatusChip(label: request.status.toUpperCase(), foreground: statusFg, background: statusBg),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  StatusChip(label: request.type.familyLabel, foreground: typeFg, background: typeBg),
+                  if (request.type.hasDurationChip)
+                    Builder(builder: (context) {
+                      final (fg, bg) = AppColors.forDuration(request.type.value);
+                      return StatusChip(label: request.type.label, foreground: fg, background: bg);
+                    }),
+                  StatusChip(
+                    label: _leaveDateLabel(request),
+                    foreground: AppColors.meta,
+                    background: AppColors.metaBg,
+                    icon: Icons.calendar_today_outlined,
+                  ),
+                  if (request.requestedAt != null)
+                    StatusChip(
+                      label: _timeFmt.format(request.requestedAt!),
+                      foreground: AppColors.meta,
+                      background: AppColors.metaBg,
+                      icon: Icons.schedule_outlined,
+                    ),
+                ],
+              ),
+              if (request.reasonHtml.isNotEmpty && request.reasonHtml != '<br>') ...[
+                const SizedBox(height: 8),
+                HtmlWidget(
+                  request.reasonHtml,
+                  textStyle: TextStyle(color: AppColors.ink700, fontSize: 13),
+                ),
+              ],
+              if (request.status != 'requested') ...[
+                const SizedBox(height: 8),
+                Text(
+                  '${request.status[0].toUpperCase()}${request.status.substring(1)} by '
+                  '${request.resolvedBy.isNotEmpty ? request.resolvedBy : "-"}',
+                  style: TextStyle(color: AppColors.ink500, fontSize: 12, fontStyle: FontStyle.italic),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

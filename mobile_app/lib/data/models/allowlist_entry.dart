@@ -1,8 +1,8 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
-/// Mirrors `allowlist/{email}` - the single source of truth for who can
-/// sign in and what they're allowed to do (see firestore.rules and
-/// README.md's "Adding or removing a team member").
+/// The signed-in user's own profile - mirrors GET /api/auth/me's response
+/// (and GET /api/users' entries), the single source of truth for who can
+/// sign in and what they're allowed to do (was `allowlist/{email}` in
+/// Firestore - see the old firestore.rules and README.md's "Adding or
+/// removing a team member").
 class AllowlistEntry {
   const AllowlistEntry({
     required this.email,
@@ -22,16 +22,15 @@ class AllowlistEntry {
   final bool isOwner;
   final bool active;
 
-  factory AllowlistEntry.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data() ?? {};
+  factory AllowlistEntry.fromJson(Map<String, dynamic> json) {
     return AllowlistEntry(
-      email: doc.id,
-      name: data['name'] as String? ?? '',
-      designation: data['designation'] as String? ?? '',
-      reportedTo: data['reportedTo'] as String? ?? '',
-      domain: data['domain'] as String? ?? 'GIS Developer',
-      isOwner: data['isOwner'] as bool? ?? false,
-      active: data['active'] as bool? ?? true,
+      email: json['email'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      designation: json['designation'] as String? ?? '',
+      reportedTo: json['reportedTo'] as String? ?? '',
+      domain: json['domain'] as String? ?? 'GIS Developer',
+      isOwner: json['isOwner'] as bool? ?? false,
+      active: json['active'] as bool? ?? true,
     );
   }
 }

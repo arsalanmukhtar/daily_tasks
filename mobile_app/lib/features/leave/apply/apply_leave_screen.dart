@@ -95,7 +95,6 @@ class _ApplyLeaveScreenState extends ConsumerState<ApplyLeaveScreen> {
     try {
       final weekLabel = weekLabelFromDate(_startDate);
       await ref.read(leaveRepositoryProvider).createLeaveRequest(
-            email: widget.email,
             name: widget.name,
             type: _type,
             weekLabel: weekLabel,

@@ -1,6 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
-/// Mirrors android-app's data/UninformedLeave.kt field-for-field. A manager
+/// Mirrors the server's uninformedLeaves client shape (GET/POST/PATCH
+/// /api/uninformed-leaves - see server/src/routes/uninformedLeaves.js's
+/// toClientShape). A manager
 /// files one of these when a developer was absent without ever applying for
 /// leave; the developer explains themselves (reported -> explained), the
 /// manager then accepts (-> resolved, converted into an approved
@@ -42,26 +42,29 @@ class UninformedLeave {
   final String resolutionHtml;
   final String linkedRequestId;
 
-  factory UninformedLeave.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data() ?? {};
-    DateTime? ts(String key) => (data[key] as Timestamp?)?.toDate();
+  factory UninformedLeave.fromJson(Map<String, dynamic> json) {
+    DateTime? dt(String key) {
+      final value = json[key] as String?;
+      return value == null ? null : DateTime.tryParse(value);
+    }
+
     return UninformedLeave(
-      reportId: doc.id,
-      email: data['email'] as String? ?? '',
-      name: data['name'] as String? ?? '',
-      date: ts('date'),
-      reasonHtml: data['reasonHtml'] as String? ?? '',
-      reportedBy: data['reportedBy'] as String? ?? '',
-      reportedAt: ts('reportedAt'),
-      status: data['status'] as String? ?? 'reported',
-      explanationHtml: data['explanationHtml'] as String? ?? '',
-      explainedAt: ts('explainedAt'),
-      rejectionNote: data['rejectionNote'] as String? ?? '',
-      rejectionNoteAt: ts('rejectionNoteAt'),
-      resolvedAt: ts('resolvedAt'),
-      resolvedBy: data['resolvedBy'] as String? ?? '',
-      resolutionHtml: data['resolutionHtml'] as String? ?? '',
-      linkedRequestId: data['linkedRequestId'] as String? ?? '',
+      reportId: json['reportId'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      date: dt('date'),
+      reasonHtml: json['reasonHtml'] as String? ?? '',
+      reportedBy: json['reportedBy'] as String? ?? '',
+      reportedAt: dt('reportedAt'),
+      status: json['status'] as String? ?? 'reported',
+      explanationHtml: json['explanationHtml'] as String? ?? '',
+      explainedAt: dt('explainedAt'),
+      rejectionNote: json['rejectionNote'] as String? ?? '',
+      rejectionNoteAt: dt('rejectionNoteAt'),
+      resolvedAt: dt('resolvedAt'),
+      resolvedBy: json['resolvedBy'] as String? ?? '',
+      resolutionHtml: json['resolutionHtml'] as String? ?? '',
+      linkedRequestId: json['linkedRequestId'] as String? ?? '',
     );
   }
 }

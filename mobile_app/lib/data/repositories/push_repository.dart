@@ -1,36 +1,21 @@
-import 'dart:io' show Platform;
+import '../../core/api/api_client.dart';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-
-/// Registers this device's FCM token the same way android-app's
-/// LeaveApiClient.registerPushToken() does (data/LeaveApiClient.kt:44-53) -
-/// same `pushTokens/{token}` shape, so push-daemon's existing lookups don't
-/// need to change to find this app's tokens too.
-///
-/// v1 note: push-daemon currently only sends FCM to *owners* (managers) -
-/// see PROJECT.md's "Future work". Registering the token now means nothing
-/// has to change here later when the daemon starts sending to developers too.
+/// Registers this device for push notifications - currently a documented
+/// no-op. FCM (`firebase_messaging`) was removed along with the rest of
+/// Firebase, so there's no token to generate here any more, and nothing on
+/// the new server (`server/src/routes/pushTokens.js` exists but nothing
+/// sends FCM pushes yet) consumes one either. See PROJECT.md's
+/// Flutter-unification notes: background push delivery (notifying a
+/// manager with the app fully closed) is a known, deliberately deferred
+/// gap - realtime while the app is open/connected is covered by
+/// RealtimeClient's WebSocket instead. Kept as a real class (not deleted)
+/// so home_screen.dart's call site needs no change when this gets built
+/// for real in a follow-up phase.
 class PushRepository {
-  PushRepository({FirebaseMessaging? messaging, FirebaseFirestore? firestore})
-      : _messaging = messaging ?? FirebaseMessaging.instance,
-        _firestore = firestore ?? FirebaseFirestore.instance;
+  PushRepository({required ApiClient apiClient}) : _api = apiClient;
 
-  final FirebaseMessaging _messaging;
-  final FirebaseFirestore _firestore;
+  // ignore: unused_field
+  final ApiClient _api;
 
-  Future<void> requestPermissionAndRegister(String email) async {
-    await _messaging.requestPermission(alert: true, badge: true, sound: true);
-    final token = await _messaging.getToken();
-    if (token != null) await _register(email, token);
-    _messaging.onTokenRefresh.listen((newToken) => _register(email, newToken));
-  }
-
-  Future<void> _register(String email, String token) {
-    return _firestore.collection('pushTokens').doc(token).set({
-      'email': email,
-      'platform': Platform.isIOS ? 'ios' : 'android',
-      'registeredAt': FieldValue.serverTimestamp(),
-    });
-  }
+  Future<void> requestPermissionAndRegister(String email) async {}
 }

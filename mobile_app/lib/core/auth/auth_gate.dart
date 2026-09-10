@@ -5,13 +5,16 @@ import '../../data/providers.dart';
 import '../theme/app_colors.dart';
 import 'sign_in_screen.dart';
 
-/// Same gate as app.js's onAuthStateChanged: not signed in -> SignInScreen;
-/// signed in but not on the allowlist (or inactive) -> SignInScreen with a
-/// denial message; signed in and allowlisted -> [child].
+/// Not signed in (or the session is invalid/expired) -> SignInScreen;
+/// signed in -> [developerChild] or [managerChild] depending on the
+/// profile's `isOwner` flag. GET /api/auth/me (behind authStateProvider)
+/// already re-verifies `active` server-side on every restore, replacing
+/// the old two-step "Firebase auth state -> allowlist lookup" chain.
 class AuthGate extends ConsumerWidget {
-  const AuthGate({required this.child, super.key});
+  const AuthGate({required this.developerChild, required this.managerChild, super.key});
 
-  final Widget child;
+  final Widget developerChild;
+  final Widget managerChild;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -20,17 +23,9 @@ class AuthGate extends ConsumerWidget {
     return authState.when(
       loading: () => const _SplashScreen(),
       error: (err, _) => SignInScreen(errorMessage: err.toString()),
-      data: (user) {
-        if (user == null) return const SignInScreen();
-
-        final allowlistState = ref.watch(currentAllowlistEntryProvider);
-        return allowlistState.when(
-          loading: () => const _SplashScreen(),
-          error: (err, _) => SignInScreen(
-            errorMessage: err is AllowlistDeniedException ? err.message : 'Something went wrong. Please try again.',
-          ),
-          data: (entry) => entry == null ? const SignInScreen() : child,
-        );
+      data: (entry) {
+        if (entry == null) return const SignInScreen();
+        return entry.isOwner ? managerChild : developerChild;
       },
     );
   }

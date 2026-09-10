@@ -24,6 +24,19 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Catches the techewapp://verify?token=... magic-link deep
+                 link (see server/src/auth.js's platform:'mobile' branch and
+                 lib/core/auth/deep_link_listener.dart). A custom scheme is
+                 used instead of Android App Links since those need a real
+                 HTTPS domain with a signed assetlinks.json, which this
+                 bare-IP, no-TLS deployment doesn't have - so no
+                 android:autoVerify here, this is a plain custom scheme. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="techewapp" android:host="verify"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

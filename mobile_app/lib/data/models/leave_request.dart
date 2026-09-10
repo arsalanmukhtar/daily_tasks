@@ -1,11 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 import 'attachment.dart';
 import 'leave_type.dart';
 
-/// Mirrors android-app's data/LeaveRequest.kt field-for-field - this is
-/// already the canonical cross-client shape (web + Kotlin app both read
-/// and write exactly these fields on `leaveRequests/{requestId}`).
+/// Mirrors the server's leaveRequests client shape (GET/POST/PATCH
+/// /api/leave-requests - see server/src/routes/leaveRequests.js's
+/// toClientShape) - the same canonical cross-client shape the web app and
+/// the old Kotlin app both used against Firestore's `leaveRequests/{id}`.
 class LeaveRequest {
   const LeaveRequest({
     required this.requestId,
@@ -28,6 +27,7 @@ class LeaveRequest {
     this.checkInTime = '',
     this.decisionNote = '',
     this.withdrawnAt,
+    this.dismissed = false,
   });
 
   final String requestId;
@@ -55,6 +55,7 @@ class LeaveRequest {
   // Plain text, never HTML - see PROJECT.md's rich-text note.
   final String decisionNote;
   final DateTime? withdrawnAt;
+  final bool dismissed;
 
   bool get isArchived {
     if (status == 'withdrawn') return true;
@@ -66,38 +67,42 @@ class LeaveRequest {
     return endDay.isBefore(todayDay);
   }
 
-  factory LeaveRequest.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data() ?? {};
-    DateTime? ts(String key) => (data[key] as Timestamp?)?.toDate();
+  factory LeaveRequest.fromJson(Map<String, dynamic> json) {
+    DateTime? dt(String key) {
+      final value = json[key] as String?;
+      return value == null ? null : DateTime.tryParse(value);
+    }
+
     return LeaveRequest(
-      requestId: doc.id,
-      requestedAt: ts('requestedAt'),
-      startDate: ts('startDate'),
-      endDate: ts('endDate'),
-      customDates: (data['customDates'] as List<dynamic>?)
-              ?.whereType<Timestamp>()
-              .map((t) => t.toDate())
+      requestId: json['requestId'] as String? ?? '',
+      requestedAt: dt('requestedAt'),
+      startDate: dt('startDate'),
+      endDate: dt('endDate'),
+      customDates: (json['customDates'] as List<dynamic>?)
+              ?.whereType<String>()
+              .map(DateTime.parse)
               .toList() ??
           const [],
-      email: data['email'] as String? ?? '',
-      name: data['name'] as String? ?? '',
-      weekLabel: data['weekLabel'] as String? ?? '',
-      type: LeaveType.normalize(data['type'] as String?),
-      reasonHtml: data['reasonHtml'] as String? ?? '',
-      status: data['status'] as String? ?? 'requested',
-      resolvedAt: ts('resolvedAt'),
-      resolvedBy: data['resolvedBy'] as String? ?? '',
-      attachments: (data['attachments'] as List<dynamic>?)
+      email: json['email'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      weekLabel: json['weekLabel'] as String? ?? '',
+      type: LeaveType.normalize(json['type'] as String?),
+      reasonHtml: json['reasonHtml'] as String? ?? '',
+      status: json['status'] as String? ?? 'requested',
+      resolvedAt: dt('resolvedAt'),
+      resolvedBy: json['resolvedBy'] as String? ?? '',
+      attachments: (json['attachments'] as List<dynamic>?)
               ?.whereType<Map<String, dynamic>>()
               .map(Attachment.fromMap)
               .toList() ??
           const [],
-      halfDayPeriod: data['halfDayPeriod'] as String? ?? '',
-      shortLeaveTime: data['shortLeaveTime'] as String? ?? '',
-      checkOutTime: data['checkOutTime'] as String? ?? '',
-      checkInTime: data['checkInTime'] as String? ?? '',
-      decisionNote: data['decisionNote'] as String? ?? '',
-      withdrawnAt: ts('withdrawnAt'),
+      halfDayPeriod: json['halfDayPeriod'] as String? ?? '',
+      shortLeaveTime: json['shortLeaveTime'] as String? ?? '',
+      checkOutTime: json['checkOutTime'] as String? ?? '',
+      checkInTime: json['checkInTime'] as String? ?? '',
+      decisionNote: json['decisionNote'] as String? ?? '',
+      withdrawnAt: dt('withdrawnAt'),
+      dismissed: json['dismissed'] as bool? ?? false,
     );
   }
 }

@@ -1,7 +1,7 @@
 /// Same ISO-8601 week calculation as app.js's dateToIsoWeek_/weekLabelFromDate_
 /// (app.js:703-714) - every client needs to agree on "Week N, YYYY" for a
-/// given date, since it's used as part of a Firestore doc ID
-/// (Submission.docIdFor) and shown as a label across all three clients.
+/// given date, since it's the server's submissions.week_label and shown as
+/// a label across all three clients.
 class IsoWeek {
   const IsoWeek(this.year, this.week);
   final int year;

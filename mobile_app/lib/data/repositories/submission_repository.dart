@@ -1,31 +1,41 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
+import '../../core/api/api_client.dart';
+import '../../core/api/realtime_client.dart';
+import '../../core/api/watch_resource.dart';
 import '../models/submission.dart';
 
-const _taskFormatVersion = 'rows-v1'; // matches app.js's TASK_FORMAT_VERSION
-
-/// Mirrors app.js's submitWeek_()/fetchUserSubmissions_() (app.js:3448-3494).
+/// Mirrors app.js's submitWeek_()/fetchUserSubmissions_(), now against
+/// server/src/routes/submissions.js instead of Firestore.
 class SubmissionRepository {
-  SubmissionRepository({FirebaseFirestore? firestore}) : _firestore = firestore ?? FirebaseFirestore.instance;
+  SubmissionRepository({required ApiClient apiClient, required this._realtime})
+      : _api = apiClient;
 
-  final FirebaseFirestore _firestore;
+  final ApiClient _api;
+  final RealtimeClient _realtime;
 
-  CollectionReference<Map<String, dynamic>> get _col => _firestore.collection('submissions');
+  Future<List<Submission>> _fetchMine() async {
+    final json = await _api.get('/submissions/mine') as List<dynamic>;
+    return json.map((e) => Submission.fromJson(e as Map<String, dynamic>)).toList();
+  }
 
   Stream<List<Submission>> watchMySubmissions(String email) {
-    return _col
-        .where('email', isEqualTo: email)
-        .snapshots()
-        .map((snap) => snap.docs.map(Submission.fromDoc).toList());
+    return watchResource(realtime: _realtime, resourceName: 'submissions', fetch: _fetchMine);
   }
 
+  /// Self-service only (`email` is always the caller's own - /mine is
+  /// always self-scoped server-side regardless of role) - finds one week in
+  /// the caller's own submissions rather than a dedicated single-week
+  /// route, same "filter the already-fetched list" approach used elsewhere
+  /// in this rewire.
   Future<Submission?> fetchByWeekLabel(String email, String weekLabel) async {
-    final doc = await _col.doc(Submission.docIdFor(email, weekLabel)).get();
-    return doc.exists ? Submission.fromDoc(doc) : null;
+    final mine = await _fetchMine();
+    for (final submission in mine) {
+      if (submission.weekLabel == weekLabel) return submission;
+    }
+    return null;
   }
 
-  /// Upserts by `{email}_{weekLabel}` doc ID - resubmitting the same week
-  /// overwrites it in place, same as the web app.
+  /// Upserts by `(email, weekLabel)` server-side - resubmitting the same
+  /// week overwrites it in place, same as the web app.
   Future<void> submitWeek({
     required String email,
     required String name,
@@ -36,18 +46,13 @@ class SubmissionRepository {
     required String weekRange,
     required List<TaskRow> taskRows,
   }) {
-    return _col.doc(Submission.docIdFor(email, weekLabel)).set({
-      'email': email,
+    return _api.put('/submissions/${Uri.encodeComponent(weekLabel)}', {
       'name': name,
       'designation': designation,
       'reportedTo': reportedTo,
       'domain': domain,
-      'weekLabel': weekLabel,
       'weekRange': weekRange,
-      'taskFormat': _taskFormatVersion,
       'taskRows': taskRows.map((r) => r.toMap()).toList(),
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
     });
   }
 }
