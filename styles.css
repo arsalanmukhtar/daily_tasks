@@ -1978,7 +1978,7 @@ textarea {
 .q .qv { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .qbar { display: flex; height: 5px; border-radius: 999px; overflow: hidden; background: var(--line-soft); margin-top: 7px; }
 .qbar i { display: block; }
-.q .qm { font-size: 10px; color: var(--ink-500); margin-top: 5px; display: flex; gap: 7px; flex-wrap: wrap; }
+.q .qm { font-size: 10px; color: var(--ink-500); margin-top: 5px; display: flex; justify-content: center; gap: 7px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
 .q.is-selected { border-color: var(--brand-600); background: var(--brand-50); }
 .q.is-future { cursor: not-allowed; background: var(--surface-2); opacity: .6; }
 .q.is-future:hover { border-color: var(--line); }

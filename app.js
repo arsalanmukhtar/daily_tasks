@@ -2168,10 +2168,14 @@ function renderMyLeavesQuarterTiles_(records) {
       (q.rejected ? '<i style="background:var(--no-600);width:' + pct(q.rejected) + '%"></i>' : '') +
       (q.pending ? '<i style="background:var(--wait-600);width:' + pct(q.pending) + '%"></i>' : '') +
     '</div>';
+    // Bare counts, no "ok"/"rejected"/"pending" words - the bar segment
+    // directly above already encodes which color means what (same
+    // green/red/amber convention used throughout the app), so this just
+    // reads as a legend's numbers rather than repeating it in prose.
     const metaParts = [];
-    if (q.approved) metaParts.push(q.approved + ' ok');
-    if (q.rejected) metaParts.push(q.rejected + ' rejected');
-    if (q.pending) metaParts.push(q.pending + ' pending');
+    if (q.approved) metaParts.push(q.approved);
+    if (q.rejected) metaParts.push(q.rejected);
+    if (q.pending) metaParts.push(q.pending);
     const meta = metaParts.length ? metaParts.join(' &middot; ')
       : '<span class="mut" style="color:var(--ink-400)">' + (isFuture ? "Hasn't started" : 'No leaves') + '</span>';
     return '<button type="button" class="q' + (q.q === myLeavesSelectedQuarter ? ' is-selected' : '') + (isFuture ? ' is-future' : '') + '"' +
@@ -3637,6 +3641,12 @@ async function fetchUserSubmissions_() {
       taskRows: data.taskRows,
       timestamp: data.updatedAt || null
     };
+  });
+  // Newest week first in the "My Submissions" drawer - weekLabelToIsoInput's
+  // "YYYY-Www" shape sorts correctly as a plain string, including across a
+  // year boundary (e.g. "2026-W02" > "2025-W52").
+  submissionsCache.sort(function (a, b) {
+    return weekLabelToIsoInput(b.weekLabel).localeCompare(weekLabelToIsoInput(a.weekLabel));
   });
   updateNavStatBadges_();
   return submissionsCache;
