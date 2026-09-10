@@ -2067,3 +2067,16 @@ textarea {
 .mini:hover:not(:disabled) { background: var(--surface-2); }
 .mini.brand { border-color: var(--brand-200); color: var(--brand-700); background: var(--brand-50); }
 .mini:disabled { opacity: .6; cursor: not-allowed; }
+
+/* Urbanist's bullet glyph is a thin, low dot, so masked password fields
+   render as a faint dotted line instead of conventional round dots. Swap
+   just the mask font (system fonts all have a proper filled-circle bullet)
+   for the filled state only - :not(:placeholder-shown) keeps the empty
+   field's placeholder in Urbanist at the normal 14px, and the eye toggle
+   flipping to type="text" drops this rule so a revealed value is Urbanist
+   again. Size is unchanged (still 14px); a little letter-spacing evens the
+   dots out. */
+input[type="password"]:not(:placeholder-shown) {
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  letter-spacing: 0.12em;
+}
