@@ -58,7 +58,7 @@ button,
 input,
 select,
 textarea {
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Urbanist', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-feature-settings: 'cv11', 'ss01', 'ss03';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -1213,7 +1213,7 @@ textarea {
 /* Inter Tight - the same family as the rest of the app, but a narrower cut,
    so KPI cards fit more (a long name, "12 tasks/week") before truncating. */
 .an-kpi-label {
-  font-family: 'Inter Tight', 'Inter', system-ui, sans-serif;
+  font-family: 'Inter Tight', 'Urbanist', system-ui, sans-serif;
   font-size: 9.5px;
   font-weight: 700;
   text-transform: uppercase;
@@ -1227,7 +1227,7 @@ textarea {
   /* Archivo Narrow only ships up to weight 700 (no 800/900 cut), so the
      weight below is set to match what's actually loaded - a heavier number
      here would just fall back to synthesized/faux bold. */
-  font-family: 'Archivo Narrow', 'Inter Tight', 'Inter', system-ui, sans-serif;
+  font-family: 'Archivo Narrow', 'Inter Tight', 'Urbanist', system-ui, sans-serif;
   margin-top: 0.25rem;
   font-size: clamp(0.92rem, 0.7vw + 0.62rem, 1.1rem);
   font-weight: 700;
@@ -1947,7 +1947,11 @@ textarea {
 /* Coloured KPI tiles - layered on top of the existing .an-kpi component */
 .an-kpi.stat-tile { position: relative; }
 .stat-tile .an-kpi-label { display: flex; align-items: center; gap: 5px; }
-.stat-tile .an-kpi-label i { width: 6px; height: 6px; border-radius: 999px; display: inline-block; background: var(--ink-400); }
+/* Flexbox centers this dot on the label's full line-box, but an all-caps
+   label has no descenders - the glyphs themselves sit visually higher than
+   that box's true center, so the dot needs a small upward nudge to read as
+   level with the letters rather than sitting low. */
+.stat-tile .an-kpi-label i { width: 6px; height: 6px; border-radius: 999px; display: inline-block; background: var(--ink-400); margin-top: -1px; }
 .an-kpi.stat-ok { background: var(--ok-50); border-color: var(--ok-200); }
 .an-kpi.stat-ok .an-kpi-value { color: var(--ok-800); }
 .an-kpi.stat-ok .an-kpi-label i { background: var(--ok-600); }
@@ -1966,7 +1970,7 @@ textarea {
    (Analytics panel) keep their original sizing. */
 .lv-kpi-grid .an-kpi { padding: 0.55rem 0.4rem; }
 .lv-kpi-grid .an-kpi-label { font-size: 8.5px; gap: 3px; }
-.lv-kpi-grid .an-kpi-label i { width: 5px; height: 5px; }
+.lv-kpi-grid .an-kpi-label i { width: 5px; height: 5px; margin-top: -1px; }
 .lv-kpi-grid .an-kpi-value { font-size: 1.05rem; }
 
 /* Quarter tiles + approve/reject progress bar */

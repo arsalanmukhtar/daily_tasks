@@ -124,6 +124,23 @@ export async function resetPassword(token, newPassword) {
   return issueJwt(user);
 }
 
+/**
+ * Changes an already-signed-in user's password - always requires the
+ * current password (unlike a reset token), so a session left open on a
+ * shared machine can't be used to silently lock the real owner out.
+ */
+export async function changePassword(email, currentPassword, newPassword) {
+  const normalized = normalizeEmail(email);
+  assertPasswordStrength(newPassword);
+  const { rows } = await pool.query('SELECT password_hash FROM users WHERE email = $1', [normalized]);
+  const user = rows[0];
+  if (!user?.password_hash) throw new Error('No password set for this account yet.');
+  const matches = await bcrypt.compare(String(currentPassword || ''), user.password_hash);
+  if (!matches) throw new Error('Current password is incorrect.');
+  const hash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+  await pool.query('UPDATE users SET password_hash = $1 WHERE email = $2', [hash, normalized]);
+}
+
 /** Express middleware: rejects unless `Authorization: Bearer <jwt>` is valid. */
 export function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';

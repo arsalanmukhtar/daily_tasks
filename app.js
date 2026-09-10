@@ -125,6 +125,19 @@ const authShowSignInFromForgotBtn   = document.getElementById('authShowSignInFro
 const authCheckEmailAddress = document.getElementById('authCheckEmailAddress');
 const authUseAnotherEmailBtn = document.getElementById('authUseAnotherEmailBtn');
 const signOutBtn       = document.getElementById('signOutBtn');
+const settingsBtn      = document.getElementById('settingsBtn');
+const settingsMenu     = document.getElementById('settingsMenu');
+const changePasswordMenuBtn = document.getElementById('changePasswordMenuBtn');
+const changePasswordModal    = document.getElementById('changePasswordModal');
+const changePasswordBackdrop = document.getElementById('changePasswordBackdrop');
+const closeChangePasswordBtn = document.getElementById('closeChangePasswordBtn');
+const changePasswordForm     = document.getElementById('changePasswordForm');
+const currentPasswordInput   = document.getElementById('currentPasswordInput');
+const newPasswordInput       = document.getElementById('newPasswordInput');
+const confirmNewPasswordInput = document.getElementById('confirmNewPasswordInput');
+const changePasswordError    = document.getElementById('changePasswordError');
+const changePasswordSuccess  = document.getElementById('changePasswordSuccess');
+const changePasswordSubmitBtn = document.getElementById('changePasswordSubmitBtn');
 const userChip         = document.getElementById('userChip');
 const userPhoto        = document.getElementById('userPhoto');
 const userName         = document.getElementById('userName');
@@ -2168,15 +2181,15 @@ function renderMyLeavesQuarterTiles_(records) {
       (q.rejected ? '<i style="background:var(--no-600);width:' + pct(q.rejected) + '%"></i>' : '') +
       (q.pending ? '<i style="background:var(--wait-600);width:' + pct(q.pending) + '%"></i>' : '') +
     '</div>';
-    // Bare counts, no "ok"/"rejected"/"pending" words - the bar segment
-    // directly above already encodes which color means what (same
-    // green/red/amber convention used throughout the app), so this just
-    // reads as a legend's numbers rather than repeating it in prose.
+    // Bare counts, no "ok"/"rejected"/"pending" words - each number is
+    // bolded in its bar segment's own color instead, so this reads as a
+    // legend (color -> count) rather than repeating the meaning in prose.
+    const SEP = '<span style="color:#000;font-weight:700">&middot;</span>';
     const metaParts = [];
-    if (q.approved) metaParts.push(q.approved);
-    if (q.rejected) metaParts.push(q.rejected);
-    if (q.pending) metaParts.push(q.pending);
-    const meta = metaParts.length ? metaParts.join(' &middot; ')
+    if (q.approved) metaParts.push('<span style="color:var(--ok-600);font-weight:700">' + q.approved + '</span>');
+    if (q.rejected) metaParts.push('<span style="color:var(--no-600);font-weight:700">' + q.rejected + '</span>');
+    if (q.pending) metaParts.push('<span style="color:var(--wait-600);font-weight:700">' + q.pending + '</span>');
+    const meta = metaParts.length ? metaParts.join(' ' + SEP + ' ')
       : '<span class="mut" style="color:var(--ink-400)">' + (isFuture ? "Hasn't started" : 'No leaves') + '</span>';
     return '<button type="button" class="q' + (q.q === myLeavesSelectedQuarter ? ' is-selected' : '') + (isFuture ? ' is-future' : '') + '"' +
       (isFuture ? ' disabled' : '') + ' data-quarter="' + q.q + '">' +
@@ -2209,7 +2222,7 @@ async function renderMyLeavesTrendChart_(records) {
   try {
     const Chart = await loadChartJS();
     if (myLeavesTrendChartInstance) { myLeavesTrendChartInstance.destroy(); myLeavesTrendChartInstance = null; }
-    const INTER_STACK = "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+    const URBANIST_STACK = "'Urbanist', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
     const AXIS_COLOR = '#94A3B8';   // --ink-400
     const GRID_COLOR = 'rgba(15, 23, 42, 0.06)';
     myLeavesTrendChartInstance = new Chart(document.getElementById('myLeavesTrendChart'), {
@@ -2241,12 +2254,12 @@ async function renderMyLeavesTrendChart_(records) {
             display: true, position: 'bottom', align: 'center',
             labels: {
               usePointStyle: true, pointStyle: 'circle', boxWidth: 7, boxHeight: 7,
-              padding: 16, color: '#475569', font: { size: 11, family: INTER_STACK, weight: '600' }
+              padding: 16, color: '#475569', font: { size: 11, family: URBANIST_STACK, weight: '600' }
             }
           },
           tooltip: {
             enabled: true, backgroundColor: '#0F172A', titleColor: '#F8FAFC', bodyColor: '#E2E8F0',
-            titleFont: { size: 12, family: INTER_STACK, weight: '700' }, bodyFont: { size: 12, family: INTER_STACK },
+            titleFont: { size: 12, family: URBANIST_STACK, weight: '700' }, bodyFont: { size: 12, family: URBANIST_STACK },
             padding: 10, cornerRadius: 8, boxPadding: 4, displayColors: true, usePointStyle: true,
             borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1
           }
@@ -2254,12 +2267,12 @@ async function renderMyLeavesTrendChart_(records) {
         scales: {
           x: {
             stacked: true, grid: { display: false }, border: { display: false },
-            ticks: { font: { size: 10.5, family: INTER_STACK }, color: AXIS_COLOR }
+            ticks: { font: { size: 10.5, family: URBANIST_STACK }, color: AXIS_COLOR }
           },
           y: {
             stacked: true, beginAtZero: true, border: { display: false },
             grid: { color: GRID_COLOR, drawTicks: false },
-            ticks: { precision: 0, font: { size: 10.5, family: INTER_STACK }, color: AXIS_COLOR, padding: 8 }
+            ticks: { precision: 0, font: { size: 10.5, family: URBANIST_STACK }, color: AXIS_COLOR, padding: 8 }
           }
         }
       }
@@ -3431,7 +3444,45 @@ authUseAnotherEmailBtn.addEventListener('click', () => {
   forgotEmail.focus();
 });
 
+// ---------- Settings menu (gear icon) ----------
+// Moved to a direct child of <body> once, up front - #userChip has
+// backdrop-blur (a frosted-glass effect against the gradient header), and
+// per spec backdrop-filter/filter/transform establish a containing block
+// for position:fixed descendants too, not just absolute ones. Left nested
+// inside userChip, this menu's top/right (computed relative to the true
+// viewport below) would resolve against that small chip instead.
+document.body.appendChild(settingsMenu);
+
+function closeSettingsMenu_() {
+  settingsMenu.classList.add('hidden');
+  settingsBtn.setAttribute('aria-expanded', 'false');
+}
+settingsBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const isOpen = !settingsMenu.classList.contains('hidden');
+  if (isOpen) {
+    closeSettingsMenu_();
+    return;
+  }
+  // Positioned from the button's own rect (not a Tailwind right-0/mt-2 on a
+  // positioned parent) since #settingsMenu is `fixed`, not `absolute` - see
+  // its markup comment for why.
+  const rect = settingsBtn.getBoundingClientRect();
+  settingsMenu.style.top = (rect.bottom + 8) + 'px';
+  settingsMenu.style.right = (window.innerWidth - rect.right) + 'px';
+  settingsMenu.classList.remove('hidden');
+  settingsBtn.setAttribute('aria-expanded', 'true');
+});
+// Closes on any click elsewhere on the page - the usual dropdown-menu
+// convention, since there's no dedicated backdrop for this small a menu.
+document.addEventListener('click', (e) => {
+  if (!settingsMenu.classList.contains('hidden') && !settingsMenu.contains(e.target) && e.target !== settingsBtn) {
+    closeSettingsMenu_();
+  }
+});
+
 signOutBtn.addEventListener('click', () => {
+  closeSettingsMenu_();
   stopInactivityTracking();
   stopLeaveStatusPolling_();
   clearStoredActivity();
@@ -3439,6 +3490,52 @@ signOutBtn.addEventListener('click', () => {
   if (realtimeSocket_) { realtimeSocket_.onclose = null; realtimeSocket_.close(); realtimeSocket_ = null; }
   currentUserContext = null;
   showAuthGate();
+});
+
+// ---------- Change password modal ----------
+function openChangePasswordModal_() {
+  closeSettingsMenu_();
+  changePasswordForm.reset();
+  changePasswordError.classList.add('hidden');
+  changePasswordSuccess.classList.add('hidden');
+  changePasswordModal.classList.remove('hidden');
+  currentPasswordInput.focus();
+}
+function closeChangePasswordModal_() {
+  changePasswordModal.classList.add('hidden');
+}
+changePasswordMenuBtn.addEventListener('click', openChangePasswordModal_);
+closeChangePasswordBtn.addEventListener('click', closeChangePasswordModal_);
+changePasswordBackdrop.addEventListener('click', closeChangePasswordModal_);
+
+changePasswordForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const currentPassword = currentPasswordInput.value;
+  const newPassword = newPasswordInput.value;
+  const confirm = confirmNewPasswordInput.value;
+  if (!currentPassword || !newPassword) return;
+  changePasswordError.classList.add('hidden');
+  changePasswordSuccess.classList.add('hidden');
+  if (newPassword !== confirm) {
+    changePasswordError.textContent = 'Passwords do not match.';
+    changePasswordError.classList.remove('hidden');
+    return;
+  }
+  const originalLabel = changePasswordSubmitBtn.innerHTML;
+  changePasswordSubmitBtn.disabled = true;
+  changePasswordSubmitBtn.innerHTML = '<span class="loader loader-sm on-brand" style="vertical-align: middle; margin-right: 6px;"></span>Updating...';
+  try {
+    await apiRequest_('PATCH', '/auth/change-password', { currentPassword, newPassword });
+    changePasswordForm.reset();
+    changePasswordSuccess.classList.remove('hidden');
+    setTimeout(closeChangePasswordModal_, 1200);
+  } catch (err) {
+    changePasswordError.textContent = err.message;
+    changePasswordError.classList.remove('hidden');
+  } finally {
+    changePasswordSubmitBtn.disabled = false;
+    changePasswordSubmitBtn.innerHTML = originalLabel;
+  }
 });
 
 // Holds the token from a #reset=<token> hash between page load and the
@@ -4913,7 +5010,7 @@ async function renderAnalytics_() {
   renderHeatmap_(model);
   try {
     const Chart = await loadChartJS();
-    Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+    Chart.defaults.font.family = "'Urbanist', system-ui, sans-serif";
     renderTeamTrendChart_(model, Chart);
     renderDevTrendChart_(model, Chart);
     renderLeaderboardChart_(model, Chart);
@@ -5312,7 +5409,7 @@ function offscreenChartImage_(Chart, config, wPx, hPx) {
   return dataUrl;
 }
 
-// Sets the PDF's current font family (Inter once registered via
+// Sets the PDF's current font family (Urbanist once registered via
 // registerPdfFonts_, else the doc falls back to Helvetica) at the given
 // style ('normal' | 'bold' | 'italic').
 function setPdfFont_(doc, style) {
@@ -5329,13 +5426,13 @@ function arrayBufferToBase64_(buf) {
   return btoa(binary);
 }
 
-// Fetches Inter (regular/bold/italic) as base64 TTFs, once - jsPDF only
-// ships Helvetica/Times/Courier, so matching the app's own Inter typography
-// in the PDF report requires embedding real font files.
+// Fetches Urbanist (regular/bold/italic) as base64 TTFs, once - jsPDF only
+// ships Helvetica/Times/Courier, so matching the app's own Urbanist
+// typography in the PDF report requires embedding real font files.
 let pdfReportFontsPromise = null;
 function loadPdfReportFonts_() {
   if (!pdfReportFontsPromise) {
-    const base = 'https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/';
+    const base = 'https://cdn.jsdelivr.net/fontsource/fonts/urbanist@latest/';
     pdfReportFontsPromise = Promise.all([
       fetch(base + 'latin-400-normal.ttf').then(function (r) { return r.arrayBuffer(); }),
       fetch(base + 'latin-700-normal.ttf').then(function (r) { return r.arrayBuffer(); }),
@@ -5347,20 +5444,20 @@ function loadPdfReportFonts_() {
   return pdfReportFontsPromise;
 }
 
-// Registers Inter on this doc instance and returns its font-family name for
-// use with setPdfFont_/autoTable. Falls back to 'helvetica' (and leaves the
-// doc otherwise untouched) if the font files can't be fetched, so the
+// Registers Urbanist on this doc instance and returns its font-family name
+// for use with setPdfFont_/autoTable. Falls back to 'helvetica' (and leaves
+// the doc otherwise untouched) if the font files can't be fetched, so the
 // report still generates offline.
 async function registerPdfFonts_(doc) {
   try {
     const fonts = await loadPdfReportFonts_();
-    doc.addFileToVFS('Inter-Regular.ttf', fonts.regular);
-    doc.addFont('Inter-Regular.ttf', 'Inter', 'normal');
-    doc.addFileToVFS('Inter-Bold.ttf', fonts.bold);
-    doc.addFont('Inter-Bold.ttf', 'Inter', 'bold');
-    doc.addFileToVFS('Inter-Italic.ttf', fonts.italic);
-    doc.addFont('Inter-Italic.ttf', 'Inter', 'italic');
-    return 'Inter';
+    doc.addFileToVFS('Urbanist-Regular.ttf', fonts.regular);
+    doc.addFont('Urbanist-Regular.ttf', 'Urbanist', 'normal');
+    doc.addFileToVFS('Urbanist-Bold.ttf', fonts.bold);
+    doc.addFont('Urbanist-Bold.ttf', 'Urbanist', 'bold');
+    doc.addFileToVFS('Urbanist-Italic.ttf', fonts.italic);
+    doc.addFont('Urbanist-Italic.ttf', 'Urbanist', 'italic');
+    return 'Urbanist';
   } catch (e) {
     return 'helvetica';
   }

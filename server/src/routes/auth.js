@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { loginWithPassword, requestPasswordReset, resetPassword, requireAuth } from '../auth.js';
+import { loginWithPassword, requestPasswordReset, resetPassword, changePassword, requireAuth } from '../auth.js';
 import { pool } from '../db.js';
 
 export const authRouter = Router();
@@ -45,6 +45,20 @@ authRouter.post('/reset-password', async (req, res) => {
   try {
     const result = await resetPassword(token, password);
     res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Changing your own password while already signed in - a plain client-side
+// modal in the web app's settings menu, not the reset-token flow. Always
+// requires the current password (see changePassword's doc comment).
+authRouter.patch('/change-password', requireAuth, async (req, res) => {
+  const currentPassword = String(req.body?.currentPassword || '');
+  const newPassword = String(req.body?.newPassword || '');
+  try {
+    await changePassword(req.user.email, currentPassword, newPassword);
+    res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

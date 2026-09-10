@@ -7,7 +7,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Inter+Tight:wght@600;700;800&family=Archivo+Narrow:wght@600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800&family=Inter+Tight:wght@600;700;800&family=Archivo+Narrow:wght@600;700&display=swap" rel="stylesheet" />
 
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="styles.css?v=20260909a" rel="stylesheet" />
@@ -57,9 +57,28 @@
                 <div id="userName" class="font-medium truncate text-sm"></div>
                 <div id="userEmail" class="text-slate-300 text-xs truncate"></div>
               </div>
-              <button id="signOutBtn" type="button" class="text-xs px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/25 transition whitespace-nowrap shrink-0">
-                Sign out
-              </button>
+              <div class="relative shrink-0">
+                <button id="settingsBtn" type="button" aria-haspopup="true" aria-expanded="false" title="Settings"
+                  class="w-8 h-8 rounded-md bg-white/15 hover:bg-white/25 transition inline-flex items-center justify-center">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
+                  </svg>
+                </button>
+                <!-- position: fixed (not absolute) - the header has
+                     overflow-hidden for its rounded corners, which would
+                     otherwise clip an absolutely-positioned dropdown; its
+                     top/right get set from the gear button's own rect in
+                     JS on open instead of relying on a positioned parent. -->
+                <div id="settingsMenu" class="hidden fixed w-48 bg-white rounded-lg shadow-lg ring-1 ring-slate-200 py-1 z-50 text-slate-700">
+                  <button id="changePasswordMenuBtn" type="button" class="w-full text-left px-3.5 py-2 text-sm hover:bg-slate-50">
+                    Change password
+                  </button>
+                  <button id="signOutBtn" type="button" class="w-full text-left px-3.5 py-2 text-sm hover:bg-slate-50 text-red-600">
+                    Sign out
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -154,6 +173,37 @@
       </div>
 
       <p id="authError" class="hidden mt-4 error-callout"></p>
+    </div>
+
+    <!-- ============ CHANGE PASSWORD MODAL ============ -->
+    <!-- Opened from the header's settings gear while already signed in -
+         a plain client-side modal, distinct from the sign-in gate's
+         forgot-password flow (this always requires the current password,
+         so a session left open on a shared machine can't be used to lock
+         the real owner out). -->
+    <div id="changePasswordModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4">
+      <div id="changePasswordBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
+      <div class="relative bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 w-full max-w-sm p-6">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-lg font-semibold text-slate-800">Change password</h3>
+          <button id="closeChangePasswordBtn" type="button" aria-label="Close" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+        </div>
+        <p class="text-slate-500 text-sm mb-4">Enter your current password and choose a new one.</p>
+        <form id="changePasswordForm" class="space-y-2.5">
+          <input id="currentPasswordInput" type="password" required autocomplete="current-password" placeholder="Current password"
+            class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500" />
+          <input id="newPasswordInput" type="password" required autocomplete="new-password" placeholder="New password (min. 8 characters)"
+            class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500" />
+          <input id="confirmNewPasswordInput" type="password" required autocomplete="new-password" placeholder="Confirm new password"
+            class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500" />
+          <p id="changePasswordError" class="hidden error-callout"></p>
+          <p id="changePasswordSuccess" class="hidden text-sm text-emerald-700 font-medium">Password updated.</p>
+          <button id="changePasswordSubmitBtn" type="submit"
+            class="mt-1 w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-orange-600 text-white text-sm font-semibold shadow-sm hover:bg-orange-700 active:bg-orange-800 transition">
+            <span>Update password</span>
+          </button>
+        </form>
+      </div>
     </div>
 
     <!-- ============ FORM ============ -->
