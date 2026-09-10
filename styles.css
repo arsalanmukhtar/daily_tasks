@@ -91,7 +91,7 @@ textarea {
   padding: 0;
 }
 .tb-btn:hover { background: #e2e8f0; color: #1e293b; }
-.tb-btn:focus { outline: none; box-shadow: 0 0 0 2px #fdba74; }
+.tb-btn:focus { outline: none; box-shadow: 0 0 0 1px #fdba74; }
 .tb-btn.active {
   background: #ffedd5;
   color: #9a3412;
@@ -281,7 +281,7 @@ textarea {
 }
 .cell-editor:focus {
   background: #fff7ed;
-  box-shadow: inset 0 0 0 1.5px #fdba74;
+  box-shadow: inset 0 0 0 1px #fdba74;
 }
 
 /* Future-day lock - weekday columns that haven't happened yet (e.g. this
@@ -336,7 +336,7 @@ textarea {
 }
 .task-row:hover .remove-row-btn { opacity: 1; }
 .remove-row-btn:hover { background: #fee2e2; color: #b91c1c; }
-.remove-row-btn:focus { opacity: 1; outline: none; box-shadow: 0 0 0 2px #fca5a5; }
+.remove-row-btn:focus { opacity: 1; outline: none; box-shadow: 0 0 0 1px #fca5a5; }
 
 /* ---------- Custom week picker ----------
    Replaces the native <input type="week"> dropdown (which can't be themed).
@@ -362,7 +362,6 @@ textarea {
 .week-trigger.is-open {
   outline: none;
   border-color: #64748b;
-  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.18);
 }
 .wt-icon,
 .wt-chevron {
@@ -443,7 +442,7 @@ textarea {
   border-color: #cbd5e1;
 }
 .week-cal-nav:disabled { opacity: 0.35; cursor: not-allowed; }
-.week-cal-nav:focus-visible { outline: none; box-shadow: 0 0 0 2px #94a3b8; }
+.week-cal-nav:focus-visible { outline: none; box-shadow: 0 0 0 1px #94a3b8; }
 
 /* Grid: week-number column + 7 day columns. Header and rows share a template
    so columns line up exactly. */
@@ -482,7 +481,7 @@ textarea {
   margin: 1px 0;
   transition: background 120ms ease, box-shadow 120ms ease;
 }
-.week-cal-row:focus-visible { outline: none; box-shadow: 0 0 0 2px #64748b; }
+.week-cal-row:focus-visible { outline: none; box-shadow: 0 0 0 1px #64748b; }
 .week-cal-row.is-disabled { cursor: not-allowed; }
 
 .week-cal-cell {
@@ -595,7 +594,7 @@ textarea {
   cursor: pointer;
   transition: background 110ms, color 110ms;
 }
-.week-cal-foot button:focus-visible { outline: none; box-shadow: 0 0 0 2px #94a3b8; }
+.week-cal-foot button:focus-visible { outline: none; box-shadow: 0 0 0 1px #94a3b8; }
 .week-cal-link { color: #334155; }
 .week-cal-link:hover { background: #f1f5f9; }
 .week-cal-clear { color: #64748b; }
@@ -673,11 +672,9 @@ textarea {
 .select-pro-trigger:focus {
   outline: none;
   border-color: #ea580c;
-  box-shadow: 0 0 0 1px #ea580c;
 }
 .select-pro.open .select-pro-trigger {
   border-color: #ea580c;
-  box-shadow: 0 0 0 1px #ea580c;
 }
 .select-pro.open #designationChevron {
   transform: rotate(180deg);
@@ -762,7 +759,6 @@ textarea {
 .ew-trigger.is-open {
   outline: none;
   border-color: #fb923c;                       /* orange-400 - modal accent */
-  box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.25);
 }
 .ew-trigger-icon { width: 16px; height: 16px; flex-shrink: 0; color: #ea580c; }
 .ew-trigger-label {
@@ -1007,7 +1003,7 @@ textarea {
   transition: background 120ms, color 120ms, border-color 120ms, box-shadow 120ms;
 }
 .an-range-btn:hover { border-color: #cbd5e1; background: #f8fafc; }
-.an-range-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px #fdba74; }
+.an-range-btn:focus-visible { outline: none; box-shadow: 0 0 0 1px #fdba74; }
 .an-range-btn.is-active {
   background: #334155;
   border-color: #334155;
@@ -1140,7 +1136,6 @@ textarea {
   outline: none;
   background: #ffffff;
   border-color: #fb923c;
-  box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.18);
 }
 
 /* Ranked developer option: a small colour dot (rank-coloured, same palette
@@ -1552,7 +1547,7 @@ textarea {
    error/warning state here, so the reason box gets its own quieter one. */
 .lv-reason-editor:focus {
   background: #ffffff;
-  box-shadow: inset 0 0 0 1.5px #94a3b8;
+  box-shadow: inset 0 0 0 1px #94a3b8;
 }
 
 .lv-chart-wrap { position: relative; min-height: 11rem; }
@@ -2030,7 +2025,7 @@ textarea {
 .mldf-select { position: relative; }
 .mldf-select-trigger { width: 100%; height: 30px; display: flex; align-items: center; justify-content: space-between; gap: 6px; border-radius: 7px; border: 1px solid var(--line); background: #fff; font-size: 11.5px; font-weight: 600; color: var(--ink-700); padding: 0 8px; cursor: pointer; }
 .mldf-select-trigger:hover { border-color: var(--ink-400); }
-.mldf-select.is-open .mldf-select-trigger { border-color: var(--brand-600); box-shadow: 0 0 0 1px var(--brand-600); }
+.mldf-select.is-open .mldf-select-trigger { border-color: var(--brand-600); }
 .mldf-select-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mldf-select-value.is-placeholder { color: var(--ink-400); font-weight: 500; }
 .mldf-select-chevron { width: 13px; height: 13px; color: var(--ink-400); flex-shrink: 0; transition: transform .15s ease; }
