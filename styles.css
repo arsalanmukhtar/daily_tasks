@@ -1904,6 +1904,11 @@ textarea {
 .file .fname { min-width: 0; flex: 1; }
 .file b { display: block; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-800); }
 .file span { font-size: 10.5px; color: var(--ink-500); }
+/* .file span above (0,1,1) otherwise beats .fic's own color: #fff (0,1,0)
+   since the file-type badge is itself a <span> - it kept its colored
+   background but lost its white text, reading as low-contrast/washed-out
+   instead of a clear badge. */
+.file .fic { color: #fff; }
 .file .rm {
   margin-left: auto; flex-shrink: 0; width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--line);
   background: #fff; color: var(--ink-500); cursor: pointer; font-size: 12px; line-height: 1;
@@ -1993,6 +1998,36 @@ textarea {
 .fchip { height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: 11.5px; font-weight: 600; color: var(--ink-600); cursor: pointer; }
 .fchip.is-selected { background: var(--ink-900); border-color: var(--ink-900); color: #fff; }
 .fchip .n { opacity: .6; margin-left: 4px; }
+/* Per-category tint (Accepted/Rejected/Withdrawn/Pending/Resolved) so the
+   chips read at a glance even before picking one - .is-selected then fills
+   with the same colour instead of the generic dark "All" treatment. */
+.fchip.f-ok { background: var(--ok-50); color: var(--ok-800); border-color: var(--ok-200); }
+.fchip.f-ok.is-selected { background: var(--ok-600); border-color: var(--ok-600); color: #fff; }
+.fchip.f-no { background: var(--no-50); color: var(--no-800); border-color: var(--no-200); }
+.fchip.f-no.is-selected { background: var(--no-600); border-color: var(--no-600); color: #fff; }
+.fchip.f-wait { background: var(--wait-50); color: var(--wait-800); border-color: var(--wait-200); }
+.fchip.f-wait.is-selected { background: var(--wait-600); border-color: var(--wait-600); color: #fff; }
+.fchip.f-neutral { background: var(--meta-bg); color: var(--meta); border-color: var(--meta-bd); }
+.fchip.f-neutral.is-selected { background: var(--meta); border-color: var(--meta); color: #fff; }
+.fchip.f-indigo { background: var(--indigo-50); color: var(--indigo-700); border-color: var(--indigo-200); }
+.fchip.f-indigo.is-selected { background: var(--indigo-600); border-color: var(--indigo-600); color: #fff; }
+
+.hfilter-cal-btn { width: 26px; height: 26px; border-radius: 999px; border: 1px solid var(--line); background: #fff; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-600); cursor: pointer; flex-shrink: 0; }
+.hfilter-cal-btn:hover { background: var(--surface-2); border-color: var(--ink-400); color: var(--ink-900); }
+.hfilter-cal-btn svg { width: 14px; height: 14px; }
+.hfilter-cal-btn.is-active { background: var(--brand-600); border-color: var(--brand-600); color: #fff; }
+
+.mldf-panel { position: fixed; z-index: 80; width: 260px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(15, 23, 42, .16); padding: 12px; }
+.mldf-section + .mldf-section { margin-top: 10px; }
+.mldf-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-400); margin-bottom: 6px; }
+.mldf-row { display: flex; flex-wrap: wrap; gap: 5px; }
+.mldf-months { display: grid; grid-template-columns: repeat(4, 1fr); }
+.mldf-chip { height: 24px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: 11px; font-weight: 600; color: var(--ink-600); cursor: pointer; }
+.mldf-chip:hover { background: var(--surface-2); }
+.mldf-chip.is-selected { background: var(--brand-600); border-color: var(--brand-600); color: #fff; }
+.mldf-select { width: 100%; height: 30px; border-radius: 7px; border: 1px solid var(--line); background: #fff; font-size: 11.5px; color: var(--ink-700); padding: 0 8px; }
+.mldf-clear { width: 100%; margin-top: 12px; height: 28px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface-2); font-size: 11px; font-weight: 700; color: var(--ink-600); cursor: pointer; }
+.mldf-clear:hover { background: #fff; border-color: var(--ink-400); }
 
 /* History cards */
 .lv { background: #fff; border: 1px solid var(--line); border-radius: var(--r-lg); padding: 11px 12px; box-shadow: var(--sh-1); scroll-margin-top: 12px; transition: box-shadow 200ms, border-color 200ms; }

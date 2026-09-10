@@ -240,6 +240,13 @@ const myLeavesKpiWithdrawn = document.getElementById('myLeavesKpiWithdrawn');
 const myLeavesYearChips    = document.getElementById('myLeavesYearChips');
 const myLeavesQuarterTiles = document.getElementById('myLeavesQuarterTiles');
 const myLeavesHistoryFilters = document.getElementById('myLeavesHistoryFilters');
+const myLeavesDateFilterBtn   = document.getElementById('myLeavesDateFilterBtn');
+const myLeavesDateFilterPanel = document.getElementById('myLeavesDateFilterPanel');
+const myLeavesDateFilterYears = document.getElementById('myLeavesDateFilterYears');
+const myLeavesDateFilterQuarters = document.getElementById('myLeavesDateFilterQuarters');
+const myLeavesDateFilterMonths = document.getElementById('myLeavesDateFilterMonths');
+const myLeavesDateFilterWeekSelect = document.getElementById('myLeavesDateFilterWeekSelect');
+const myLeavesDateFilterClearBtn = document.getElementById('myLeavesDateFilterClearBtn');
 const myLeavesList         = document.getElementById('myLeavesList');
 const myLeavesBanner          = document.getElementById('myLeavesBanner');
 const myLeavesBannerTitle     = document.getElementById('myLeavesBannerTitle');
@@ -765,6 +772,68 @@ wireColorButtons_(uninformedResolveToolbar);
 uninformedResolveEditor.addEventListener('focus', () => { activeCell = uninformedResolveEditor; activeToolbarEl = uninformedResolveToolbar; });
 uninformedResolveEditor.addEventListener('beforeinput', handleListAutoformat);
 
+// ---------- Rich-text paste sanitizing (shared by every .cell-editor) ----------
+// Every contenteditable in this app (daily-task cells, the leave-reason box,
+// the uninformed-explanation box) shares this one toolbar/execCommand
+// plumbing. Pasting from Word, a browser tab, or even this app's own
+// rendered UI carries over the source's inline styles/classes wholesale -
+// copying text off this app's own Tailwind-built pages in particular drags
+// along a huge "--tw-*" custom-property block on every <span>. Those inline
+// styles then permanently outrank this app's own .rich-text CSS wherever the
+// saved HTML is later displayed (an inline style always wins over an
+// external stylesheet rule), which is what made some pasted reasons render
+// as a dense, inconsistently-styled block instead of the clean bold/list
+// formatting .rich-text already provides for content typed via the toolbar.
+// Paste is intercepted here and rebuilt down to a plain semantic subset.
+const RICH_TEXT_PASTE_ALLOWED_TAGS_ = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'UL', 'OL', 'LI', 'P', 'DIV', 'A']);
+function sanitizeRichTextPasteInto_(sourceNode, targetParent) {
+  sourceNode.childNodes.forEach(function (node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      targetParent.appendChild(document.createTextNode(node.textContent));
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    if (node.tagName === 'BR') { targetParent.appendChild(document.createElement('br')); return; }
+    if (RICH_TEXT_PASTE_ALLOWED_TAGS_.has(node.tagName)) {
+      const clean = document.createElement(node.tagName);
+      if (node.tagName === 'A' && node.getAttribute('href')) clean.setAttribute('href', node.getAttribute('href'));
+      sanitizeRichTextPasteInto_(node, clean);
+      targetParent.appendChild(clean);
+    } else {
+      // Unwrap anything not on the allowlist (span, font, a styled div,
+      // etc.) - keep its text/children, drop the wrapper itself.
+      sanitizeRichTextPasteInto_(node, targetParent);
+    }
+  });
+}
+document.addEventListener('paste', function (e) {
+  const editor = e.target.closest && e.target.closest('.cell-editor');
+  if (!editor) return;
+  e.preventDefault();
+  const clipboard = e.clipboardData || window.clipboardData;
+  const html = clipboard.getData('text/html');
+  const wrapper = document.createElement('div');
+  if (html) wrapper.innerHTML = html;
+  else wrapper.textContent = clipboard.getData('text/plain');
+  const clean = document.createElement('div');
+  sanitizeRichTextPasteInto_(wrapper, clean);
+
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  const frag = document.createDocumentFragment();
+  let lastNode = null;
+  Array.from(clean.childNodes).forEach(function (n) { lastNode = frag.appendChild(n); });
+  range.insertNode(frag);
+  if (lastNode) {
+    range.setStartAfter(lastNode);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+});
+
 // Seed with a single empty row on startup.
 addTaskRow();
 
@@ -998,7 +1067,15 @@ let lcalViewYear = new Date().getFullYear();
 let lcalViewMonth = new Date().getMonth(); // 0-11
 let myLeavesSelectedYear = null;
 let myLeavesSelectedQuarter = null; // 1-4, or null - clicking a quarter tile filters the history list to it
-let myLeavesHistoryFilter = 'all'; // 'all' | 'pending' | 'resolved' - the hfilter chips
+// The three below are only ever set via the History tab's calendar-icon date
+// filter panel (myLeavesSelectedQuarter above is shared with the Overview
+// tab's quarter tiles too) - at most one of quarter/month/week/yearOnly is
+// active at a time, enforced by setMyLeavesDateFilter_ always resetting the
+// other three whenever one is applied.
+let myLeavesSelectedMonth = null; // 0-11, or null
+let myLeavesSelectedWeek = null;  // ISO week number (see dateToIsoWeek_), or null
+let myLeavesYearOnlyFilter = false; // true = filter to myLeavesSelectedYear with no further narrowing
+let myLeavesHistoryFilter = 'all'; // 'all' | 'accepted' | 'rejected' | 'withdrawn' | 'pending' | 'resolved' - the hfilter chips
 let myLeavesExpandedReasons = new Set(); // requestIds whose history-card reason clamp is expanded
 let myLeavesTrendChartInstance = null;
 // Last successful leaveStatus_ fetch - reused by the cooldown check, the
@@ -1054,12 +1131,11 @@ function updateNavStatBadges_() {
 async function fetchLeaveStatus_() {
   if (!currentUserContext) return null;
   try {
-    // Owners get everyone's requests from this same endpoint; this function
-    // is only ever called for "my own status" purposes, so that distinction
-    // doesn't matter here - every caller of fetchLeaveStatus_ is a
-    // non-owner-scoped view (My Leaves), never the owner-wide analytics read
-    // (that goes through renderLeaveKpis_() calling the same endpoint itself).
-    const items = await apiRequest_('GET', '/leave-requests');
+    // ?mine=1 forces self-scoping even for an owner caller - this function is
+    // only ever used for "my own status" (My Leaves), never the owner-wide
+    // analytics read (that's renderLeaveKpis_(), which deliberately omits
+    // ?mine=1 to get everyone's requests when the caller is an owner).
+    const items = await apiRequest_('GET', '/leave-requests?mine=1');
 
     // The API already returns plain ISO strings (Postgres, not Firestore
     // Timestamps) - no .toDate() decoding needed any more.
@@ -1965,6 +2041,7 @@ async function openMyLeavesDrawer() {
 function closeMyLeavesDrawer() {
   myLeavesDrawer.classList.remove('open');
   myLeavesBackdrop.classList.remove('open');
+  closeMyLeavesDateFilterPanel_();
 }
 
 async function loadMyLeavesData_() {
@@ -1992,11 +2069,11 @@ async function loadMyLeavesData_() {
 // nav-card bell badge, so both reflect the same one Firestore read.
 async function fetchOpenUninformedReports_() {
   if (!currentUserContext) return [];
-  // GET /api/uninformed-leaves is already self-scoped to the signed-in
-  // user (non-owners never see anyone else's reports) - filter to the two
-  // "still open" statuses client-side, same result the old where('status',
-  // 'in', [...]) query produced.
-  const reports = await apiRequest_('GET', '/uninformed-leaves');
+  // ?mine=1 forces self-scoping even for an owner caller (see the matching
+  // comment on server/src/routes/leaveRequests.js's GET '/') - filter to the
+  // two "still open" statuses client-side, same result the old
+  // where('status', 'in', [...]) query produced.
+  const reports = await apiRequest_('GET', '/uninformed-leaves?mine=1');
   return reports
     .filter(function (r) { return r.status === 'reported' || r.status === 'explained'; })
     .sort(function (a, b) { return new Date(b.reportedAt) - new Date(a.reportedAt); });
@@ -2173,10 +2250,17 @@ function renderMyLeavesKpis_(records) {
   myLeavesKpiWithdrawn.textContent = String(records.filter((r) => r.status === 'withdrawn').length);
 }
 
-function renderMyLeavesYearChips_(records) {
+// Every year that has at least one record, plus the current year (so a
+// brand-new account still has somewhere to land) - shared by the "By
+// quarter" year chips and the date-filter panel's own year row.
+function leaveRecordYears_(records) {
   const years = new Set([new Date().getFullYear()]);
   records.forEach((r) => { const d = leaveRecordDate_(r); if (d) years.add(d.getFullYear()); });
-  const sorted = Array.from(years).sort((a, b) => b - a);
+  return Array.from(years).sort((a, b) => b - a);
+}
+
+function renderMyLeavesYearChips_(records) {
+  const sorted = leaveRecordYears_(records);
   if (!myLeavesSelectedYear || sorted.indexOf(myLeavesSelectedYear) === -1) {
     myLeavesSelectedYear = sorted[0];
   }
@@ -2188,12 +2272,8 @@ function renderMyLeavesYearChips_(records) {
     btn.textContent = String(year);
     btn.addEventListener('click', () => {
       myLeavesSelectedYear = year;
-      myLeavesSelectedQuarter = null;
-      const recs = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
-      renderMyLeavesYearChips_(recs);
-      renderMyLeavesQuarterTiles_(recs);
-      renderMyLeavesTrendChart_(recs);
-      renderMyLeavesHistorySection_(recs);
+      setMyLeavesDateFilter_({});
+      renderMyLeavesYearChips_((latestLeaveStatusData && latestLeaveStatusData.allRecords) || []);
     });
     myLeavesYearChips.appendChild(btn);
   });
@@ -2341,49 +2421,173 @@ function leaveStatusLabel_(status) {
   return status || '';
 }
 
-// Records scoped to the currently-selected quarter tile (if any) - shared by
-// the history filter-chip counts and the list itself so they always agree.
+// Records scoped to whichever date filter is currently active (a quarter
+// tile, or the History tab's calendar-icon panel's year/quarter/month/week
+// choice) - shared by the history filter-chip counts and the list itself so
+// they always agree. No filter active at all -> everything, same as before.
 function quarterScopedLeaveRecords_(records) {
-  if (!myLeavesSelectedQuarter) return records;
+  const hasFilter = myLeavesSelectedQuarter || myLeavesSelectedMonth !== null || myLeavesSelectedWeek !== null || myLeavesYearOnlyFilter;
+  if (!hasFilter) return records;
   return records.filter(function (r) {
     const d = leaveRecordDate_(r);
-    return d && d.getFullYear() === myLeavesSelectedYear && (Math.floor(d.getMonth() / 3) + 1) === myLeavesSelectedQuarter;
+    if (!d || d.getFullYear() !== myLeavesSelectedYear) return false;
+    if (myLeavesSelectedQuarter) return (Math.floor(d.getMonth() / 3) + 1) === myLeavesSelectedQuarter;
+    if (myLeavesSelectedMonth !== null) return d.getMonth() === myLeavesSelectedMonth;
+    if (myLeavesSelectedWeek !== null) return dateToIsoWeek_(d).week === myLeavesSelectedWeek;
+    return true; // year-only filter - year match above is enough
   });
+}
+
+// Single place that changes which date filter is active, resetting the
+// other three so at most one is ever set, then re-renders everything that
+// depends on it. Pass {} to clear back to "all time".
+function setMyLeavesDateFilter_(opts) {
+  opts = opts || {};
+  myLeavesSelectedQuarter = opts.quarter || null;
+  myLeavesSelectedMonth = opts.month != null ? opts.month : null;
+  myLeavesSelectedWeek = opts.week != null ? opts.week : null;
+  myLeavesYearOnlyFilter = !!opts.yearOnly;
+  const recs = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
+  renderMyLeavesQuarterTiles_(recs);
+  renderMyLeavesHistorySection_(recs);
+  renderMyLeavesTrendChart_(recs);
+  renderMyLeavesDateFilterPanelContent_();
 }
 
 // Renders the All/Pending/Resolved filter chips (mockup .hfilter) together
 // with the history list they filter, so the two never fall out of sync.
+// "Accepted"/"Rejected" only cover ordinary leave decisions - an
+// uninformedAbsence-type row only ever lands in leave_requests once its
+// report has already been accepted (resolveUninformedLeave's conversion),
+// so from this history's point of view it's its own category ("Resolved",
+// meaning a resolved uninformed absence) rather than double-counted as an
+// ordinary Accepted decision too.
+function isResolvedUninformedRecord_(r) { return normalizeLeaveType_(r.type) === 'uninformedAbsence'; }
+
+const MY_LEAVES_HISTORY_FILTERS_ = [
+  { key: 'all', label: 'All', chipClass: '', match: function () { return true; } },
+  { key: 'accepted', label: 'Accepted', chipClass: 'f-ok', match: function (r) { return r.status === 'approved' && !isResolvedUninformedRecord_(r); } },
+  { key: 'rejected', label: 'Rejected', chipClass: 'f-no', match: function (r) { return r.status === 'rejected' && !isResolvedUninformedRecord_(r); } },
+  { key: 'withdrawn', label: 'Withdrawn', chipClass: 'f-neutral', match: function (r) { return r.status === 'withdrawn'; } },
+  { key: 'pending', label: 'Pending', chipClass: 'f-wait', match: function (r) { return r.status === 'requested'; } },
+  { key: 'resolved', label: 'Resolved', chipClass: 'f-indigo', match: isResolvedUninformedRecord_ }
+];
+
 function renderMyLeavesHistorySection_(records) {
   const scoped = quarterScopedLeaveRecords_(records);
-  const pendingCount = scoped.filter(function (r) { return r.status === 'requested'; }).length;
-  const counts = { all: scoped.length, pending: pendingCount, resolved: scoped.length - pendingCount };
-  const filters = [
-    { key: 'all', label: 'All' },
-    { key: 'pending', label: 'Pending' },
-    { key: 'resolved', label: 'Resolved' }
-  ];
-  myLeavesHistoryFilters.innerHTML = '<span class="t">HISTORY</span>' + filters.map(function (f) {
-    return '<button type="button" class="fchip' + (f.key === myLeavesHistoryFilter ? ' is-selected' : '') + '" data-filter="' + f.key + '">' +
-      escapeHtml(f.label) + '<span class="n">' + counts[f.key] + '</span></button>';
+  myLeavesHistoryFilters.innerHTML = '<span class="t">HISTORY</span>' + MY_LEAVES_HISTORY_FILTERS_.map(function (f) {
+    const count = scoped.filter(f.match).length;
+    const classes = 'fchip' + (f.chipClass ? ' ' + f.chipClass : '') + (f.key === myLeavesHistoryFilter ? ' is-selected' : '');
+    return '<button type="button" class="' + classes + '" data-filter="' + f.key + '">' +
+      escapeHtml(f.label) + '<span class="n">' + count + '</span></button>';
   }).join('');
 
-  let listRecords = scoped;
-  if (myLeavesHistoryFilter === 'pending') listRecords = scoped.filter(function (r) { return r.status === 'requested'; });
-  else if (myLeavesHistoryFilter === 'resolved') listRecords = scoped.filter(function (r) { return r.status !== 'requested'; });
-  renderMyLeavesList_(listRecords);
+  const active = MY_LEAVES_HISTORY_FILTERS_.find(function (f) { return f.key === myLeavesHistoryFilter; }) || MY_LEAVES_HISTORY_FILTERS_[0];
+  renderMyLeavesList_(scoped.filter(active.match));
 }
+
+// ---------- History date filter panel (calendar icon) ----------
+const MY_LEAVES_DATE_FILTER_MONTHS_ = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function renderMyLeavesDateFilterPanelContent_() {
+  const recs = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
+  const years = leaveRecordYears_(recs);
+
+  myLeavesDateFilterYears.innerHTML = years.map(function (year) {
+    return '<button type="button" class="mldf-chip' + (year === myLeavesSelectedYear ? ' is-selected' : '') + '" data-year="' + year + '">' + year + '</button>';
+  }).join('');
+
+  myLeavesDateFilterQuarters.innerHTML = [1, 2, 3, 4].map(function (q) {
+    return '<button type="button" class="mldf-chip' + (myLeavesSelectedQuarter === q ? ' is-selected' : '') + '" data-quarter="' + q + '">Q' + q + '</button>';
+  }).join('');
+
+  myLeavesDateFilterMonths.innerHTML = MY_LEAVES_DATE_FILTER_MONTHS_.map(function (label, i) {
+    return '<button type="button" class="mldf-chip' + (myLeavesSelectedMonth === i ? ' is-selected' : '') + '" data-month="' + i + '">' + label + '</button>';
+  }).join('');
+
+  // Only weeks that actually have a record in the selected year - a bare
+  // 1-53 dropdown would be almost entirely empty options for most people.
+  const weeksInYear = new Set();
+  recs.forEach(function (r) {
+    const d = leaveRecordDate_(r);
+    if (d && d.getFullYear() === myLeavesSelectedYear) weeksInYear.add(dateToIsoWeek_(d).week);
+  });
+  const sortedWeeks = Array.from(weeksInYear).sort(function (a, b) { return a - b; });
+  myLeavesDateFilterWeekSelect.innerHTML = '<option value="">Pick a week&hellip;</option>' +
+    sortedWeeks.map(function (w) {
+      return '<option value="' + w + '"' + (myLeavesSelectedWeek === w ? ' selected' : '') + '>Week ' + w + '</option>';
+    }).join('');
+
+  myLeavesDateFilterBtn.classList.toggle('is-active',
+    !!myLeavesSelectedQuarter || myLeavesSelectedMonth !== null || myLeavesSelectedWeek !== null || myLeavesYearOnlyFilter);
+}
+
+// Fixed-position portal, same reasoning as #settingsMenu (see app.js's
+// settings-menu section) - escapes the My Leaves drawer's own scrollable/
+// backdrop-blur containing-block quirks that broke position:absolute here.
+document.body.appendChild(myLeavesDateFilterPanel);
+
+function closeMyLeavesDateFilterPanel_() {
+  myLeavesDateFilterPanel.classList.add('hidden');
+  myLeavesDateFilterBtn.setAttribute('aria-expanded', 'false');
+}
+myLeavesDateFilterBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const isOpen = !myLeavesDateFilterPanel.classList.contains('hidden');
+  if (isOpen) { closeMyLeavesDateFilterPanel_(); return; }
+  renderMyLeavesDateFilterPanelContent_();
+  const rect = myLeavesDateFilterBtn.getBoundingClientRect();
+  myLeavesDateFilterPanel.style.top = (rect.bottom + 8) + 'px';
+  myLeavesDateFilterPanel.style.right = (window.innerWidth - rect.right) + 'px';
+  myLeavesDateFilterPanel.classList.remove('hidden');
+  myLeavesDateFilterBtn.setAttribute('aria-expanded', 'true');
+});
+document.addEventListener('click', (e) => {
+  if (myLeavesDateFilterPanel.classList.contains('hidden')) return;
+  if (myLeavesDateFilterPanel.contains(e.target) || myLeavesDateFilterBtn.contains(e.target)) return;
+  closeMyLeavesDateFilterPanel_();
+});
+function refreshMyLeavesYearChipsRow_() {
+  renderMyLeavesYearChips_((latestLeaveStatusData && latestLeaveStatusData.allRecords) || []);
+}
+myLeavesDateFilterYears.addEventListener('click', (e) => {
+  const btn = e.target.closest('.mldf-chip');
+  if (!btn) return;
+  myLeavesSelectedYear = parseInt(btn.dataset.year, 10);
+  setMyLeavesDateFilter_({ yearOnly: true });
+  refreshMyLeavesYearChipsRow_();
+});
+myLeavesDateFilterQuarters.addEventListener('click', (e) => {
+  const btn = e.target.closest('.mldf-chip');
+  if (!btn) return;
+  const q = parseInt(btn.dataset.quarter, 10);
+  setMyLeavesDateFilter_(myLeavesSelectedQuarter === q ? {} : { quarter: q });
+  refreshMyLeavesYearChipsRow_();
+});
+myLeavesDateFilterMonths.addEventListener('click', (e) => {
+  const btn = e.target.closest('.mldf-chip');
+  if (!btn) return;
+  const m = parseInt(btn.dataset.month, 10);
+  setMyLeavesDateFilter_(myLeavesSelectedMonth === m ? {} : { month: m });
+  refreshMyLeavesYearChipsRow_();
+});
+myLeavesDateFilterWeekSelect.addEventListener('change', () => {
+  const val = myLeavesDateFilterWeekSelect.value;
+  setMyLeavesDateFilter_(val ? { week: parseInt(val, 10) } : {});
+  refreshMyLeavesYearChipsRow_();
+});
+myLeavesDateFilterClearBtn.addEventListener('click', () => {
+  setMyLeavesDateFilter_({});
+  refreshMyLeavesYearChipsRow_();
+});
 
 // Resets filters to show everything, expands the given card's reason, and
 // scrolls it into view - used by the pending banner's "View" button.
 function viewLeaveRequestInHistory_(requestId) {
   if (!requestId) return;
   myLeavesHistoryFilter = 'all';
-  myLeavesSelectedQuarter = null;
   myLeavesExpandedReasons.add(requestId);
-  const recs = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
-  renderMyLeavesQuarterTiles_(recs);
-  renderMyLeavesHistorySection_(recs);
-  renderMyLeavesTrendChart_(recs);
+  setMyLeavesDateFilter_({});
   requestAnimationFrame(function () {
     const el = document.getElementById('leave-card-' + requestId);
     if (!el) return;
@@ -2643,9 +2847,9 @@ uninformedBannerViewBtn.addEventListener('click', async () => {
   const reportId = uninformedBanner.dataset.reportId;
   if (!reportId) return;
   try {
-    // Same "find in the already-self-scoped list" approach as the deep-link
-    // opener - no dedicated single-report GET route exists or is needed.
-    const reports = await apiRequest_('GET', '/uninformed-leaves');
+    // Same "find in the caller's own list" approach as the deep-link opener
+    // below - no dedicated single-report GET route exists or is needed.
+    const reports = await apiRequest_('GET', '/uninformed-leaves?mine=1');
     const report = reports.find(function (r) { return r.reportId === reportId; });
     if (report) openUninformedResolveDrawer_(report);
   } catch (_e) { /* best-effort */ }
@@ -2658,11 +2862,7 @@ myLeavesQuarterTiles.addEventListener('click', (e) => {
   const btn = e.target.closest('.q');
   if (!btn || btn.disabled) return;
   const q = parseInt(btn.dataset.quarter, 10);
-  myLeavesSelectedQuarter = (myLeavesSelectedQuarter === q) ? null : q;
-  const recs = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
-  renderMyLeavesQuarterTiles_(recs);
-  renderMyLeavesHistorySection_(recs);
-  renderMyLeavesTrendChart_(recs);
+  setMyLeavesDateFilter_(myLeavesSelectedQuarter === q ? {} : { quarter: q });
 });
 myLeavesHistoryFilters.addEventListener('click', (e) => {
   const btn = e.target.closest('.fchip');
@@ -3418,9 +3618,9 @@ async function openResolveUninformedDeepLinkOnce_() {
   const reportId = decodeURIComponent(match[1]);
   try {
     // No single-report GET route exists (or is needed) server-side - the
-    // self-scoped list is already small, so find the one report client-side
+    // caller's own list is already small, so find the one report client-side
     // rather than adding a route for this one deep-link case.
-    const reports = await apiRequest_('GET', '/uninformed-leaves');
+    const reports = await apiRequest_('GET', '/uninformed-leaves?mine=1');
     const data = reports.find(function (r) { return r.reportId === reportId; });
     if (!data) return;
     if ((data.email || '').toLowerCase() !== currentUserEmail_()) return;

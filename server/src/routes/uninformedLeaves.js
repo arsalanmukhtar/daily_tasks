@@ -29,10 +29,14 @@ function toClientShape(row) {
   };
 }
 
-// Owners see every report; a developer only ever sees their own - mirrors
+// Owners see every report unless ?mine=1 is passed (the web app's My Leaves
+// banner/deep-link/resolve flows are always the caller's own reports, even
+// for an owner - see the matching ?mine=1 comment on leaveRequestsRouter's
+// GET '/' above); a developer only ever sees their own either way - mirrors
 // firestore.rules' `resource.data.email == emailLower() || isOwner()`.
 uninformedLeavesRouter.get('/', requireAuth, async (req, res) => {
-  const query = req.user.isOwner
+  const mine = req.query.mine === '1' || req.query.mine === 'true';
+  const query = (req.user.isOwner && !mine)
     ? pool.query('SELECT * FROM uninformed_leaves ORDER BY reported_at DESC LIMIT 500')
     : pool.query('SELECT * FROM uninformed_leaves WHERE email = $1 ORDER BY reported_at DESC LIMIT 500', [
         req.user.email

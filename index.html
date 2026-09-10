@@ -306,6 +306,32 @@
       </div>
     </div>
 
+    <!-- ============ HISTORY DATE FILTER PANEL ============ -->
+    <!-- Opened from the History tab's calendar-icon button next to the
+         All/Accepted/... chips - narrows the history list (and the chip
+         counts) to a specific year, quarter, month, or week. Fixed-position
+         portal (moved to document.body in app.js), same reasoning as
+         #settingsMenu. -->
+    <div id="myLeavesDateFilterPanel" class="hidden mldf-panel">
+      <div class="mldf-section">
+        <div class="mldf-label">Year</div>
+        <div id="myLeavesDateFilterYears" class="mldf-row"></div>
+      </div>
+      <div class="mldf-section">
+        <div class="mldf-label">Quarter</div>
+        <div id="myLeavesDateFilterQuarters" class="mldf-row"></div>
+      </div>
+      <div class="mldf-section">
+        <div class="mldf-label">Month</div>
+        <div id="myLeavesDateFilterMonths" class="mldf-row mldf-months"></div>
+      </div>
+      <div class="mldf-section">
+        <div class="mldf-label">Week</div>
+        <select id="myLeavesDateFilterWeekSelect" class="mldf-select"></select>
+      </div>
+      <button type="button" id="myLeavesDateFilterClearBtn" class="mldf-clear">Clear filter (show all time)</button>
+    </div>
+
     <!-- ============ FORM ============ -->
     <form id="taskForm"
       class="hidden space-y-3 sm:space-y-4 lg:space-y-0 lg:flex-1 lg:min-h-0 lg:grid lg:grid-cols-12 lg:gap-3 xl:gap-4"
@@ -758,7 +784,12 @@
 
           <!-- Full history -->
           <div id="myLeavesHistorySection" class="hidden">
-            <div id="myLeavesHistoryFilters" class="hfilter mb-2.5"></div>
+            <div class="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
+              <div id="myLeavesHistoryFilters" class="hfilter"></div>
+              <button type="button" id="myLeavesDateFilterBtn" class="hfilter-cal-btn" title="Filter by date" aria-label="Filter by date" aria-haspopup="true" aria-expanded="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+              </button>
+            </div>
             <div id="myLeavesList"></div>
           </div>
 

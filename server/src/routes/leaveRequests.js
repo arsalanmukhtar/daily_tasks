@@ -42,11 +42,16 @@ function toClientShape(row) {
   };
 }
 
-// Owners see everyone's requests (the Requests/Archived tabs); everyone
-// else only ever sees their own - same read scope as firestore.rules'
+// Owners see everyone's requests (the Requests/Archived tabs, and the
+// owner-wide Analytics read) unless ?mine=1 is passed - the web app's My
+// Leaves drawer is always the *caller's own* personal history, even for an
+// owner viewing their own leave record, so it always passes ?mine=1 to force
+// self-scoping regardless of role. Non-owners always get their own requests
+// either way - same read scope as firestore.rules'
 // `resource.data.email == emailLower() || isOwner()`.
 leaveRequestsRouter.get('/', requireAuth, async (req, res) => {
-  const query = req.user.isOwner
+  const mine = req.query.mine === '1' || req.query.mine === 'true';
+  const query = (req.user.isOwner && !mine)
     ? pool.query('SELECT * FROM leave_requests ORDER BY requested_at DESC LIMIT 500')
     : pool.query('SELECT * FROM leave_requests WHERE email = $1 ORDER BY requested_at DESC LIMIT 500', [
         req.user.email
