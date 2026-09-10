@@ -8,6 +8,14 @@ import { buildDecisionEmail } from '../emailTemplate.cjs';
 
 export const leaveRequestsRouter = Router();
 
+// Short Leave and Out Pass are always a single day (a part of one day, not a
+// whole-day absence) - the client already enforces this by disabling the
+// Range/Custom date modes for these two types (see
+// updateLeaveDateModeAvailability_ in app.js), but that's a UI guard only.
+// Enforced again here so a malformed or future client (or a direct API call)
+// can never create a multi-day partial-day leave.
+const PARTIAL_DAY_TYPES = new Set(['casualShort', 'casualOutPass']);
+
 function toClientShape(row) {
   return {
     requestId: row.id,
@@ -49,6 +57,12 @@ leaveRequestsRouter.get('/', requireAuth, async (req, res) => {
 
 leaveRequestsRouter.post('/', requireAuth, async (req, res) => {
   const b = req.body || {};
+  const type = b.type || 'casualShort';
+  const customDates = Array.isArray(b.customDates) ? b.customDates : [];
+  const spansMultipleDays = customDates.length > 1 || (b.startDate && b.endDate && b.startDate !== b.endDate);
+  if (PARTIAL_DAY_TYPES.has(type) && spansMultipleDays) {
+    return res.status(400).json({ error: 'Short Leave and Out Pass can only be requested for a single day.' });
+  }
   const { rows } = await pool.query(
     `INSERT INTO leave_requests
        (email, name, week_label, type, start_date, end_date, custom_dates, reason_html,
@@ -59,10 +73,10 @@ leaveRequestsRouter.post('/', requireAuth, async (req, res) => {
       req.user.email,
       b.name || '',
       b.weekLabel || '',
-      b.type || 'casualShort',
+      type,
       b.startDate || null,
       b.endDate || null,
-      JSON.stringify(b.customDates || []),
+      JSON.stringify(customDates),
       b.reasonHtml === '<br>' ? '' : b.reasonHtml || '',
       b.halfDayPeriod || '',
       b.shortLeaveTime || '',
