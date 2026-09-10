@@ -245,7 +245,10 @@ const myLeavesDateFilterPanel = document.getElementById('myLeavesDateFilterPanel
 const myLeavesDateFilterYears = document.getElementById('myLeavesDateFilterYears');
 const myLeavesDateFilterQuarters = document.getElementById('myLeavesDateFilterQuarters');
 const myLeavesDateFilterMonths = document.getElementById('myLeavesDateFilterMonths');
-const myLeavesDateFilterWeekSelect = document.getElementById('myLeavesDateFilterWeekSelect');
+const myLeavesDateFilterWeek = document.getElementById('myLeavesDateFilterWeek');
+const myLeavesDateFilterWeekTrigger = document.getElementById('myLeavesDateFilterWeekTrigger');
+const myLeavesDateFilterWeekValue = document.getElementById('myLeavesDateFilterWeekValue');
+const myLeavesDateFilterWeekMenu = document.getElementById('myLeavesDateFilterWeekMenu');
 const myLeavesDateFilterClearBtn = document.getElementById('myLeavesDateFilterClearBtn');
 const myLeavesList         = document.getElementById('myLeavesList');
 const myLeavesBanner          = document.getElementById('myLeavesBanner');
@@ -2546,10 +2549,16 @@ function renderMyLeavesDateFilterPanelContent_() {
     if (d && d.getFullYear() === myLeavesSelectedYear) weeksInYear.add(dateToIsoWeek_(d).week);
   });
   const sortedWeeks = Array.from(weeksInYear).sort(function (a, b) { return a - b; });
-  myLeavesDateFilterWeekSelect.innerHTML = '<option value="">Pick a week&hellip;</option>' +
+  const hasWeek = myLeavesSelectedWeek !== null;
+  myLeavesDateFilterWeekValue.textContent = hasWeek ? 'Week ' + myLeavesSelectedWeek : 'All weeks';
+  myLeavesDateFilterWeekValue.classList.toggle('is-placeholder', !hasWeek);
+  myLeavesDateFilterWeekMenu.innerHTML =
+    '<button type="button" role="option" data-week=""' + (hasWeek ? '' : ' class="is-selected"') + '>All weeks</button>' +
     sortedWeeks.map(function (w) {
-      return '<option value="' + w + '"' + (myLeavesSelectedWeek === w ? ' selected' : '') + '>Week ' + w + '</option>';
+      return '<button type="button" role="option" data-week="' + w + '"' +
+        (myLeavesSelectedWeek === w ? ' class="is-selected"' : '') + '>Week ' + w + '</button>';
     }).join('');
+  closeWeekMenu_();
 
   myLeavesDateFilterBtn.classList.toggle('is-active',
     !!myLeavesSelectedQuarter || myLeavesSelectedMonth !== null || myLeavesSelectedWeek !== null || myLeavesYearOnlyFilter);
@@ -2560,7 +2569,13 @@ function renderMyLeavesDateFilterPanelContent_() {
 // backdrop-blur containing-block quirks that broke position:absolute here.
 document.body.appendChild(myLeavesDateFilterPanel);
 
+function closeWeekMenu_() {
+  myLeavesDateFilterWeekMenu.classList.add('hidden');
+  myLeavesDateFilterWeek.classList.remove('is-open');
+  myLeavesDateFilterWeekTrigger.setAttribute('aria-expanded', 'false');
+}
 function closeMyLeavesDateFilterPanel_() {
+  closeWeekMenu_();
   myLeavesDateFilterPanel.classList.add('hidden');
   myLeavesDateFilterBtn.setAttribute('aria-expanded', 'false');
 }
@@ -2577,6 +2592,9 @@ myLeavesDateFilterBtn.addEventListener('click', (e) => {
 });
 document.addEventListener('click', (e) => {
   if (myLeavesDateFilterPanel.classList.contains('hidden')) return;
+  // A click anywhere except inside the week dropdown closes that dropdown -
+  // including clicks elsewhere in the panel (a month chip, etc.).
+  if (!myLeavesDateFilterWeek.contains(e.target)) closeWeekMenu_();
   if (myLeavesDateFilterPanel.contains(e.target) || myLeavesDateFilterBtn.contains(e.target)) return;
   closeMyLeavesDateFilterPanel_();
 });
@@ -2604,9 +2622,19 @@ myLeavesDateFilterMonths.addEventListener('click', (e) => {
   setMyLeavesDateFilter_(myLeavesSelectedMonth === m ? {} : { month: m });
   refreshMyLeavesYearChipsRow_();
 });
-myLeavesDateFilterWeekSelect.addEventListener('change', () => {
-  const val = myLeavesDateFilterWeekSelect.value;
-  setMyLeavesDateFilter_(val ? { week: parseInt(val, 10) } : {});
+myLeavesDateFilterWeekTrigger.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const willOpen = myLeavesDateFilterWeekMenu.classList.contains('hidden');
+  myLeavesDateFilterWeekMenu.classList.toggle('hidden', !willOpen);
+  myLeavesDateFilterWeek.classList.toggle('is-open', willOpen);
+  myLeavesDateFilterWeekTrigger.setAttribute('aria-expanded', String(willOpen));
+});
+myLeavesDateFilterWeekMenu.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-week]');
+  if (!btn) return;
+  const raw = btn.dataset.week;
+  closeWeekMenu_();
+  setMyLeavesDateFilter_(raw ? { week: parseInt(raw, 10) } : {});
   refreshMyLeavesYearChipsRow_();
 });
 myLeavesDateFilterClearBtn.addEventListener('click', () => {
