@@ -2835,11 +2835,15 @@ async function withdrawLeaveRequest_(requestId, buttonEl) {
 // silently dropped.
 async function cleanupExpiredWithdrawnRequests_(_records) {}
 
-const TOAST_ICONS_ = {
-  success: '<svg class="toast-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>',
-  error: '<svg class="toast-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>',
-  warning: '<svg class="toast-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>'
-};
+// Leading glyph on every toast: a tiny analog clock whose hand ticks one
+// step per second and completes a full turn as the toast's 5s life runs
+// out (animation is purely CSS - see .toast-clock).
+const TOAST_CLOCK_SVG_ =
+  '<span class="toast-clock" aria-hidden="true"><svg viewBox="0 0 24 24">' +
+  '<circle class="toast-clock-face" cx="12" cy="12" r="9"/>' +
+  '<line class="toast-clock-tick" x1="12" y1="4.5" x2="12" y2="6"/>' +
+  '<line class="toast-clock-hand" x1="12" y1="12" x2="12" y2="5.5"/>' +
+  '</svg></span>';
 
 // The single channel for transient feedback. `tone` is 'success' | 'error' |
 // 'warning' (or omitted for a plain slate toast). Slides up from the bottom,
@@ -2849,7 +2853,7 @@ function showToast_(message, tone) {
   const el = document.createElement('div');
   el.className = 'toast' + (tone ? ' is-' + tone : '');
   el.setAttribute('role', tone === 'error' || tone === 'warning' ? 'alert' : 'status');
-  el.innerHTML = (TOAST_ICONS_[tone] || '') + '<span>' + escapeHtml(message) + '</span>';
+  el.innerHTML = TOAST_CLOCK_SVG_ + '<span>' + escapeHtml(message) + '</span>';
   toastContainer.appendChild(el);
   requestAnimationFrame(() => el.classList.add('is-visible'));
   setTimeout(() => {
