@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/providers.dart';
+import '../../../widgets/filter_pill.dart';
 import '../manager_providers.dart';
 import 'widgets/report_cards.dart';
 
@@ -32,15 +33,29 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
       error: (err, _) => Center(child: Text('Could not load reports: $err')),
       data: (all) {
         final filtered = all
-            .where((r) => _developerFilter == null || r.email == _developerFilter)
+            .where(
+              (r) => _developerFilter == null || r.email == _developerFilter,
+            )
             .where((r) => r.matchesQuery(query))
             .toList();
-        final explained = filtered.where((r) => r.status == 'explained').toList()
-          ..sort((a, b) => (a.explainedAt ?? DateTime(0)).compareTo(b.explainedAt ?? DateTime(0)));
+        final explained =
+            filtered.where((r) => r.status == 'explained').toList()..sort(
+              (a, b) => (a.explainedAt ?? DateTime(0)).compareTo(
+                b.explainedAt ?? DateTime(0),
+              ),
+            );
         final open = filtered.where((r) => r.status == 'reported').toList()
-          ..sort((a, b) => (a.reportedAt ?? DateTime(0)).compareTo(b.reportedAt ?? DateTime(0)));
+          ..sort(
+            (a, b) => (a.reportedAt ?? DateTime(0)).compareTo(
+              b.reportedAt ?? DateTime(0),
+            ),
+          );
         final resolved = filtered.where((r) => r.status == 'resolved').toList()
-          ..sort((a, b) => (b.resolvedAt ?? DateTime(0)).compareTo(a.resolvedAt ?? DateTime(0)));
+          ..sort(
+            (a, b) => (b.resolvedAt ?? DateTime(0)).compareTo(
+              a.resolvedAt ?? DateTime(0),
+            ),
+          );
 
         return ListView(
           padding: const EdgeInsets.all(12),
@@ -48,20 +63,21 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
             Row(
               children: [
                 Expanded(
-                  child: DropdownButtonFormField<String?>(
-                    initialValue: _developerFilter,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Developer', border: OutlineInputBorder()),
-                    items: [
-                      const DropdownMenuItem(value: null, child: Text('All developers')),
-                      for (final u in roster) DropdownMenuItem(value: u.email, child: Text(u.name)),
-                    ],
+                  child: FilterPill<String?>(
+                    value: _developerFilter,
+                    items: [null, ...roster.map((u) => u.email)],
+                    labelOf: (v) {
+                      if (v == null) return 'All developers';
+                      final match = roster.where((u) => u.email == v);
+                      return match.isNotEmpty ? match.first.name : v;
+                    },
                     onChanged: (v) => setState(() => _developerFilter = v),
                   ),
                 ),
                 const SizedBox(width: 10),
                 FilledButton.icon(
-                  onPressed: () => setState(() => _showNewReport = !_showNewReport),
+                  onPressed: () =>
+                      setState(() => _showNewReport = !_showNewReport),
                   icon: Icon(_showNewReport ? Icons.close : Icons.add),
                   label: Text(_showNewReport ? 'Cancel' : 'New report'),
                 ),
@@ -72,10 +88,21 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
               NewReportCard(
                 roster: roster,
                 onCancel: () => setState(() => _showNewReport = false),
-                onSubmit: ({required email, required name, required date, required reasonHtml}) async {
-                  await uninformedRepo.report(email: email, name: name, date: date, reasonHtml: reasonHtml);
-                  if (mounted) setState(() => _showNewReport = false);
-                },
+                onSubmit:
+                    ({
+                      required email,
+                      required name,
+                      required date,
+                      required reasonHtml,
+                    }) async {
+                      await uninformedRepo.report(
+                        email: email,
+                        name: name,
+                        date: date,
+                        reasonHtml: reasonHtml,
+                      );
+                      if (mounted) setState(() => _showNewReport = false);
+                    },
               ),
             if (explained.isNotEmpty) ...[
               _sectionHeader(context, 'Needs your decision', explained.length),
@@ -90,19 +117,32 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
             if (open.isNotEmpty) ...[
               _sectionHeader(context, 'Open reports', open.length),
               for (final r in open)
-                OpenReportCard(report: r, onResolve: (html) => uninformedRepo.resolve(r.reportId, html)),
+                OpenReportCard(
+                  report: r,
+                  onResolve: (html) => uninformedRepo.resolve(r.reportId, html),
+                ),
               const SizedBox(height: 12),
             ],
             if (resolved.isNotEmpty) ...[
-              _sectionHeader(context, 'Resolutions', resolved.length, subtitle: 'Audit log'),
+              _sectionHeader(
+                context,
+                'Resolutions',
+                resolved.length,
+                subtitle: 'Audit log',
+              ),
               for (final r in resolved) ResolvedReportCard(report: r),
             ],
-            if (explained.isEmpty && open.isEmpty && resolved.isEmpty && !_showNewReport)
+            if (explained.isEmpty &&
+                open.isEmpty &&
+                resolved.isEmpty &&
+                !_showNewReport)
               Padding(
                 padding: const EdgeInsets.all(32),
                 child: Center(
                   child: Text(
-                    query.trim().isNotEmpty ? 'No reports match your search.' : 'No uninformed-absence reports.',
+                    query.trim().isNotEmpty
+                        ? 'No reports match your search.'
+                        : 'No uninformed-absence reports.',
                     style: TextStyle(color: AppColors.ink500),
                   ),
                 ),
@@ -113,15 +153,26 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
     );
   }
 
-  Widget _sectionHeader(BuildContext context, String title, int count, {String? subtitle}) {
+  Widget _sectionHeader(
+    BuildContext context,
+    String title,
+    int count, {
+    String? subtitle,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          Text('$title · $count', style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            '$title · $count',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
           if (subtitle != null) ...[
             const SizedBox(width: 8),
-            Text(subtitle, style: TextStyle(color: AppColors.ink500, fontSize: 12)),
+            Text(
+              subtitle,
+              style: TextStyle(color: AppColors.ink500, fontSize: 12),
+            ),
           ],
         ],
       ),
