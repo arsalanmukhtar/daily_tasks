@@ -74,6 +74,14 @@ class RequestCard extends StatelessWidget {
                       background: AppColors.metaBg,
                       icon: Icons.schedule_outlined,
                     ),
+                  // Plain glyph, not a chip and not tappable - just flags
+                  // that this request has file(s) attached. Open them from
+                  // the detail sheet's actual AttachmentChip rows instead.
+                  if (request.attachments.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                      child: Icon(Icons.attach_file_rounded, size: 18, color: AppColors.attachmentIndicator),
+                    ),
                 ],
               ),
               if (request.reasonHtml.isNotEmpty && request.reasonHtml != '<br>') ...[

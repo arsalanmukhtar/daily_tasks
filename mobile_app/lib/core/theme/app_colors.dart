@@ -49,6 +49,11 @@ class AppColors {
   static const meta = Color(0xFF54607A);
   static const metaBg = Color(0xFFECEEF4);
 
+  // Non-interactive "has attachment(s)" indicator on a request card's chip
+  // row - a plain glyph, not itself a file-type badge (see fileType* below,
+  // used inside the detail sheet's actual openable AttachmentChip rows).
+  static const attachmentIndicator = Color(0xFF2563EB);
+
   // Attachment file-type badges - same hex values as styles.css's
   // .fic-pdf/.fic-doc/.fic-txt/.fic-zip so a file reads the same color on
   // web and mobile.
