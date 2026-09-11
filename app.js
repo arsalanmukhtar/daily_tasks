@@ -900,6 +900,12 @@ function isoWeekToMonday(year, week) {
   target.setUTCDate(week1Mon.getUTCDate() + (week - 1) * 7);
   return target;
 }
+// Dec 28 always falls in a year's final ISO week, so this reads back
+// however many weeks (52 or 53) that year has - used to draw a full week
+// list in the My Leaves date filter instead of only the weeks with a record.
+function isoWeeksInYear_(year) {
+  return dateToIsoWeek_(new Date(Date.UTC(year, 11, 28))).week;
+}
 function fmtISO(d) { return d.toISOString().slice(0, 10); }
 function fmtLong(d) { return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }); }
 
@@ -1219,9 +1225,26 @@ async function fetchLeaveStatus_() {
   return null;
 }
 
+// The date this record's Year/Quarter/Month/Week filter buckets belong to.
+// Deliberately the leave's OWN date (when the time off actually falls), not
+// requestedAt (when it was filed) - a request filed today for two weeks out
+// must bucket under that future week, matching the week already shown on
+// the card itself, not under "today". Falls back to requestedAt only for a
+// malformed/legacy row with no real date at all.
 function leaveRecordDate_(rec) {
-  const d = new Date(rec.requestedAt);
-  return isNaN(d.getTime()) ? null : d;
+  if (rec.startDate) {
+    const d = new Date(rec.startDate);
+    if (!isNaN(d.getTime())) return d;
+  }
+  if (Array.isArray(rec.customDates) && rec.customDates.length) {
+    const earliest = rec.customDates.slice().sort()[0];
+    const d = new Date(earliest);
+    if (!isNaN(d.getTime())) return d;
+  }
+  const weekMatch = /^Week\s+(\d+),\s*(\d+)/.exec(String(rec.weekLabel || ''));
+  if (weekMatch) return isoWeekToMonday(parseInt(weekMatch[2], 10), parseInt(weekMatch[1], 10));
+  const requested = new Date(rec.requestedAt);
+  return isNaN(requested.getTime()) ? null : requested;
 }
 
 // A withdrawn request is kept for a 7-day grace window (see the matching
@@ -2539,23 +2562,36 @@ function renderMyLeavesDateFilterPanelContent_() {
     return '<button type="button" class="mldf-chip' + (myLeavesSelectedMonth === i ? ' is-selected' : '') + '" data-month="' + i + '">' + label + '</button>';
   }).join('');
 
-  // Only weeks that actually have a record in the selected year - a bare
-  // 1-53 dropdown would be almost entirely empty options for most people.
-  const weeksInYear = new Set();
+  // Every ISO week of the selected year, not just weeks with a record -
+  // weeks with leave taken are highlighted with a count badge instead of
+  // being the only ones listed, so the dropdown reads as a real calendar of
+  // the year rather than an arbitrary shortlist.
+  const weekCounts = new Map(); // week number -> record count, selected year only
   recs.forEach(function (r) {
     const d = leaveRecordDate_(r);
-    if (d && d.getFullYear() === myLeavesSelectedYear) weeksInYear.add(dateToIsoWeek_(d).week);
+    if (d && d.getFullYear() === myLeavesSelectedYear) {
+      const w = dateToIsoWeek_(d).week;
+      weekCounts.set(w, (weekCounts.get(w) || 0) + 1);
+    }
   });
-  const sortedWeeks = Array.from(weeksInYear).sort(function (a, b) { return a - b; });
+  const totalWeeks = isoWeeksInYear_(myLeavesSelectedYear);
   const hasWeek = myLeavesSelectedWeek !== null;
   myLeavesDateFilterWeekValue.textContent = hasWeek ? 'Week ' + myLeavesSelectedWeek : 'All weeks';
   myLeavesDateFilterWeekValue.classList.toggle('is-placeholder', !hasWeek);
+  let weekOptionsHtml = '';
+  for (let w = 1; w <= totalWeeks; w++) {
+    const count = weekCounts.get(w) || 0;
+    const classes = ['mldf-week-option'];
+    if (myLeavesSelectedWeek === w) classes.push('is-selected');
+    if (count > 0) classes.push('has-leave');
+    weekOptionsHtml += '<button type="button" role="option" data-week="' + w + '" class="' + classes.join(' ') + '">' +
+      '<span>Week ' + w + '</span>' +
+      (count > 0 ? '<span class="mldf-week-count">' + count + '</span>' : '') +
+      '</button>';
+  }
   myLeavesDateFilterWeekMenu.innerHTML =
     '<button type="button" role="option" data-week=""' + (hasWeek ? '' : ' class="is-selected"') + '>All weeks</button>' +
-    sortedWeeks.map(function (w) {
-      return '<button type="button" role="option" data-week="' + w + '"' +
-        (myLeavesSelectedWeek === w ? ' class="is-selected"' : '') + '>Week ' + w + '</button>';
-    }).join('');
+    weekOptionsHtml;
   closeWeekMenu_();
 
   myLeavesDateFilterBtn.classList.toggle('is-active',
@@ -2804,7 +2840,9 @@ async function dismissLeaveRequest_(requestId, buttonEl) {
   }
   try {
     await apiRequest_('PATCH', '/leave-requests/' + requestId + '/dismiss');
-  } catch (_e) { /* best-effort */ }
+  } catch (err) {
+    showErrorToast_(err.message || 'Could not dismiss this request.');
+  }
   await refreshApplyLeaveButton();
   await loadMyLeavesData_();
 }
@@ -2822,7 +2860,9 @@ async function withdrawLeaveRequest_(requestId, buttonEl) {
   }
   try {
     await apiRequest_('PATCH', '/leave-requests/' + requestId + '/withdraw');
-  } catch (_e) { /* best-effort */ }
+  } catch (err) {
+    showErrorToast_(err.message || 'Could not withdraw this request.');
+  }
   await refreshApplyLeaveButton();
   await loadMyLeavesData_();
 }

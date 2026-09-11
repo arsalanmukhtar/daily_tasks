@@ -2047,6 +2047,15 @@ textarea {
 .mldf-select-menu button { display: block; width: 100%; text-align: left; border: 0; background: transparent; border-radius: 6px; padding: 6px 8px; font-size: 11.5px; font-weight: 500; color: var(--ink-700); cursor: pointer; }
 .mldf-select-menu button:hover { background: var(--surface-2); }
 .mldf-select-menu button.is-selected { background: var(--brand-50); color: var(--brand-700); font-weight: 600; }
+.mldf-select-menu button.mldf-week-option { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mldf-select-menu button.mldf-week-option.has-leave { background: var(--brand-50); color: var(--brand-700); font-weight: 600; }
+.mldf-select-menu button.mldf-week-option.has-leave.is-selected { background: var(--brand-100); }
+.mldf-week-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px;
+  background: var(--brand-600); color: #fff; font-size: 10px; font-weight: 700; line-height: 1;
+  flex-shrink: 0;
+}
 .mldf-clear { width: 100%; margin-top: 12px; height: 28px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface-2); font-size: 11px; font-weight: 700; color: var(--ink-600); cursor: pointer; }
 .mldf-clear:hover { background: #fff; border-color: var(--ink-400); }
 
