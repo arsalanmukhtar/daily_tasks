@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 import 'attachment.dart';
 import 'leave_type.dart';
 
@@ -65,6 +67,38 @@ class LeaveRequest {
     final endDay = DateTime(end.year, end.month, end.day);
     final todayDay = DateTime(today.year, today.month, today.day);
     return endDay.isBefore(todayDay);
+  }
+
+  /// Every calendar day this request actually covers - the non-contiguous
+  /// pick (customDates) when there is one, otherwise every day from
+  /// startDate to endDate inclusive. Used to mark a read-only calendar (see
+  /// LeaveDatesCalendarSheet) so a "4 days (custom)" request shows all 4
+  /// actual dates, not just startDate.
+  List<DateTime> get leaveDays {
+    DateTime dayOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+    if (customDates.length > 1) {
+      return customDates.map(dayOnly).toList()..sort();
+    }
+    final start = startDate;
+    if (start == null) return const [];
+    final s = dayOnly(start);
+    final e = dayOnly(endDate ?? start);
+    if (!e.isAfter(s)) return [s];
+    return [for (var d = s; !d.isAfter(e); d = d.add(const Duration(days: 1))) d];
+  }
+
+  /// Human-readable summary of the same days - "N days (custom)" for a
+  /// non-contiguous pick, a single formatted date for one day, or
+  /// "start - end" for a contiguous range. Shared by RequestCard and
+  /// RequestDetailSheet so the list and the detail view can never disagree
+  /// about what a request's dates actually are.
+  String leaveDateSummary(DateFormat fmt) {
+    if (customDates.length > 1) return '${customDates.length} days (custom)';
+    final start = startDate;
+    if (start == null) return '-';
+    final end = endDate;
+    if (end == null || start.difference(end).inDays == 0) return fmt.format(start);
+    return '${fmt.format(start)} - ${fmt.format(end)}';
   }
 
   factory LeaveRequest.fromJson(Map<String, dynamic> json) {

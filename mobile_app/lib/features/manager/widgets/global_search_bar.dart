@@ -55,6 +55,13 @@ class _GlobalSearchBarState extends ConsumerState<GlobalSearchBar> {
               style: const TextStyle(fontSize: 14, color: AppColors.ink900),
               decoration: const InputDecoration(
                 isDense: true,
+                // The app-wide InputDecorationTheme fills every field with
+                // a grey background (AppColors.surface2) by default - this
+                // field's own white pill container (see Container above) is
+                // the field's whole visual chrome, so that default fill has
+                // to be switched off here or it shows through as a
+                // mismatched grey patch.
+                filled: false,
                 border: InputBorder.none,
                 hintText: 'Search requests, reports, developers…',
                 hintStyle: TextStyle(color: AppColors.ink500, fontSize: 14),

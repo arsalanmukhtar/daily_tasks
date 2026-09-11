@@ -10,15 +10,6 @@ import '../../../../widgets/status_chip.dart';
 final _dateFmt = DateFormat('d MMM yyyy');
 final _timeFmt = DateFormat('d MMM, h:mm a');
 
-String _leaveDateLabel(LeaveRequest r) {
-  if (r.customDates.length > 1) return '${r.customDates.length} days (custom)';
-  final start = r.startDate;
-  final end = r.endDate;
-  if (start == null) return '-';
-  if (end == null || start.difference(end).inDays == 0) return _dateFmt.format(start);
-  return '${_dateFmt.format(start)} - ${_dateFmt.format(end)}';
-}
-
 /// One row in the Requests/Archived list - avatar, status badge, type/
 /// duration/week chips, a short reason preview, and a resolved-by summary
 /// once decided. Mirrors the Kotlin app's RequestCard.kt.
@@ -71,7 +62,7 @@ class RequestCard extends StatelessWidget {
                       return StatusChip(label: request.type.label, foreground: fg, background: bg);
                     }),
                   StatusChip(
-                    label: _leaveDateLabel(request),
+                    label: request.leaveDateSummary(_dateFmt),
                     foreground: AppColors.meta,
                     background: AppColors.metaBg,
                     icon: Icons.calendar_today_outlined,

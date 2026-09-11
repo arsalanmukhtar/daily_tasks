@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/leave_request.dart';
 import '../../../../widgets/avatar.dart';
 import '../../../../widgets/status_chip.dart';
+import 'leave_dates_calendar_sheet.dart';
 
 final _fullDateFmt = DateFormat('EEEE, d MMMM yyyy');
 final _timeFmt = DateFormat('d MMM yyyy, h:mm a');
@@ -87,10 +88,7 @@ class _RequestDetailSheetState extends State<RequestDetailSheet> {
                   controller: scrollController,
                   children: [
                     _fact('Leave type', r.type.label),
-                    _fact(
-                      'Date',
-                      r.startDate != null ? _fullDateFmt.format(r.startDate!) : '-',
-                    ),
+                    _dateFact(context, r),
                     if (r.weekLabel.isNotEmpty) _fact('Week', r.weekLabel),
                     if (r.requestedAt != null) _fact('Applied', _timeFmt.format(r.requestedAt!)),
                     if (r.attachments.isNotEmpty) _fact('Attachments', '${r.attachments.length} file(s)'),
@@ -126,6 +124,36 @@ class _RequestDetailSheetState extends State<RequestDetailSheet> {
           SizedBox(width: 100, child: Text(label, style: TextStyle(color: AppColors.ink500, fontSize: 13))),
           Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600))),
         ],
+      ),
+    );
+  }
+
+  /// The "Date" row specifically - r.leaveDateSummary already correctly
+  /// summarizes a non-contiguous "N days (custom)" pick (matching what
+  /// RequestCard shows in the list), and this row is tappable - with a
+  /// calendar icon signaling that - to open the actual marked days behind
+  /// that summary in LeaveDatesCalendarSheet.
+  Widget _dateFact(BuildContext context, LeaveRequest r) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: AppColors.surface,
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          builder: (_) => LeaveDatesCalendarSheet(request: r),
+        ),
+        child: Row(
+          children: [
+            SizedBox(width: 100, child: Text('Date', style: TextStyle(color: AppColors.ink500, fontSize: 13))),
+            Expanded(
+              child: Text(r.leaveDateSummary(_fullDateFmt), style: const TextStyle(fontWeight: FontWeight.w600)),
+            ),
+            Icon(Icons.calendar_month_outlined, size: 18, color: AppColors.brandPrimary),
+          ],
+        ),
       ),
     );
   }
