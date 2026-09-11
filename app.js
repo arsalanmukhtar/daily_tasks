@@ -255,15 +255,16 @@ const myLeavesBanner          = document.getElementById('myLeavesBanner');
 const myLeavesBannerTitle     = document.getElementById('myLeavesBannerTitle');
 const myLeavesBannerMeta      = document.getElementById('myLeavesBannerMeta');
 const myLeavesBannerViewBtn   = document.getElementById('myLeavesBannerViewBtn');
-// Uninformed-leave banner + resolution drawer.
+// Uninformed-leave banner + "Explain the Absence" tab (see myLeavesUninformedWrap
+// in index.html - used to be a separate drawer, now one more leaves-rail tab).
+const uninformedRailBadge      = document.getElementById('uninformedRailBadge');
+const myLeavesUninformedWrap   = document.getElementById('myLeavesUninformedWrap');
+const myLeavesUninformedFooter = document.getElementById('myLeavesUninformedFooter');
 const uninformedBanner         = document.getElementById('uninformedBanner');
 const uninformedBannerTitle    = document.getElementById('uninformedBannerTitle');
 const uninformedBannerMeta     = document.getElementById('uninformedBannerMeta');
-const uninformedBannerViewBtn  = document.getElementById('uninformedBannerViewBtn');
-const uninformedResolveBackdrop      = document.getElementById('uninformedResolveBackdrop');
-const uninformedResolveDrawer        = document.getElementById('uninformedResolveDrawer');
-const uninformedResolveDate          = document.getElementById('uninformedResolveDate');
-const closeUninformedResolveDrawerBtn = document.getElementById('closeUninformedResolveDrawerBtn');
+const uninformedExplainForm    = document.getElementById('uninformedExplainForm');
+const uninformedExplainEmpty   = document.getElementById('uninformedExplainEmpty');
 const uninformedResolveReportedReason = document.getElementById('uninformedResolveReportedReason');
 const uninformedResolveReportedBy    = document.getElementById('uninformedResolveReportedBy');
 const uninformedResolveRejectionBlock = document.getElementById('uninformedResolveRejectionBlock');
@@ -271,7 +272,6 @@ const uninformedResolveRejectionNote = document.getElementById('uninformedResolv
 const uninformedResolveToolbar       = document.getElementById('uninformedResolveToolbar');
 const uninformedResolveEditor        = document.getElementById('uninformedResolveEditor');
 const uninformedResolveError         = document.getElementById('uninformedResolveError');
-const uninformedResolveCancelBtn     = document.getElementById('uninformedResolveCancelBtn');
 const uninformedResolveSubmitBtn     = document.getElementById('uninformedResolveSubmitBtn');
 // Nav-card stat badges (updateNavStatBadges_)
 const navSubWeeksTag      = document.getElementById('navSubWeeksTag');
@@ -2015,7 +2015,8 @@ function lcalClearSelection_() {
 const LEAVES_TAB_COPY = {
   overview: ['My Leaves', 'Apply, track approvals, and review your leave history.'],
   history: ['Leave History', 'Every request you have ever submitted.'],
-  apply: ['Apply for Leave', 'Pick a type, date(s), and reason.']
+  apply: ['Apply for Leave', 'Pick a type, date(s), and reason.'],
+  uninformed: ['Explain the Absence', 'Respond to an uninformed-absence report.']
 };
 let leavesActiveTab_ = 'overview';
 
@@ -2024,11 +2025,17 @@ function switchLeavesTab_(tab) {
   leavesTabRail.querySelectorAll('.leaves-rail-btn').forEach(function (btn) {
     btn.classList.toggle('is-active', btn.dataset.tab === tab);
   });
-  myLeavesOverviewHistoryWrap.classList.toggle('hidden', tab === 'apply');
+  myLeavesOverviewHistoryWrap.classList.toggle('hidden', tab === 'apply' || tab === 'uninformed');
   myLeavesApplyWrap.classList.toggle('hidden', tab !== 'apply');
+  myLeavesUninformedWrap.classList.toggle('hidden', tab !== 'uninformed');
   myLeavesOverviewSection.classList.toggle('hidden', tab === 'history');
   myLeavesHistorySection.classList.toggle('hidden', tab !== 'history');
   myLeavesApplyFooter.classList.toggle('hidden', tab !== 'apply');
+  // The submit footer only makes sense while there's actually an open
+  // report still awaiting an explanation (currentUninformedReport is set by
+  // renderUninformedTab_ below) - an already-explained/empty state has
+  // nothing to submit, same as the tab's own form staying hidden then.
+  myLeavesUninformedFooter.classList.toggle('hidden', tab !== 'uninformed' || !currentUninformedReport);
   const copy = LEAVES_TAB_COPY[tab];
   myLeavesDrawerTitle.textContent = copy[0];
   myLeavesDrawerSubtitle.textContent = copy[1];
@@ -2138,59 +2145,63 @@ async function fetchOpenUninformedReports_() {
     .sort(function (a, b) { return new Date(b.reportedAt) - new Date(a.reportedAt); });
 }
 
-// A second access path to the same resolution drawer the emailed "Resolve
-// the Issue" link opens, since an email can get lost/deleted but My Leaves
-// is checked regularly anyway.
+// A second access path to the same "Explain the Absence" tab the emailed
+// "Resolve the Issue" link opens, since an email can get lost/deleted but
+// My Leaves is checked regularly anyway.
 async function loadUninformedBanner_() {
   if (!currentUserContext) return;
   try {
     const reports = await fetchOpenUninformedReports_();
     updateUninformedNavBadge_(reports);
-    renderUninformedBanner_(reports[0] || null);
-  } catch (_e) { /* offline - banner just stays hidden */ }
+    renderUninformedTab_(reports[0] || null);
+  } catch (_e) { /* offline - banner/badge just stay as they were */ }
 }
 
-function renderUninformedBanner_(report) {
-  if (!report) {
-    uninformedBanner.classList.add('hidden');
-    uninformedBanner.dataset.reportId = '';
-    return;
-  }
-  uninformedBanner.classList.remove('hidden');
-  uninformedBanner.dataset.reportId = report.reportId;
-  const d = report.date ? new Date(report.date) : null;
-  if (report.status === 'explained') {
-    uninformedBannerTitle.textContent = 'Explanation submitted' + (d ? ' — ' + fmtDateLocal_(d) : '');
-    uninformedBannerMeta.textContent = 'Awaiting your manager’s review';
-    uninformedBannerViewBtn.classList.add('hidden');
-  } else {
-    uninformedBannerTitle.textContent = 'Uninformed absence flagged' + (d ? ' — ' + fmtDateLocal_(d) : '');
-    uninformedBannerMeta.textContent = report.rejectionNote
-      ? 'Sent back by ' + (report.reportedBy || 'your manager') + ' — please re-explain'
-      : (report.reportedBy ? 'Reported by ' + report.reportedBy : 'Explain what happened');
-    uninformedBannerViewBtn.classList.remove('hidden');
-  }
-}
-
-// "Needs you" chip on the "My Leaves" dashboard nav-card - live the moment
-// there's anything open (reported or explained), without the user having to
-// open the drawer first.
-function updateUninformedNavBadge_(reports) {
-  navNeedsYouBadge.textContent = reports.length;
-}
-
-// ---------- Resolve Uninformed Leave drawer ----------
-// The report currently open in the drawer - set by either the banner's
-// "Resolve" button or the emailed-link deep link, read by the submit
-// handler to know which uninformedLeaves doc to update.
+// The report currently awaiting this developer's explanation (status
+// 'reported' only - an 'explained' one has nothing left to submit) - read
+// by submitUninformedResolution_ to know which uninformedLeaves doc to
+// PATCH, and by switchLeavesTab_ to decide whether the tab's footer Submit
+// button should show at all.
 let currentUninformedReport = null;
 
-function openUninformedResolveDrawer_(report) {
-  // Only one drawer open at a time - close My Leaves before opening on top of it.
-  closeMyLeavesDrawer();
-  currentUninformedReport = report;
+// Renders the "Explain the Absence" tab's whole state (banner + rail badge
+// + form/empty), moved out of the Overview tab and out of a separate
+// resolution drawer into one more leaves-rail tab. Runs on every My Leaves
+// refresh (including realtime WS pushes), same as every other section of
+// this drawer - so unlike the old openUninformedResolveDrawer_ (which only
+// ever ran once, right when the developer chose to act), this must never
+// blow away an explanation the developer is already mid-typing just
+// because an unrelated refresh happened to fire.
+function renderUninformedTab_(report) {
+  const isNewReport = !report || !currentUninformedReport || currentUninformedReport.reportId !== report.reportId;
+  uninformedRailBadge.classList.toggle('hidden', !report);
+
+  if (!report) {
+    currentUninformedReport = null;
+    uninformedBanner.classList.add('hidden');
+    uninformedExplainForm.classList.add('hidden');
+    uninformedExplainEmpty.classList.remove('hidden');
+    if (leavesActiveTab_ === 'uninformed') myLeavesUninformedFooter.classList.add('hidden');
+    return;
+  }
+
+  uninformedBanner.classList.remove('hidden');
+  uninformedExplainEmpty.classList.add('hidden');
   const d = report.date ? new Date(report.date) : null;
-  uninformedResolveDate.textContent = d ? fmtDateLocal_(d) : '-';
+
+  if (report.status === 'explained') {
+    currentUninformedReport = null; // already submitted - nothing left to explain
+    uninformedBannerTitle.textContent = 'Explanation submitted' + (d ? ' — ' + fmtDateLocal_(d) : '');
+    uninformedBannerMeta.textContent = 'Awaiting your manager’s review';
+    uninformedExplainForm.classList.add('hidden');
+    if (leavesActiveTab_ === 'uninformed') myLeavesUninformedFooter.classList.add('hidden');
+    return;
+  }
+
+  uninformedBannerTitle.textContent = 'Uninformed absence flagged' + (d ? ' — ' + fmtDateLocal_(d) : '');
+  uninformedBannerMeta.textContent = report.rejectionNote
+    ? 'Sent back by ' + (report.reportedBy || 'your manager') + ' — please re-explain'
+    : (report.reportedBy ? 'Reported by ' + report.reportedBy : 'Explain what happened');
   uninformedResolveReportedReason.innerHTML = sanitizeStoredRichTextHtml_(report.reasonHtml) || '<i>No reason provided.</i>';
   uninformedResolveReportedBy.textContent = report.reportedBy ? 'Reported by ' + report.reportedBy : '';
   if (report.rejectionNote) {
@@ -2199,18 +2210,22 @@ function openUninformedResolveDrawer_(report) {
   } else {
     uninformedResolveRejectionBlock.classList.add('hidden');
   }
-  uninformedResolveEditor.innerHTML = '';
-  uninformedResolveError.classList.add('hidden');
-  uninformedResolveDrawer.classList.add('open');
-  uninformedResolveBackdrop.classList.add('open');
-  uninformedResolveEditor.focus();
+  // Only reset the editor for a genuinely different report than whatever
+  // might already be a in-progress draft - see this function's doc comment.
+  if (isNewReport) {
+    uninformedResolveEditor.innerHTML = '';
+    uninformedResolveError.classList.add('hidden');
+  }
+  currentUninformedReport = report;
+  uninformedExplainForm.classList.remove('hidden');
+  if (leavesActiveTab_ === 'uninformed') myLeavesUninformedFooter.classList.remove('hidden');
 }
 
-function closeUninformedResolveDrawer_() {
-  uninformedResolveDrawer.classList.remove('open');
-  uninformedResolveBackdrop.classList.remove('open');
-  currentUninformedReport = null;
-  if (activeCell === uninformedResolveEditor) activeCell = null;
+// "Needs you" chip on the "My Leaves" dashboard nav-card - live the moment
+// there's anything open (reported or explained), without the user having to
+// open the drawer first.
+function updateUninformedNavBadge_(reports) {
+  navNeedsYouBadge.textContent = reports.length;
 }
 
 async function submitUninformedResolution_() {
@@ -2227,7 +2242,7 @@ async function submitUninformedResolution_() {
     await apiRequest_('PATCH', '/uninformed-leaves/' + currentUninformedReport.reportId + '/explain', {
       explanationHtml: html
     });
-    closeUninformedResolveDrawer_();
+    switchLeavesTab_('overview');
     // Strip the #resolve-uninformed=<id> hash left over from the email link -
     // otherwise a later refresh in this same tab still points at a report
     // that's no longer waiting on this developer.
@@ -2907,10 +2922,9 @@ leavesTabRail.addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && myLeavesDrawer.classList.contains('open')) {
     // Back out one level at a time - out of the form first, then the panel.
-    if (leavesActiveTab_ === 'apply') switchLeavesTab_('overview');
+    if (leavesActiveTab_ === 'apply' || leavesActiveTab_ === 'uninformed') switchLeavesTab_('overview');
     else closeMyLeavesDrawer();
   }
-  if (e.key === 'Escape' && uninformedResolveDrawer.classList.contains('open')) closeUninformedResolveDrawer_();
 });
 
 leaveCategoryForeignTripBtn.addEventListener('click', () => selectLeaveCategory_('foreignTrip'));
@@ -2945,20 +2959,6 @@ myLeavesList.addEventListener('click', (e) => {
 myLeavesBannerViewBtn.addEventListener('click', () => {
   viewLeaveRequestInHistory_(myLeavesBanner.dataset.requestId);
 });
-uninformedBannerViewBtn.addEventListener('click', async () => {
-  const reportId = uninformedBanner.dataset.reportId;
-  if (!reportId) return;
-  try {
-    // Same "find in the caller's own list" approach as the deep-link opener
-    // below - no dedicated single-report GET route exists or is needed.
-    const reports = await apiRequest_('GET', '/uninformed-leaves?mine=1');
-    const report = reports.find(function (r) { return r.reportId === reportId; });
-    if (report) openUninformedResolveDrawer_(report);
-  } catch (_e) { /* best-effort */ }
-});
-closeUninformedResolveDrawerBtn.addEventListener('click', closeUninformedResolveDrawer_);
-uninformedResolveBackdrop.addEventListener('click', closeUninformedResolveDrawer_);
-uninformedResolveCancelBtn.addEventListener('click', closeUninformedResolveDrawer_);
 uninformedResolveSubmitBtn.addEventListener('click', submitUninformedResolution_);
 myLeavesQuarterTiles.addEventListener('click', (e) => {
   const btn = e.target.closest('.q');
@@ -3705,8 +3705,8 @@ function openMyLeavesDeepLinkOnce_() {
 // same guarding pattern as openMyLeavesDeepLinkOnce_ above (only fires once,
 // after currentUserContext is fully set). The read rule already restricts
 // this doc to its own reported email or the owner, but this double-checks
-// email match too rather than silently opening the drawer with someone
-// else's report should the two ever disagree.
+// email match too rather than silently opening the tab with someone else's
+// report should the two ever disagree.
 let resolveDeepLinkOpened_ = false;
 async function openResolveUninformedDeepLinkOnce_() {
   const match = /^#resolve-uninformed=(.+)$/.exec(location.hash);
@@ -3725,7 +3725,12 @@ async function openResolveUninformedDeepLinkOnce_() {
     // stays in the address bar after resolving, so a later refresh in the
     // same tab must not resurrect an already-resolved report.
     if (data.status !== 'reported') return;
-    openUninformedResolveDrawer_(data);
+    // openMyLeavesDrawer() awaits the same data load that populates the
+    // "Explain the Absence" tab (loadUninformedBanner_, via
+    // loadMyLeavesData_) before returning, so the tab already has this
+    // report's content ready the moment switchLeavesTab_ shows it.
+    await openMyLeavesDrawer();
+    switchLeavesTab_('uninformed');
   } catch (_e) { /* offline or permission-denied - nothing to open */ }
 }
 

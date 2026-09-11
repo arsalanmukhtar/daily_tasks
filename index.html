@@ -672,6 +672,10 @@
         <button type="button" class="leaves-rail-btn" data-tab="apply" title="Apply for Leave" aria-label="Apply for Leave">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
         </button>
+        <button type="button" class="leaves-rail-btn" data-tab="uninformed" title="Explain the Absence" aria-label="Explain the Absence">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          <span id="uninformedRailBadge" class="rail-badge hidden" aria-hidden="true"></span>
+        </button>
       </nav>
 
       <div class="flex-1 min-w-0 flex flex-col overflow-hidden">
@@ -733,20 +737,6 @@
                 <span id="myLeavesBannerMeta"></span>
               </div>
               <button type="button" id="myLeavesBannerViewBtn" class="link">View</button>
-            </div>
-
-            <!-- Uninformed-leave banner - the signed-in user's own most recently
-                 reported still-open uninformedLeaves doc; "Resolve" opens the
-                 resolution drawer, same as the emailed "Resolve the Issue" link. -->
-            <div id="uninformedBanner" class="banner hidden">
-              <div class="bic">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-              </div>
-              <div class="min-w-0">
-                <b id="uninformedBannerTitle">Uninformed absence flagged</b>
-                <span id="uninformedBannerMeta"></span>
-              </div>
-              <button type="button" id="uninformedBannerViewBtn" class="link">Resolve</button>
             </div>
 
             <!-- Stats summary - flex-1/min-h-0 so it absorbs whatever height
@@ -1016,6 +1006,71 @@
             </div>
           </div>
         </div>
+
+        <!-- Explain the Absence tab - reached via the rail's flag icon
+             (badged red when there's an open report), not a separate
+             drawer any more. Shows the same "Uninformed absence flagged"
+             banner that used to sit inline in the Overview tab, now at the
+             top of its own tab, plus - only while still awaiting this
+             developer's explanation - the actual explanation form (was
+             the standalone "Resolve Uninformed Leave" drawer). -->
+        <div id="myLeavesUninformedWrap" class="flex-1 min-w-0 overflow-y-auto hidden p-4 sm:p-5 space-y-4">
+          <div id="uninformedBanner" class="banner hidden">
+            <div class="bic">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+            </div>
+            <div class="min-w-0">
+              <b id="uninformedBannerTitle">Uninformed absence flagged</b>
+              <span id="uninformedBannerMeta"></span>
+            </div>
+          </div>
+
+          <div id="uninformedExplainForm" class="hidden space-y-4">
+            <div>
+              <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Reported reason</div>
+              <div id="uninformedResolveReportedReason" class="rich-text text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-3"></div>
+              <p id="uninformedResolveReportedBy" class="text-xs text-slate-400 mt-2"></p>
+            </div>
+
+            <div id="uninformedResolveRejectionBlock" class="hidden">
+              <div class="text-[10px] uppercase tracking-wider text-amber-600 font-bold mb-2">Sent back by your manager</div>
+              <div id="uninformedResolveRejectionNote" class="rich-text text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-3"></div>
+            </div>
+
+            <div>
+              <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Your explanation</div>
+              <div id="uninformedResolveToolbar" class="flex flex-wrap items-center gap-0.5 px-2 py-1.5 rounded-t-lg border border-slate-300 border-b-0 bg-slate-50">
+                <button type="button" data-cmd="bold"          class="tb-btn" title="Bold (Ctrl+B)"><b>B</b></button>
+                <button type="button" data-cmd="italic"        class="tb-btn" title="Italic (Ctrl+I)"><i>I</i></button>
+                <button type="button" data-cmd="underline"     class="tb-btn" title="Underline (Ctrl+U)"><u>U</u></button>
+                <button type="button" data-cmd="strikethrough" class="tb-btn" title="Strikethrough"><s>S</s></button>
+                <span class="w-px h-5 bg-slate-300 mx-1 sm:mx-1.5" aria-hidden="true"></span>
+                <button type="button" data-color-action="foreColor" class="tb-btn tb-color-btn" title="Text colour" aria-label="Text colour">
+                  <span class="tb-color-letter">A</span>
+                  <span class="tb-color-bar" style="background-color: #1e293b;"></span>
+                </button>
+                <button type="button" data-color-action="hiliteColor" class="tb-btn tb-color-btn" title="Highlight" aria-label="Highlight">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 20h9"/>
+                    <path d="M16.5 3.5l4 4-10 10H6.5v-4l10-10z"/>
+                  </svg>
+                  <span class="tb-color-bar" style="background-color: #fde047;"></span>
+                </button>
+                <span class="w-px h-5 bg-slate-300 mx-1 sm:mx-1.5" aria-hidden="true"></span>
+                <button type="button" data-cmd="insertUnorderedList" class="tb-btn" title="Bulleted list" aria-label="Bulleted list">
+                  <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><circle cx="3" cy="5" r="1.5"/><circle cx="3" cy="10" r="1.5"/><circle cx="3" cy="15" r="1.5"/><rect x="7" y="4" width="11" height="2" rx="1"/><rect x="7" y="9" width="11" height="2" rx="1"/><rect x="7" y="14" width="11" height="2" rx="1"/></svg>
+                </button>
+                <button type="button" data-cmd="insertOrderedList" class="tb-btn" title="Numbered list" aria-label="Numbered list">
+                  <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><text x="0" y="7" font-size="6" font-weight="700">1.</text><text x="0" y="13" font-size="6" font-weight="700">2.</text><text x="0" y="19" font-size="6" font-weight="700">3.</text><rect x="7" y="4" width="11" height="2" rx="1"/><rect x="7" y="9" width="11" height="2" rx="1"/><rect x="7" y="14" width="11" height="2" rx="1"/></svg>
+                </button>
+              </div>
+              <div id="uninformedResolveEditor" class="cell-editor lv-reason-editor rich-text border border-t-0 border-slate-300 rounded-b-lg" contenteditable="true" data-placeholder="Explain what happened..."></div>
+            </div>
+            <p id="uninformedResolveError" class="hidden text-xs text-red-600"></p>
+          </div>
+
+          <div id="uninformedExplainEmpty" class="hidden text-center py-12 text-sm text-slate-400">Nothing to explain right now.</div>
+        </div>
       </div>
     </div>
 
@@ -1030,81 +1085,8 @@
         Send
       </button>
     </footer>
-  </aside>
 
-  <!-- ============ RESOLVE UNINFORMED LEAVE DRAWER ============
-       Opened either from the My Leaves banner above, or the emailed
-       "Resolve the Issue" link (#resolve-uninformed=<id> deep link) - shows
-       the manager's original report read-only, then a rich-text box for the
-       developer's own explanation. Submitting flips the uninformedLeaves
-       doc to status:'resolved'; push-daemon (Admin SDK) does the rest. -->
-  <div id="uninformedResolveBackdrop" class="drawer-backdrop fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"></div>
-  <aside id="uninformedResolveDrawer" class="drawer-panel fixed top-0 right-0 h-full w-full sm:w-[30rem] lg:w-[34rem] max-w-full bg-white shadow-2xl ring-1 ring-slate-200 z-50 flex flex-col">
-    <header class="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-slate-200 flex items-start justify-between gap-3 shrink-0 bg-gradient-to-r from-slate-50 to-amber-50/60">
-      <div class="min-w-0">
-        <h2 class="text-base font-semibold text-slate-800">Explain the Absence</h2>
-        <p id="uninformedResolveDate" class="text-xs text-slate-500 mt-0.5">-</p>
-      </div>
-      <div class="flex items-center gap-1 shrink-0">
-        <button type="button" id="closeUninformedResolveDrawerBtn"
-          class="text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition p-1.5 rounded-md"
-          aria-label="Close">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>
-      </div>
-    </header>
-
-    <div class="flex-1 overflow-y-auto px-4 sm:px-5 py-4 space-y-4">
-      <div>
-        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Reported reason</div>
-        <div id="uninformedResolveReportedReason" class="rich-text text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-3"></div>
-        <p id="uninformedResolveReportedBy" class="text-xs text-slate-400 mt-2"></p>
-      </div>
-
-      <div id="uninformedResolveRejectionBlock" class="hidden">
-        <div class="text-[10px] uppercase tracking-wider text-amber-600 font-bold mb-2">Sent back by your manager</div>
-        <div id="uninformedResolveRejectionNote" class="rich-text text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-3"></div>
-      </div>
-
-      <div>
-        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Your explanation</div>
-        <div id="uninformedResolveToolbar" class="flex flex-wrap items-center gap-0.5 px-2 py-1.5 rounded-t-lg border border-slate-300 border-b-0 bg-slate-50">
-          <button type="button" data-cmd="bold"          class="tb-btn" title="Bold (Ctrl+B)"><b>B</b></button>
-          <button type="button" data-cmd="italic"        class="tb-btn" title="Italic (Ctrl+I)"><i>I</i></button>
-          <button type="button" data-cmd="underline"     class="tb-btn" title="Underline (Ctrl+U)"><u>U</u></button>
-          <button type="button" data-cmd="strikethrough" class="tb-btn" title="Strikethrough"><s>S</s></button>
-          <span class="w-px h-5 bg-slate-300 mx-1 sm:mx-1.5" aria-hidden="true"></span>
-          <button type="button" data-color-action="foreColor" class="tb-btn tb-color-btn" title="Text colour" aria-label="Text colour">
-            <span class="tb-color-letter">A</span>
-            <span class="tb-color-bar" style="background-color: #1e293b;"></span>
-          </button>
-          <button type="button" data-color-action="hiliteColor" class="tb-btn tb-color-btn" title="Highlight" aria-label="Highlight">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M12 20h9"/>
-              <path d="M16.5 3.5l4 4-10 10H6.5v-4l10-10z"/>
-            </svg>
-            <span class="tb-color-bar" style="background-color: #fde047;"></span>
-          </button>
-          <span class="w-px h-5 bg-slate-300 mx-1 sm:mx-1.5" aria-hidden="true"></span>
-          <button type="button" data-cmd="insertUnorderedList" class="tb-btn" title="Bulleted list" aria-label="Bulleted list">
-            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><circle cx="3" cy="5" r="1.5"/><circle cx="3" cy="10" r="1.5"/><circle cx="3" cy="15" r="1.5"/><rect x="7" y="4" width="11" height="2" rx="1"/><rect x="7" y="9" width="11" height="2" rx="1"/><rect x="7" y="14" width="11" height="2" rx="1"/></svg>
-          </button>
-          <button type="button" data-cmd="insertOrderedList" class="tb-btn" title="Numbered list" aria-label="Numbered list">
-            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><text x="0" y="7" font-size="6" font-weight="700">1.</text><text x="0" y="13" font-size="6" font-weight="700">2.</text><text x="0" y="19" font-size="6" font-weight="700">3.</text><rect x="7" y="4" width="11" height="2" rx="1"/><rect x="7" y="9" width="11" height="2" rx="1"/><rect x="7" y="14" width="11" height="2" rx="1"/></svg>
-          </button>
-        </div>
-        <div id="uninformedResolveEditor" class="cell-editor lv-reason-editor rich-text border border-t-0 border-slate-300 rounded-b-lg" contenteditable="true" data-placeholder="Explain what happened..."></div>
-      </div>
-      <p id="uninformedResolveError" class="hidden text-xs text-red-600"></p>
-    </div>
-
-    <footer class="px-4 sm:px-5 py-3 border-t border-slate-100 bg-slate-50/60 flex items-center justify-end gap-3 shrink-0">
-      <button type="button" id="uninformedResolveCancelBtn"
-        class="shrink-0 px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-400 transition">
-        Cancel
-      </button>
+    <footer id="myLeavesUninformedFooter" class="hidden px-4 sm:px-5 py-3 border-t border-slate-100 bg-slate-50/60 flex items-center justify-end gap-3 shrink-0">
       <button type="button" id="uninformedResolveSubmitBtn"
         class="shrink-0 px-4 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold shadow-sm hover:bg-orange-700 active:bg-orange-800 transition">
         Submit

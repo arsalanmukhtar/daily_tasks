@@ -653,6 +653,7 @@ textarea {
   background: var(--surface-2); order: 2;
 }
 .leaves-rail-btn {
+  position: relative;
   width: 36px; height: 36px; border-radius: 10px; border: 1px solid transparent;
   background: transparent; color: var(--ink-400); cursor: pointer;
   display: flex; align-items: center; justify-content: center; transition: background 120ms, color 120ms;
@@ -660,6 +661,13 @@ textarea {
 .leaves-rail-btn svg { width: 18px; height: 18px; }
 .leaves-rail-btn:hover { background: #fff; color: var(--ink-600); }
 .leaves-rail-btn.is-active { background: var(--brand-600); color: #fff; box-shadow: 0 2px 6px rgba(194, 65, 12, .3); }
+
+/* Plain notification dot (not a count) - flags that the rail's "Explain the
+   Absence" tab has something open needing the developer's attention. */
+.rail-badge {
+  position: absolute; top: 4px; right: 4px; width: 8px; height: 8px;
+  border-radius: 999px; background: #DC2626; border: 1.5px solid #fff; box-sizing: border-box;
+}
 
 /* ---------- Custom designation dropdown ---------- */
 .select-pro-trigger {
