@@ -94,16 +94,17 @@ class _RequestDetailSheetState extends State<RequestDetailSheet> {
                     if (r.attachments.isNotEmpty) _fact('Attachments', '${r.attachments.length} file(s)'),
                     const SizedBox(height: 12),
                     Text('Reason', style: Theme.of(context).textTheme.labelLarge),
-                    const SizedBox(height: 4),
-                    if (r.reasonHtml.isNotEmpty && r.reasonHtml != '<br>')
-                      HtmlWidget(r.reasonHtml)
-                    else
-                      const Text('No reason provided.', style: TextStyle(fontStyle: FontStyle.italic)),
+                    const SizedBox(height: 6),
+                    _noteBox(
+                      child: r.reasonHtml.isNotEmpty && r.reasonHtml != '<br>'
+                          ? HtmlWidget(r.reasonHtml)
+                          : const Text('No reason provided.', style: TextStyle(fontStyle: FontStyle.italic)),
+                    ),
                     if (r.status != 'requested' && r.decisionNote.isNotEmpty) ...[
                       const SizedBox(height: 16),
                       Text('Decision note', style: Theme.of(context).textTheme.labelLarge),
-                      const SizedBox(height: 4),
-                      Text(r.decisionNote),
+                      const SizedBox(height: 6),
+                      _noteBox(child: Text(r.decisionNote)),
                     ],
                   ],
                 ),
@@ -113,6 +114,26 @@ class _RequestDetailSheetState extends State<RequestDetailSheet> {
           ),
         );
       },
+    );
+  }
+
+  /// Bordered, tinted block around the Reason/Decision note bodies - plain
+  /// text sitting directly under a label read as one continuous paragraph
+  /// with the row of facts above it; this gives each its own visible
+  /// boundary instead.
+  Widget _noteBox({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: DefaultTextStyle.merge(
+        style: const TextStyle(fontSize: 13.5, height: 1.4),
+        child: child,
+      ),
     );
   }
 

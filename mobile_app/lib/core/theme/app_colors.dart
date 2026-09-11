@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 
 /// Originally a direct translation of the retired Kotlin app's Color.kt;
-/// the brand hues below have since moved off that orange to a blue ("sky")
-/// palette (see the mobile UI refactor notes in PROJECT.md) while every
-/// other role - status/type/duration chips, neutrals - is unchanged, so
-/// those still trace back to android-app's Theme.kt where it once existed.
+/// the brand hues below have since moved off that orange (then briefly a
+/// blue "sky" palette) to a warm neutral/charcoal scale (see the mobile UI
+/// refactor notes in PROJECT.md) while every other role - status/type/
+/// duration chips, neutrals - is unchanged, so those still trace back to
+/// android-app's Theme.kt where it once existed.
 class AppColors {
   AppColors._();
 
-  // Brand - Tailwind's "sky" scale.
-  static const brandPrimary = Color(0xFF0284C7); // sky-600
-  static const brandPrimaryDark = Color(0xFF075985); // sky-800
+  // Brand - warm neutral/charcoal scale (a client-supplied 10-step ramp,
+  // darkest to lightest: 0c0a09 1d1816 2b2422 473c39 5b4f4b 7c6d67 aba09c
+  // d8d2d0 e8e4e3 f3f1f1). Only the brand role changes here, same scope as
+  // the earlier orange->sky swap - AppColors' own neutral ink/surface scale
+  // below is intentionally untouched.
+  static const brandPrimary = Color(0xFF2B2422);
+  static const brandPrimaryDark = Color(0xFF1D1816);
 
   // Status
   static const statusRequested = Color(0xFF92400E);
@@ -57,8 +62,8 @@ class AppColors {
   static const ink400 = Color(0xFFC2C2C4);
   static const line = Color(0xFFE6E4DF); // hairline card border
   static const lineStrong = Color(0xFFD1CFC9);
-  static const brandTint = Color(0xFFBAE6FD); // primaryContainer, e.g. "Q1-Q4" badge - sky-200
-  static const brandTintStrong = Color(0xFF7DD3FC); // sky-300
+  static const brandTint = Color(0xFFE8E4E3); // primaryContainer, e.g. "Q1-Q4" badge
+  static const brandTintStrong = Color(0xFFD8D2D0);
 
   /// (foreground, background) pair for a leave status - mirrors
   /// RequestCard.kt's typeColors()-adjacent status lookup.
