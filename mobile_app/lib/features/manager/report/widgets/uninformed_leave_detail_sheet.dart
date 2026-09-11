@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/uninformed_leave.dart';
+import '../../../../utils/rich_text.dart';
 import '../../../../widgets/avatar.dart';
 import '../../../../widgets/status_chip.dart';
 
@@ -117,7 +118,7 @@ class UninformedLeaveDetailSheet extends StatelessWidget {
                     const SizedBox(height: 6),
                     _noteBox(
                       child: r.reasonHtml.isNotEmpty
-                          ? HtmlWidget(r.reasonHtml)
+                          ? HtmlWidget(normalizeStoredRichText(r.reasonHtml))
                           : const Text(
                               'No reason provided.',
                               style: TextStyle(fontStyle: FontStyle.italic),
@@ -130,7 +131,7 @@ class UninformedLeaveDetailSheet extends StatelessWidget {
                         style: Theme.of(context).textTheme.labelLarge,
                       ),
                       const SizedBox(height: 6),
-                      _noteBox(child: HtmlWidget(r.explanationHtml)),
+                      _noteBox(child: HtmlWidget(normalizeStoredRichText(r.explanationHtml))),
                     ],
                     if (r.rejectionNote.isNotEmpty) ...[
                       const SizedBox(height: 16),
@@ -141,7 +142,11 @@ class UninformedLeaveDetailSheet extends StatelessWidget {
                       const SizedBox(height: 6),
                       _noteBox(
                         tone: AppColors.statusRejectedBg,
-                        child: Text(r.rejectionNote),
+                        // Was a plain Text() showing raw tags literally -
+                        // rejectionNote is rich-text HTML same as everything
+                        // else here (matches the web app's
+                        // uninformedResolveRejectionNote.innerHTML use).
+                        child: HtmlWidget(normalizeStoredRichText(r.rejectionNote)),
                       ),
                     ],
                     if (r.resolutionHtml.isNotEmpty) ...[
@@ -153,7 +158,7 @@ class UninformedLeaveDetailSheet extends StatelessWidget {
                       const SizedBox(height: 6),
                       _noteBox(
                         tone: AppColors.statusApprovedBg,
-                        child: HtmlWidget(r.resolutionHtml),
+                        child: HtmlWidget(normalizeStoredRichText(r.resolutionHtml)),
                       ),
                     ],
                   ],

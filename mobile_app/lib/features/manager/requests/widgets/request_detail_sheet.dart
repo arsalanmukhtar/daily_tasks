@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/leave_request.dart';
+import '../../../../utils/rich_text.dart';
 import '../../../../widgets/attachment_chip.dart';
 import '../../../../widgets/avatar.dart';
 import '../../../../widgets/status_chip.dart';
@@ -103,7 +104,7 @@ class _RequestDetailSheetState extends State<RequestDetailSheet> {
                     const SizedBox(height: 6),
                     _noteBox(
                       child: r.reasonHtml.isNotEmpty && r.reasonHtml != '<br>'
-                          ? HtmlWidget(r.reasonHtml)
+                          ? HtmlWidget(normalizeStoredRichText(r.reasonHtml))
                           : const Text('No reason provided.', style: TextStyle(fontStyle: FontStyle.italic)),
                     ),
                     if (r.status != 'requested' && r.decisionNote.isNotEmpty) ...[

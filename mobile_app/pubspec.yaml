@@ -59,6 +59,10 @@ dependencies:
   # Renders reasonHtml/resolutionHtml/explanationHtml/rejectionNote -
   # never decisionNote, which is plain text (see PROJECT.md).
   flutter_widget_from_html_core: ^0.16.0
+  # Was already a transitive dep of flutter_widget_from_html_core; declared
+  # directly too since lib/utils/rich_text.dart uses its dom/parser API
+  # itself (normalizeStoredRichText - see its doc comment).
+  html: ^0.15.7
 
   intl: ^0.19.0
   flutter_local_notifications: ^18.0.1

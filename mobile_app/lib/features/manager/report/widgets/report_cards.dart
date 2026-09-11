@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/allowlist_entry.dart';
 import '../../../../data/models/uninformed_leave.dart';
+import '../../../../utils/rich_text.dart';
 import '../../../../widgets/avatar.dart';
 import '../../../../widgets/filter_pill.dart';
 import '../../../../widgets/rich_text_editor.dart';
@@ -245,7 +246,7 @@ class _OpenReportCardState extends State<OpenReportCard> {
               ),
               const SizedBox(height: 8),
               if (r.reasonHtml.isNotEmpty)
-                HtmlWidget(r.reasonHtml)
+                HtmlWidget(normalizeStoredRichText(r.reasonHtml))
               else
                 const Text('No reason provided.'),
               Text(
@@ -272,7 +273,7 @@ class _OpenReportCardState extends State<OpenReportCard> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      HtmlWidget(r.rejectionNote),
+                      HtmlWidget(normalizeStoredRichText(r.rejectionNote)),
                     ],
                   ),
                 ),
@@ -412,7 +413,7 @@ class _ExplainedReportCardState extends State<ExplainedReportCard> {
               ),
               HtmlWidget(
                 r.reasonHtml.isNotEmpty
-                    ? r.reasonHtml
+                    ? normalizeStoredRichText(r.reasonHtml)
                     : '<i>No reason provided.</i>',
               ),
               const SizedBox(height: 8),
@@ -424,7 +425,7 @@ class _ExplainedReportCardState extends State<ExplainedReportCard> {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              HtmlWidget(r.explanationHtml),
+              HtmlWidget(normalizeStoredRichText(r.explanationHtml)),
               const SizedBox(height: 10),
               if (_deciding == null)
                 Row(
@@ -541,7 +542,7 @@ class ResolvedReportCard extends StatelessWidget {
               ),
               if (report.resolutionHtml.isNotEmpty) ...[
                 const SizedBox(height: 6),
-                HtmlWidget(report.resolutionHtml),
+                HtmlWidget(normalizeStoredRichText(report.resolutionHtml)),
               ],
               if (report.resolvedBy.isNotEmpty)
                 Text(

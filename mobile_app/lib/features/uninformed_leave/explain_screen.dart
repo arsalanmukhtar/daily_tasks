@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/uninformed_leave.dart';
 import '../../data/providers.dart';
+import '../../utils/rich_text.dart';
 import '../../widgets/rich_text_editor.dart';
 
 final _dateFormat = DateFormat('EEEE, d MMM yyyy');
@@ -73,7 +74,9 @@ class _UninformedExplainScreenState extends ConsumerState<UninformedExplainScree
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: AppColors.surface2, borderRadius: BorderRadius.circular(10)),
-            child: HtmlWidget(report.reasonHtml.isEmpty ? '<i>No reason provided.</i>' : report.reasonHtml),
+            child: HtmlWidget(
+              report.reasonHtml.isEmpty ? '<i>No reason provided.</i>' : normalizeStoredRichText(report.reasonHtml),
+            ),
           ),
           if (report.reportedBy.isNotEmpty) ...[
             const SizedBox(height: 6),
@@ -90,7 +93,7 @@ class _UninformedExplainScreenState extends ConsumerState<UninformedExplainScree
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(color: AppColors.statusRequestedBg, borderRadius: BorderRadius.circular(10)),
-              child: HtmlWidget(report.rejectionNote),
+              child: HtmlWidget(normalizeStoredRichText(report.rejectionNote)),
             ),
           ],
           const SizedBox(height: 16),

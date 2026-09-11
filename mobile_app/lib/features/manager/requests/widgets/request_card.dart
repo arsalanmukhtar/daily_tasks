@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/leave_request.dart';
+import '../../../../utils/rich_text.dart';
 import '../../../../widgets/avatar.dart';
 import '../../../../widgets/status_chip.dart';
 
@@ -110,7 +111,7 @@ class RequestCard extends StatelessWidget {
               if (request.reasonHtml.isNotEmpty && request.reasonHtml != '<br>') ...[
                 const SizedBox(height: 8),
                 HtmlWidget(
-                  request.reasonHtml,
+                  normalizeStoredRichText(request.reasonHtml),
                   textStyle: TextStyle(color: AppColors.ink700, fontSize: 13),
                 ),
               ],

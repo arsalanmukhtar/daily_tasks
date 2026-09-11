@@ -832,10 +832,121 @@ function parseInertHtml_(html) {
   tpl.innerHTML = String(html || '');
   return tpl.content;
 }
+// Some already-stored reason/explanation/resolution/rejection HTML never
+// went through the toolbar's insertUnorderedList/insertOrderedList - it was
+// pasted as plain text (clipboard had no HTML, e.g. a reason drafted
+// elsewhere and copied in), so it's really just paragraph text whose lines
+// happen to start with a literal "•"/"-"/"1." character instead of a real
+// <ul>/<ol>. Rendered as-is, only the first visual line of a wrapped
+// paragraph lines up with that marker - every wrapped continuation line
+// falls back to the left margin, since there's no actual list for the
+// browser to hang-indent.
+//
+// This retroactively regroups literal marker lines into real <ul>/<ol>
+// before display, so normal list layout (and the same fix applied on the
+// mobile app - see lib/utils/rich_text.dart, kept in sync since both
+// clients render the exact same stored HTML) applies the same way it would
+// to a list built with the toolbar.
+const BULLET_MARKER_RE_ = /^[•\-\*]\s+/;
+const NUMBERED_MARKER_RE_ = /^\d+[.)]\s+/;
+
+// A plain-text paste with no clipboard HTML lands as one text node holding
+// literal "\n"s. Splitting those into real <br> siblings first means the
+// line-grouping pass below only ever has to reason about <br>/<div>/<p>
+// boundaries, matching what a real contenteditable would have produced.
+function splitNewlinesIntoBr_(root) {
+  Array.from(root.childNodes).forEach(function (node) {
+    if (node.nodeType !== Node.TEXT_NODE || node.textContent.indexOf('\n') === -1) return;
+    const parts = node.textContent.split('\n');
+    parts.forEach(function (part, i) {
+      if (i > 0) root.insertBefore(document.createElement('br'), node);
+      if (part) root.insertBefore(document.createTextNode(part), node);
+    });
+    root.removeChild(node);
+  });
+}
+
+// Splits `container`'s direct children into logical lines: a <div>/<p>
+// child is one line by itself, and a run of inline nodes at the top level
+// (text, <b>, <a>, ...) delimited by <br> is one line too.
+function computeLines_(container) {
+  const lines = [];
+  let contentNodes = [];
+  let allNodes = [];
+  function flush() {
+    if (contentNodes.length || allNodes.length) lines.push({ contentNodes: contentNodes, allNodes: allNodes });
+    contentNodes = [];
+    allNodes = [];
+  }
+  Array.from(container.childNodes).forEach(function (node) {
+    const tag = node.nodeType === Node.ELEMENT_NODE ? node.tagName : null;
+    if (tag === 'DIV' || tag === 'P') {
+      flush();
+      lines.push({ contentNodes: Array.from(node.childNodes), allNodes: [node] });
+      return;
+    }
+    if (tag === 'BR') {
+      allNodes.push(node);
+      flush();
+      return;
+    }
+    contentNodes.push(node);
+    allNodes.push(node);
+  });
+  flush();
+  return lines;
+}
+
+function leadingMarkerMatch_(line, markerRe) {
+  const first = line.contentNodes[0];
+  if (!first || first.nodeType !== Node.TEXT_NODE) return null;
+  return first.textContent.match(markerRe);
+}
+
+function groupMarkerLinesIntoList_(container, markerRe, listTag) {
+  const lines = computeLines_(container);
+  let i = 0;
+  while (i < lines.length) {
+    const match = leadingMarkerMatch_(lines[i], markerRe);
+    if (!match) { i++; continue; }
+    const run = [{ line: lines[i], marker: match }];
+    let j = i + 1;
+    while (j < lines.length) {
+      const m = leadingMarkerMatch_(lines[j], markerRe);
+      if (!m) break;
+      run.push({ line: lines[j], marker: m });
+      j++;
+    }
+
+    // Insert the (still-empty) list before anything moves - once a line's
+    // content nodes get appended into an <li> below, they're detached from
+    // `container` and can no longer serve as an insertion anchor.
+    const list = document.createElement(listTag);
+    container.insertBefore(list, run[0].line.allNodes[0]);
+
+    run.forEach(function (r) {
+      const li = document.createElement('li');
+      const first = r.line.contentNodes[0];
+      first.textContent = first.textContent.slice(r.marker[0].length);
+      r.line.contentNodes.forEach(function (n) { li.appendChild(n); }); // moves n into li
+      list.appendChild(li);
+      r.line.allNodes.forEach(function (n) { if (n.parentNode === container) container.removeChild(n); }); // leftover <br>, if any
+    });
+    i = j;
+  }
+}
+
+function normalizeStoredListMarkers_(container) {
+  splitNewlinesIntoBr_(container);
+  groupMarkerLinesIntoList_(container, BULLET_MARKER_RE_, 'ul');
+  groupMarkerLinesIntoList_(container, NUMBERED_MARKER_RE_, 'ol');
+}
+
 // Stored reason/explanation/rejection HTML -> a clean string safe to inject.
 function sanitizeStoredRichTextHtml_(html) {
   const clean = document.createElement('div');
   sanitizeRichTextInto_(parseInertHtml_(html), clean);
+  normalizeStoredListMarkers_(clean);
   return clean.innerHTML;
 }
 document.addEventListener('paste', function (e) {
@@ -2249,8 +2360,12 @@ async function submitUninformedResolution_() {
     if (/^#resolve-uninformed=/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search);
     showToast_('Explanation submitted — your manager will review it.', 'success');
     loadUninformedBanner_();
-  } catch (_e) {
-    showErrorToast_('Could not submit - please try again.');
+  } catch (err) {
+    // Was a hardcoded generic message that swallowed the real error (e.g. a
+    // 401 from a stale/missing token) - match the dismiss/withdraw handlers'
+    // convention of surfacing err.message so a real failure is diagnosable
+    // instead of always reading as "just try again".
+    showErrorToast_(err.message || 'Could not submit - please try again.');
   } finally {
     uninformedResolveSubmitBtn.disabled = false;
     uninformedResolveSubmitBtn.textContent = originalLabel;
