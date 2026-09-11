@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/theme/app_colors.dart';
 import '../../core/utils/week_utils.dart';
 
 enum PeriodGranularity { year, quarter, month, week }
@@ -57,54 +58,120 @@ class Period {
   }
 }
 
+const _granularities = [
+  (PeriodGranularity.year, 'Year'),
+  (PeriodGranularity.quarter, 'Quarter'),
+  (PeriodGranularity.month, 'Month'),
+  (PeriodGranularity.week, 'Week'),
+];
+
 /// Segmented Year/Quarter/Month/Week control + prev/next navigation for
 /// the currently selected [period]. Weeks are only offered once a quarter
 /// is selected (a whole year of weekly bars/cards would be unreasonably
 /// cramped - same reasoning as the Kotlin app's Summary chart toggle).
+///
+/// Custom-built rather than Material's SegmentedButton: that widget sizes
+/// itself to its content instead of filling the row, and "Quarter" (the
+/// longest label) doesn't fit its own segment's default width, wrapping to
+/// two lines and throwing the whole control's height/alignment off the
+/// moment it's selected. Four equal Expanded segments in a fixed-height
+/// track sidesteps both problems and matches the brand-colored "active"
+/// pill look the rest of this screen's filters already use.
 class PeriodSelector extends StatelessWidget {
   const PeriodSelector({required this.period, required this.onChanged, super.key});
 
   final Period period;
   final ValueChanged<Period> onChanged;
 
+  void _select(PeriodGranularity g) {
+    switch (g) {
+      case PeriodGranularity.year:
+        onChanged(Period.yearOf(period.year));
+      case PeriodGranularity.quarter:
+        onChanged(Period(PeriodGranularity.quarter, period.year, quarter: period.quarter ?? 1));
+      case PeriodGranularity.month:
+        onChanged(Period(PeriodGranularity.month, period.year, month: period.month ?? 1));
+      case PeriodGranularity.week:
+        onChanged(Period(PeriodGranularity.week, period.year, isoWeek: period.isoWeek ?? isoWeekOf(DateTime.now()).week));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SegmentedButton<PeriodGranularity>(
-          segments: const [
-            ButtonSegment(value: PeriodGranularity.year, label: Text('Year')),
-            ButtonSegment(value: PeriodGranularity.quarter, label: Text('Quarter')),
-            ButtonSegment(value: PeriodGranularity.month, label: Text('Month')),
-            ButtonSegment(value: PeriodGranularity.week, label: Text('Week')),
-          ],
-          selected: {period.granularity},
-          onSelectionChanged: (selected) {
-            final g = selected.first;
-            switch (g) {
-              case PeriodGranularity.year:
-                onChanged(Period.yearOf(period.year));
-              case PeriodGranularity.quarter:
-                onChanged(Period(PeriodGranularity.quarter, period.year, quarter: period.quarter ?? 1));
-              case PeriodGranularity.month:
-                onChanged(Period(PeriodGranularity.month, period.year, month: period.month ?? 1));
-              case PeriodGranularity.week:
-                onChanged(Period(PeriodGranularity.week, period.year, isoWeek: period.isoWeek ?? isoWeekOf(DateTime.now()).week));
-            }
-          },
+        Container(
+          height: 40,
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(color: AppColors.surface2, borderRadius: BorderRadius.circular(11)),
+          child: Row(
+            children: [
+              for (final (g, label) in _granularities)
+                Expanded(child: _segment(granularity: g, label: label)),
+            ],
+          ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Row(
           children: [
-            IconButton(icon: const Icon(Icons.chevron_left), onPressed: () => onChanged(_shift(-1))),
+            _navButton(icon: Icons.chevron_left_rounded, onTap: () => onChanged(_shift(-1))),
             Expanded(
-              child: Text(period.label, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium),
+              child: Text(
+                period.label,
+                textAlign: TextAlign.center,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(color: AppColors.brandPrimaryDark, fontWeight: FontWeight.w800),
+              ),
             ),
-            IconButton(icon: const Icon(Icons.chevron_right), onPressed: () => onChanged(_shift(1))),
+            _navButton(icon: Icons.chevron_right_rounded, onTap: () => onChanged(_shift(1))),
           ],
         ),
       ],
+    );
+  }
+
+  Widget _segment({required PeriodGranularity granularity, required String label}) {
+    final selected = period.granularity == granularity;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _select(granularity),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? AppColors.brandPrimary : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : AppColors.ink700,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _navButton({required IconData icon, required VoidCallback onTap}) {
+    return Material(
+      color: AppColors.brandTint,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Icon(icon, size: 22, color: AppColors.brandPrimaryDark),
+        ),
+      ),
     );
   }
 
