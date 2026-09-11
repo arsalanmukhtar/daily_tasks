@@ -3,9 +3,13 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
 
-// Urbanist everywhere - same family the web app pulls from Google Fonts
-// (see index.html). Built once here rather than inline per TextStyle below.
-final _urbanistTextTheme = GoogleFonts.urbanistTextTheme();
+// Roboto everywhere (Material's own default face, used deliberately rather
+// than left implicit so every TextStyle in the app - including ones that
+// don't go through this textTheme at all, like the search bar/dropdowns'
+// inline styles - resolves the same family via the ambient DefaultTextStyle
+// this ThemeData's fontFamily sets). Built once here rather than inline per
+// TextStyle below.
+final _baseTextTheme = GoogleFonts.robotoTextTheme();
 
 /// Same light theme as every other surface in this product: white cards on
 /// a barely-off-white page, near-black text, a thin hairline outline doing
@@ -14,7 +18,7 @@ final _urbanistTextTheme = GoogleFonts.urbanistTextTheme();
 final appTheme = ThemeData(
   useMaterial3: true,
   scaffoldBackgroundColor: AppColors.bg,
-  fontFamily: GoogleFonts.urbanist().fontFamily,
+  fontFamily: GoogleFonts.roboto().fontFamily,
   colorScheme: const ColorScheme.light(
     primary: AppColors.brandPrimary,
     onPrimary: Colors.white,
@@ -94,12 +98,12 @@ final appTheme = ThemeData(
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
   ),
   dividerTheme: const DividerThemeData(color: AppColors.line, thickness: 1, space: 1),
-  textTheme: _urbanistTextTheme.copyWith(
-    headlineSmall: _urbanistTextTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: AppColors.ink900),
-    titleLarge: _urbanistTextTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: AppColors.ink900),
-    titleMedium: _urbanistTextTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, color: AppColors.ink900),
-    bodyMedium: _urbanistTextTheme.bodyMedium?.copyWith(color: AppColors.ink900),
-    bodySmall: _urbanistTextTheme.bodySmall?.copyWith(color: AppColors.ink700),
-    labelLarge: _urbanistTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+  textTheme: _baseTextTheme.copyWith(
+    headlineSmall: _baseTextTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: AppColors.ink900),
+    titleLarge: _baseTextTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: AppColors.ink900),
+    titleMedium: _baseTextTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, color: AppColors.ink900),
+    bodyMedium: _baseTextTheme.bodyMedium?.copyWith(color: AppColors.ink900),
+    bodySmall: _baseTextTheme.bodySmall?.copyWith(color: AppColors.ink700),
+    labelLarge: _baseTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
   ),
 );

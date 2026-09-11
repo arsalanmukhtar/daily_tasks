@@ -52,9 +52,15 @@ class _GlobalSearchBarState extends ConsumerState<GlobalSearchBar> {
               controller: _controller,
               onChanged: (v) => ref.read(globalSearchQueryProvider.notifier).state = v,
               textInputAction: TextInputAction.search,
+              // isCollapsed below strips the InputDecorator's own default
+              // vertical padding (reserved for a floating label this field
+              // never uses), which otherwise sits the text a few pixels
+              // lower than the search icon beside it; this plus centering
+              // the text's own paint area is what actually lines them up.
+              textAlignVertical: TextAlignVertical.center,
               style: const TextStyle(fontSize: 14, color: AppColors.ink900),
               decoration: const InputDecoration(
-                isDense: true,
+                isCollapsed: true,
                 // The app-wide InputDecorationTheme fills every field with
                 // a grey background (AppColors.surface2) by default - this
                 // field's own white pill container (see Container above) is
