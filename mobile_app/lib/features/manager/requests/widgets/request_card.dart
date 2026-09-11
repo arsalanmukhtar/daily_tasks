@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:intl/intl.dart';
@@ -51,6 +53,12 @@ class RequestCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
+              // Row 1: type/duration/date - however many fit, wrapping among
+              // themselves. Row 2 is always just Applied-time (+ the
+              // attachment glyph, if any) on its own line, rather than
+              // however the Wrap happened to overflow - keeps that one
+              // consistent from card to card instead of drifting up onto
+              // row 1 when the name/type/date happen to be short.
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
@@ -67,23 +75,38 @@ class RequestCard extends StatelessWidget {
                     background: AppColors.metaBg,
                     icon: Icons.calendar_today_outlined,
                   ),
-                  if (request.requestedAt != null)
-                    StatusChip(
-                      label: _timeFmt.format(request.requestedAt!),
-                      foreground: AppColors.meta,
-                      background: AppColors.metaBg,
-                      icon: Icons.schedule_outlined,
-                    ),
-                  // Plain glyph, not a chip and not tappable - just flags
-                  // that this request has file(s) attached. Open them from
-                  // the detail sheet's actual AttachmentChip rows instead.
-                  if (request.attachments.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                      child: Icon(Icons.attach_file_rounded, size: 18, color: AppColors.attachmentIndicator),
-                    ),
                 ],
               ),
+              if (request.requestedAt != null || request.attachments.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    if (request.requestedAt != null)
+                      StatusChip(
+                        label: _timeFmt.format(request.requestedAt!),
+                        foreground: AppColors.meta,
+                        background: AppColors.metaBg,
+                        icon: Icons.schedule_outlined,
+                      ),
+                    if (request.attachments.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      // Plain glyph, not a chip and not tappable - just
+                      // flags that this request has file(s) attached. Open
+                      // them from the detail sheet's actual AttachmentChip
+                      // rows instead. Tilted like a paperclip icon
+                      // conventionally sits (a forward-slash lean), not
+                      // upright.
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Transform.rotate(
+                          angle: math.pi / 4,
+                          child: Icon(Icons.attach_file_rounded, size: 18, color: AppColors.attachmentIndicator),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
               if (request.reasonHtml.isNotEmpty && request.reasonHtml != '<br>') ...[
                 const SizedBox(height: 8),
                 HtmlWidget(
