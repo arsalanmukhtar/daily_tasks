@@ -2835,16 +2835,6 @@ async function withdrawLeaveRequest_(requestId, buttonEl) {
 // silently dropped.
 async function cleanupExpiredWithdrawnRequests_(_records) {}
 
-// Leading glyph on every toast: a tiny analog clock whose hand ticks one
-// step per second and completes a full turn as the toast's 5s life runs
-// out (animation is purely CSS - see .toast-clock).
-const TOAST_CLOCK_SVG_ =
-  '<span class="toast-clock" aria-hidden="true"><svg viewBox="0 0 24 24">' +
-  '<circle class="toast-clock-face" cx="12" cy="12" r="9"/>' +
-  '<line class="toast-clock-tick" x1="12" y1="4.5" x2="12" y2="6"/>' +
-  '<line class="toast-clock-hand" x1="12" y1="12" x2="12" y2="5.5"/>' +
-  '</svg></span>';
-
 // The single channel for transient feedback. `tone` is 'success' | 'error' |
 // 'warning' (or omitted for a plain slate toast). Slides up from the bottom,
 // holds 5s, fades out. Every error/warning in the app routes through here
@@ -2853,7 +2843,7 @@ function showToast_(message, tone) {
   const el = document.createElement('div');
   el.className = 'toast' + (tone ? ' is-' + tone : '');
   el.setAttribute('role', tone === 'error' || tone === 'warning' ? 'alert' : 'status');
-  el.innerHTML = TOAST_CLOCK_SVG_ + '<span>' + escapeHtml(message) + '</span>';
+  el.innerHTML = '<span>' + escapeHtml(message) + '</span>';
   toastContainer.appendChild(el);
   requestAnimationFrame(() => el.classList.add('is-visible'));
   setTimeout(() => {
