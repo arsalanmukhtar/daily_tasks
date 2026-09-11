@@ -49,3 +49,50 @@ class RequestFilter {
 }
 
 final requestFilterProvider = StateProvider<RequestFilter>((ref) => const RequestFilter());
+
+/// Free-text query from the global search bar shown above every manager
+/// tab (see GlobalSearchBar) - one shared provider so it persists across
+/// tab switches exactly like requestFilterProvider above.
+final globalSearchQueryProvider = StateProvider<String>((ref) => '');
+
+final _htmlTagPattern = RegExp('<[^>]*>');
+
+/// reasonHtml/explanationHtml/resolutionHtml are rich text (see
+/// PROJECT.md) - strip tags before matching so e.g. a query for "flu"
+/// isn't thrown off by markup, and a query can't accidentally match inside
+/// a tag name.
+String _stripHtml(String html) => html.replaceAll(_htmlTagPattern, ' ');
+
+/// Shared by every list-backed tab's search filtering - all field lookups
+/// are case-insensitive substring matches, same as a browser's Ctrl+F.
+extension LeaveRequestSearch on LeaveRequest {
+  bool matchesQuery(String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return name.toLowerCase().contains(q) ||
+        email.toLowerCase().contains(q) ||
+        type.label.toLowerCase().contains(q) ||
+        type.familyLabel.toLowerCase().contains(q) ||
+        weekLabel.toLowerCase().contains(q) ||
+        status.toLowerCase().contains(q) ||
+        resolvedBy.toLowerCase().contains(q) ||
+        decisionNote.toLowerCase().contains(q) ||
+        _stripHtml(reasonHtml).toLowerCase().contains(q);
+  }
+}
+
+extension UninformedLeaveSearch on UninformedLeave {
+  bool matchesQuery(String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    return name.toLowerCase().contains(q) ||
+        email.toLowerCase().contains(q) ||
+        status.toLowerCase().contains(q) ||
+        reportedBy.toLowerCase().contains(q) ||
+        resolvedBy.toLowerCase().contains(q) ||
+        rejectionNote.toLowerCase().contains(q) ||
+        _stripHtml(reasonHtml).toLowerCase().contains(q) ||
+        _stripHtml(explanationHtml).toLowerCase().contains(q) ||
+        _stripHtml(resolutionHtml).toLowerCase().contains(q);
+  }
+}

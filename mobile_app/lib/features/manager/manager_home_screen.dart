@@ -7,6 +7,7 @@ import 'report/report_screen.dart';
 import 'requests/archived_screen.dart';
 import 'requests/requests_screen.dart';
 import 'summary/summary_screen.dart';
+import 'widgets/global_search_bar.dart';
 
 /// Manager's 4-tab shell (Requests/Archived/Summary/Report) - replaces the
 /// Kotlin app's ManagerHomeScreen entirely. Shown instead of the developer
@@ -51,9 +52,24 @@ class _ManagerHomeScreenState extends ConsumerState<ManagerHomeScreen> {
           ),
         ],
       ),
-      body: IndexedStack(
-        index: _tabIndex,
-        children: const [RequestsScreen(), ArchivedScreen(), SummaryScreen(), ReportScreen()],
+      body: Column(
+        children: [
+          // Above every tab's own content (filters, lists, charts) rather
+          // than inside any one of them, and built once here rather than
+          // per-tab, so the typed query and the search itself both persist
+          // across tab switches.
+          const Padding(
+            padding: EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: GlobalSearchBar(),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: IndexedStack(
+              index: _tabIndex,
+              children: const [RequestsScreen(), ArchivedScreen(), SummaryScreen(), ReportScreen()],
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tabIndex,

@@ -24,13 +24,17 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
   Widget build(BuildContext context) {
     final reportsAsync = ref.watch(allUninformedLeavesProvider);
     final roster = ref.watch(rosterProvider).valueOrNull ?? const [];
+    final query = ref.watch(globalSearchQueryProvider);
     final uninformedRepo = ref.watch(uninformedLeaveRepositoryProvider);
 
     return reportsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, _) => Center(child: Text('Could not load reports: $err')),
       data: (all) {
-        final filtered = _developerFilter == null ? all : all.where((r) => r.email == _developerFilter).toList();
+        final filtered = all
+            .where((r) => _developerFilter == null || r.email == _developerFilter)
+            .where((r) => r.matchesQuery(query))
+            .toList();
         final explained = filtered.where((r) => r.status == 'explained').toList()
           ..sort((a, b) => (a.explainedAt ?? DateTime(0)).compareTo(b.explainedAt ?? DateTime(0)));
         final open = filtered.where((r) => r.status == 'reported').toList()
@@ -97,7 +101,10 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
               Padding(
                 padding: const EdgeInsets.all(32),
                 child: Center(
-                  child: Text('No uninformed-absence reports.', style: TextStyle(color: AppColors.ink500)),
+                  child: Text(
+                    query.trim().isNotEmpty ? 'No reports match your search.' : 'No uninformed-absence reports.',
+                    style: TextStyle(color: AppColors.ink500),
+                  ),
                 ),
               ),
           ],
