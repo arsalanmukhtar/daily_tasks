@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/leave_request.dart';
+import '../../../../widgets/attachment_chip.dart';
 import '../../../../widgets/avatar.dart';
 import '../../../../widgets/status_chip.dart';
 import 'leave_dates_calendar_sheet.dart';
@@ -91,7 +92,12 @@ class _RequestDetailSheetState extends State<RequestDetailSheet> {
                     _dateFact(context, r),
                     if (r.weekLabel.isNotEmpty) _fact('Week', r.weekLabel),
                     if (r.requestedAt != null) _fact('Applied', _timeFmt.format(r.requestedAt!)),
-                    if (r.attachments.isNotEmpty) _fact('Attachments', '${r.attachments.length} file(s)'),
+                    if (r.attachments.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text('Attachments', style: Theme.of(context).textTheme.labelLarge),
+                      const SizedBox(height: 6),
+                      for (final a in r.attachments) AttachmentChip(attachment: a),
+                    ],
                     const SizedBox(height: 12),
                     Text('Reason', style: Theme.of(context).textTheme.labelLarge),
                     const SizedBox(height: 6),

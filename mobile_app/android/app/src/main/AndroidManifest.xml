@@ -54,5 +54,17 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Required for url_launcher (AttachmentChip) to resolve an
+             external viewer for an attachment's http(s) URL under Android
+             11+'s package-visibility rules - see
+             https://pub.dev/packages/url_launcher#configuration. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="http"/>
+        </intent>
     </queries>
 </manifest>

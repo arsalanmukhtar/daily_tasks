@@ -49,6 +49,15 @@ class AppColors {
   static const meta = Color(0xFF54607A);
   static const metaBg = Color(0xFFECEEF4);
 
+  // Attachment file-type badges - same hex values as styles.css's
+  // .fic-pdf/.fic-doc/.fic-txt/.fic-zip so a file reads the same color on
+  // web and mobile.
+  static const fileTypePdf = Color(0xFFB4342B);
+  static const fileTypeDoc = Color(0xFF2B5EB4);
+  static const fileTypeTxt = Color(0xFF5A6B7C);
+  static const fileTypeZip = Color(0xFF7C6A2B);
+  static const fileTypeOther = meta;
+
   // Neutral scale (SignIn*Light in Color.kt) - background/surface/text/borders.
   // True neutral gray (zero chroma), sampled from the same screens/mobile/*.png
   // references the Kotlin app's light theme was built from.
@@ -90,5 +99,15 @@ class AppColors {
         'casualShort' => (durationShort, durationShortBg),
         'casualOutPass' => (durationOutPass, durationOutPassBg),
         _ => (durationFull, durationFullBg),
+      };
+
+  /// Background color for an attachment's file-type badge - keyed by
+  /// Attachment.typeLabel.
+  static Color forFileType(String typeLabel) => switch (typeLabel) {
+        'PDF' => fileTypePdf,
+        'DOC' => fileTypeDoc,
+        'TXT' => fileTypeTxt,
+        'ZIP' => fileTypeZip,
+        _ => fileTypeOther,
       };
 }
