@@ -34,7 +34,7 @@ class SubmissionsScreen extends ConsumerWidget {
         stream: ref.watch(submissionRepositoryProvider).watchMySubmissions(entry.email),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.techEwOrange));
+            return const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary));
           }
           final submissions = [...snapshot.data!]
             ..sort((a, b) => (b.updatedAt ?? DateTime(0)).compareTo(a.updatedAt ?? DateTime(0)));

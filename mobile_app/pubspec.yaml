@@ -62,6 +62,10 @@ dependencies:
 
   intl: ^0.19.0
   flutter_local_notifications: ^18.0.1
+  # Urbanist everywhere - matches the web app's Google Fonts link (see
+  # index.html). Fetches once and caches on-device; app_theme.dart is the
+  # single place it's wired in.
+  google_fonts: ^6.2.1
   url_launcher: ^6.3.1
 
 dev_dependencies:

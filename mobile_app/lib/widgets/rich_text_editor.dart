@@ -290,7 +290,7 @@ class _FormatToggleButton extends StatelessWidget {
     final color = !enabled
         ? AppColors.ink400
         : active
-            ? AppColors.techEwOrange
+            ? AppColors.brandPrimary
             : AppColors.ink700;
     return IconButton(icon: Icon(icon, color: color), onPressed: enabled ? onPressed : null);
   }

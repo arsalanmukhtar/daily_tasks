@@ -134,7 +134,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     color: AppColors.brandTint,
                     borderRadius: BorderRadius.circular(18),
                   ),
-                  child: const Icon(Icons.event_available_rounded, color: AppColors.techEwOrangeDark, size: 32),
+                  child: const Icon(Icons.event_available_rounded, color: AppColors.brandPrimaryDark, size: 32),
                 ),
                 const SizedBox(height: 20),
                 Text('Daily Tasks', style: Theme.of(context).textTheme.headlineSmall),

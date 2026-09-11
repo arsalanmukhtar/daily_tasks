@@ -39,7 +39,7 @@ class MyLeavesScreen extends ConsumerWidget {
         builder: (context, snapshot) {
           final records = snapshot.data ?? const <LeaveRequest>[];
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.techEwOrange));
+            return const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary));
           }
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),

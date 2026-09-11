@@ -25,7 +25,7 @@ class HorizontalBarRow extends StatelessWidget {
                 value: fraction,
                 minHeight: 14,
                 backgroundColor: AppColors.surface2,
-                valueColor: const AlwaysStoppedAnimation(AppColors.techEwOrange),
+                valueColor: const AlwaysStoppedAnimation(AppColors.brandPrimary),
               ),
             ),
           ),

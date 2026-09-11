@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 
-/// Direct translation of the Kotlin app's Color.kt - same hex values, same
-/// names where practical, so the web app, the native manager app, and this
-/// app all read as one visual product. Keep in sync with:
-///   android-app/app/src/main/kotlin/com/techew/leaveapprovals/ui/theme/Color.kt
+/// Originally a direct translation of the retired Kotlin app's Color.kt;
+/// the brand hues below have since moved off that orange to a blue ("sky")
+/// palette (see the mobile UI refactor notes in PROJECT.md) while every
+/// other role - status/type/duration chips, neutrals - is unchanged, so
+/// those still trace back to android-app's Theme.kt where it once existed.
 class AppColors {
   AppColors._();
 
-  // Brand
-  static const techEwOrange = Color(0xFFEA580C);
-  static const techEwOrangeDark = Color(0xFFC2410C);
+  // Brand - Tailwind's "sky" scale.
+  static const brandPrimary = Color(0xFF0284C7); // sky-600
+  static const brandPrimaryDark = Color(0xFF075985); // sky-800
 
   // Status
   static const statusRequested = Color(0xFF92400E);
@@ -56,8 +57,8 @@ class AppColors {
   static const ink400 = Color(0xFFC2C2C4);
   static const line = Color(0xFFE6E4DF); // hairline card border
   static const lineStrong = Color(0xFFD1CFC9);
-  static const brandTint = Color(0xFFFFE9DA); // primaryContainer, e.g. "Q1-Q4" badge
-  static const brandTintStrong = Color(0xFFFFD2AD);
+  static const brandTint = Color(0xFFBAE6FD); // primaryContainer, e.g. "Q1-Q4" badge - sky-200
+  static const brandTintStrong = Color(0xFF7DD3FC); // sky-300
 
   /// (foreground, background) pair for a leave status - mirrors
   /// RequestCard.kt's typeColors()-adjacent status lookup.

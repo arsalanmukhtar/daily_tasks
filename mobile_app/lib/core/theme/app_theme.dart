@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
+
+// Urbanist everywhere - same family the web app pulls from Google Fonts
+// (see index.html). Built once here rather than inline per TextStyle below.
+final _urbanistTextTheme = GoogleFonts.urbanistTextTheme();
 
 /// Same light theme as every other surface in this product: white cards on
 /// a barely-off-white page, near-black text, a thin hairline outline doing
@@ -9,11 +14,12 @@ import 'app_colors.dart';
 final appTheme = ThemeData(
   useMaterial3: true,
   scaffoldBackgroundColor: AppColors.bg,
+  fontFamily: GoogleFonts.urbanist().fontFamily,
   colorScheme: const ColorScheme.light(
-    primary: AppColors.techEwOrange,
+    primary: AppColors.brandPrimary,
     onPrimary: Colors.white,
     primaryContainer: AppColors.brandTint,
-    onPrimaryContainer: AppColors.techEwOrangeDark,
+    onPrimaryContainer: AppColors.brandPrimaryDark,
     secondaryContainer: AppColors.brandTint,
     surface: AppColors.surface,
     onSurface: AppColors.ink900,
@@ -51,18 +57,18 @@ final appTheme = ThemeData(
       (states) => TextStyle(
         fontSize: 12,
         fontWeight: states.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500,
-        color: states.contains(WidgetState.selected) ? AppColors.techEwOrangeDark : AppColors.ink700,
+        color: states.contains(WidgetState.selected) ? AppColors.brandPrimaryDark : AppColors.ink700,
       ),
     ),
     iconTheme: WidgetStateProperty.resolveWith(
       (states) => IconThemeData(
-        color: states.contains(WidgetState.selected) ? AppColors.techEwOrangeDark : AppColors.ink700,
+        color: states.contains(WidgetState.selected) ? AppColors.brandPrimaryDark : AppColors.ink700,
       ),
     ),
   ),
   elevatedButtonTheme: ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
-      backgroundColor: AppColors.techEwOrange,
+      backgroundColor: AppColors.brandPrimary,
       foregroundColor: Colors.white,
       elevation: 0,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -88,12 +94,12 @@ final appTheme = ThemeData(
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
   ),
   dividerTheme: const DividerThemeData(color: AppColors.line, thickness: 1, space: 1),
-  textTheme: const TextTheme(
-    headlineSmall: TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink900),
-    titleLarge: TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink900),
-    titleMedium: TextStyle(fontWeight: FontWeight.w700, color: AppColors.ink900),
-    bodyMedium: TextStyle(color: AppColors.ink900),
-    bodySmall: TextStyle(color: AppColors.ink700),
-    labelLarge: TextStyle(fontWeight: FontWeight.w700),
+  textTheme: _urbanistTextTheme.copyWith(
+    headlineSmall: _urbanistTextTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: AppColors.ink900),
+    titleLarge: _urbanistTextTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: AppColors.ink900),
+    titleMedium: _urbanistTextTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, color: AppColors.ink900),
+    bodyMedium: _urbanistTextTheme.bodyMedium?.copyWith(color: AppColors.ink900),
+    bodySmall: _urbanistTextTheme.bodySmall?.copyWith(color: AppColors.ink700),
+    labelLarge: _urbanistTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
   ),
 );

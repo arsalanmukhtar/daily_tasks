@@ -34,7 +34,7 @@ class SimpleBarChart extends StatelessWidget {
                     Container(
                       height: maxValue == 0 ? 2 : (values[i] / maxValue) * (height - 36) + 2,
                       decoration: BoxDecoration(
-                        color: i == peakIndex ? AppColors.techEwOrange : AppColors.surface3,
+                        color: i == peakIndex ? AppColors.brandPrimary : AppColors.surface3,
                         borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
                       ),
                     ),
