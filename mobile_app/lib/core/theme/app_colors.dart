@@ -110,4 +110,22 @@ class AppColors {
         'ZIP' => fileTypeZip,
         _ => fileTypeOther,
       };
+
+  /// Solid bar color for the Summary screen's "By leave type" chart - one
+  /// distinct color per row, keyed by LeaveType.value. Deliberately not the
+  /// same as forType() above: that groups all three casual variants (Full/
+  /// Short/Out Pass) under one shared family color for the request-card
+  /// chips, but here each is its own row and needs to read apart from its
+  /// neighbors, so this reuses forDuration()'s already-distinct
+  /// short/full/outPass colors instead.
+  static Color forLeaveTypeBar(String typeValue) => switch (typeValue) {
+        'casualFull' => durationFull,
+        'casualShort' => durationShort,
+        'casualOutPass' => durationOutPass,
+        'medical' => typeMedical,
+        'foreignTrip' => typeForeignTrip,
+        'umrah' => typeUmrah,
+        'uninformedAbsence' => statusRequested,
+        _ => meta,
+      };
 }

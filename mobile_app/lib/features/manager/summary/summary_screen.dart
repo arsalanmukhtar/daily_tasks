@@ -8,6 +8,7 @@ import '../../../data/models/leave_type.dart';
 import '../../../data/models/uninformed_leave.dart';
 import '../../../data/providers.dart';
 import '../../../widgets/avatar.dart';
+import '../../../widgets/filter_pill.dart';
 import '../../../widgets/kpi_tile.dart';
 import '../manager_providers.dart';
 import '../period_selector.dart';
@@ -110,14 +111,14 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
   }
 
   Widget _developerPicker(List<AllowlistEntry> roster) {
-    return DropdownButtonFormField<String?>(
-      initialValue: _selectedEmail,
-      isExpanded: true,
-      decoration: const InputDecoration(labelText: 'Developer', border: OutlineInputBorder()),
-      items: [
-        const DropdownMenuItem(value: null, child: Text('All developers')),
-        for (final u in roster) DropdownMenuItem(value: u.email, child: Text(u.name)),
-      ],
+    return FilterPill<String?>(
+      value: _selectedEmail,
+      items: [null, ...roster.map((u) => u.email)],
+      labelOf: (v) {
+        if (v == null) return 'All developers';
+        final match = roster.where((u) => u.email == v);
+        return match.isNotEmpty ? match.first.name : v;
+      },
       onChanged: (v) => setState(() => _selectedEmail = v),
     );
   }
@@ -177,8 +178,19 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
     final maxValue = [...counts.values, scopedUninformed.length].fold(0, (a, b) => a > b ? a : b);
     return Column(
       children: [
-        for (final t in _typeOrder) HorizontalBarRow(label: t.label, value: counts[t]!, maxValue: maxValue),
-        HorizontalBarRow(label: 'Uninformed', value: scopedUninformed.length, maxValue: maxValue),
+        for (final t in _typeOrder)
+          HorizontalBarRow(
+            label: t.label,
+            value: counts[t]!,
+            maxValue: maxValue,
+            color: AppColors.forLeaveTypeBar(t.value),
+          ),
+        HorizontalBarRow(
+          label: 'Uninformed',
+          value: scopedUninformed.length,
+          maxValue: maxValue,
+          color: AppColors.forLeaveTypeBar('uninformedAbsence'),
+        ),
       ],
     );
   }
