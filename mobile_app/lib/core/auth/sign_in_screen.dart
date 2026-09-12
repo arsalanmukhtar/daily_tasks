@@ -35,6 +35,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   bool _isBusy = false;
   String? _localError;
 
+  // Independently toggleable per field - matches the web app's per-field
+  // eye icon (index.html's .pw-toggle-btn), which this mirrors.
+  bool _obscureSignInPassword = true;
+  bool _obscureResetPassword = true;
+  bool _obscureResetConfirm = true;
+
   @override
   void initState() {
     super.initState();
@@ -195,6 +201,16 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     }
   }
 
+  // Show/hide eye icon, floated at the field's trailing edge - mirrors the
+  // web app's .pw-toggle-btn on every password input (index.html).
+  Widget _obscureToggle(bool obscured, VoidCallback onPressed) {
+    return IconButton(
+      icon: Icon(obscured ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: AppColors.ink500),
+      tooltip: obscured ? 'Show password' : 'Hide password',
+      onPressed: onPressed,
+    );
+  }
+
   List<Widget> _signInBody() {
     return [
       TextField(
@@ -206,8 +222,15 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       const SizedBox(height: 10),
       TextField(
         controller: _passwordController,
-        obscureText: true,
-        decoration: const InputDecoration(hintText: 'Password', border: OutlineInputBorder()),
+        obscureText: _obscureSignInPassword,
+        decoration: InputDecoration(
+          hintText: 'Password',
+          border: const OutlineInputBorder(),
+          suffixIcon: _obscureToggle(
+            _obscureSignInPassword,
+            () => setState(() => _obscureSignInPassword = !_obscureSignInPassword),
+          ),
+        ),
         onSubmitted: (_) => _isBusy ? null : _signIn(),
       ),
       const SizedBox(height: 16),
@@ -270,14 +293,28 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     return [
       TextField(
         controller: _resetPasswordController,
-        obscureText: true,
-        decoration: const InputDecoration(hintText: 'New password (min. 8 characters)', border: OutlineInputBorder()),
+        obscureText: _obscureResetPassword,
+        decoration: InputDecoration(
+          hintText: 'New password (min. 8 characters)',
+          border: const OutlineInputBorder(),
+          suffixIcon: _obscureToggle(
+            _obscureResetPassword,
+            () => setState(() => _obscureResetPassword = !_obscureResetPassword),
+          ),
+        ),
       ),
       const SizedBox(height: 10),
       TextField(
         controller: _resetConfirmController,
-        obscureText: true,
-        decoration: const InputDecoration(hintText: 'Confirm new password', border: OutlineInputBorder()),
+        obscureText: _obscureResetConfirm,
+        decoration: InputDecoration(
+          hintText: 'Confirm new password',
+          border: const OutlineInputBorder(),
+          suffixIcon: _obscureToggle(
+            _obscureResetConfirm,
+            () => setState(() => _obscureResetConfirm = !_obscureResetConfirm),
+          ),
+        ),
         onSubmitted: (_) => _isBusy ? null : _submitReset(),
       ),
       const SizedBox(height: 16),
