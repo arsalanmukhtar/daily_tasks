@@ -22,6 +22,28 @@ class AllowlistEntry {
   final bool isOwner;
   final bool active;
 
+  /// Local-state helper for the Team tab's edit sheet - the actual write
+  /// still goes through UsersRepository.updateUser (PATCH), this is just
+  /// for building the form's working copy / optimistic display.
+  AllowlistEntry copyWith({
+    String? name,
+    String? designation,
+    String? reportedTo,
+    String? domain,
+    bool? isOwner,
+    bool? active,
+  }) {
+    return AllowlistEntry(
+      email: email,
+      name: name ?? this.name,
+      designation: designation ?? this.designation,
+      reportedTo: reportedTo ?? this.reportedTo,
+      domain: domain ?? this.domain,
+      isOwner: isOwner ?? this.isOwner,
+      active: active ?? this.active,
+    );
+  }
+
   factory AllowlistEntry.fromJson(Map<String, dynamic> json) {
     return AllowlistEntry(
       email: json['email'] as String? ?? '',

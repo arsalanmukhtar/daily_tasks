@@ -30,6 +30,7 @@ class ApiClient {
   Future<dynamic> post(String path, [Map<String, dynamic>? body]) => _request('POST', path, body);
   Future<dynamic> patch(String path, [Map<String, dynamic>? body]) => _request('PATCH', path, body);
   Future<dynamic> put(String path, [Map<String, dynamic>? body]) => _request('PUT', path, body);
+  Future<dynamic> delete(String path) => _request('DELETE', path);
 
   Future<dynamic> _request(String method, String path, [Map<String, dynamic>? body]) async {
     final token = await tokenStore.read();
@@ -46,6 +47,7 @@ class ApiClient {
         'POST' => await http.post(uri, headers: headers, body: body != null ? jsonEncode(body) : null),
         'PATCH' => await http.patch(uri, headers: headers, body: body != null ? jsonEncode(body) : null),
         'PUT' => await http.put(uri, headers: headers, body: body != null ? jsonEncode(body) : null),
+        'DELETE' => await http.delete(uri, headers: headers),
         _ => throw ApiException('Unsupported method: $method'),
       };
     } catch (_) {
@@ -64,6 +66,9 @@ class ApiClient {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw ApiException((json?['error'] as String?) ?? 'Request failed (${response.statusCode}).');
     }
+    // A 204 (e.g. DELETE /attendance/:email/:date) has no body at all -
+    // nothing to decode, and callers that care just await the Future.
+    if (response.body.isEmpty) return null;
     // Some responses (e.g. GET list endpoints) are a JSON array, not object -
     // jsonDecode already handles that; only the object-shaped error check
     // above needed the Map cast.

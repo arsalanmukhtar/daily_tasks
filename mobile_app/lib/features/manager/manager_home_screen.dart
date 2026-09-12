@@ -8,13 +8,20 @@ import 'report/report_screen.dart';
 import 'requests/archived_screen.dart';
 import 'requests/requests_screen.dart';
 import 'summary/summary_screen.dart';
+import 'team/team_screen.dart';
 import 'widgets/global_search_bar.dart';
 
-/// Manager's 4-tab shell (Requests/Archived/Summary/Report) - replaces the
-/// Kotlin app's ManagerHomeScreen entirely. Shown instead of the developer
-/// HomeScreen when the signed-in user's profile has isOwner==true (see
-/// AuthGate's caller in main.dart... actually the role branch itself lives
-/// wherever AuthGate's `child` is chosen - see RoleBasedHome).
+/// Manager's 5-tab shell (Home/Requests/Archived/Summary/Report) - replaces
+/// the Kotlin app's ManagerHomeScreen entirely. Shown instead of the
+/// developer HomeScreen when the signed-in user's profile has isOwner==true
+/// (see AuthGate's caller in main.dart... actually the role branch itself
+/// lives wherever AuthGate's `child` is chosen - see RoleBasedHome).
+///
+/// Home is the leftmost tab (index 0) by design - it's the team roster/
+/// attendance panel (TeamScreen), not a dashboard, but a manager reaches
+/// for "who's on my team, who's in today" before anything else, so it gets
+/// the first slot and the literal home icon rather than being tacked on
+/// at the end.
 class ManagerHomeScreen extends ConsumerStatefulWidget {
   const ManagerHomeScreen({super.key});
 
@@ -25,7 +32,7 @@ class ManagerHomeScreen extends ConsumerStatefulWidget {
 class _ManagerHomeScreenState extends ConsumerState<ManagerHomeScreen> {
   int _tabIndex = 0;
 
-  static const _titles = ['Requests', 'Archived', 'Summary', 'Report'];
+  static const _titles = ['Home', 'Requests', 'Archived', 'Summary', 'Report'];
 
   @override
   void initState() {
@@ -63,7 +70,7 @@ class _ManagerHomeScreenState extends ConsumerState<ManagerHomeScreen> {
           Expanded(
             child: IndexedStack(
               index: _tabIndex,
-              children: const [RequestsScreen(), ArchivedScreen(), SummaryScreen(), ReportScreen()],
+              children: const [TeamScreen(), RequestsScreen(), ArchivedScreen(), SummaryScreen(), ReportScreen()],
             ),
           ),
         ],
@@ -72,6 +79,7 @@ class _ManagerHomeScreenState extends ConsumerState<ManagerHomeScreen> {
         selectedIndex: _tabIndex,
         onDestinationSelected: (i) => setState(() => _tabIndex = i),
         destinations: [
+          const NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
           NavigationDestination(
             icon: _badge(const Icon(Icons.inbox_outlined), pendingCount),
             label: 'Requests',

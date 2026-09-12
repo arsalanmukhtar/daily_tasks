@@ -118,3 +118,30 @@ CREATE TABLE push_tokens (
     registered_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_push_tokens_email ON push_tokens (email);
+
+-- ---------- attendance ----------
+-- Manager-marked daily attendance: present/absent/late only. There is no
+-- 'on_leave' value here on purpose - a day covered by an approved
+-- leave_requests row (including the leave_requests row every resolved
+-- uninformed_leaves report is converted into - see uninformedLeaves.js's
+-- /:id/accept route) is derived as "On Leave" at read time by every client,
+-- never written here. That keeps exactly one source of truth for "this
+-- person was away" - a stored on_leave row could go stale the moment the
+-- underlying leave is later withdrawn or edited, with nothing to keep it in
+-- sync. A manual mark always wins over a derived On Leave day (covers
+-- corrections). Absence of a row for a given (email, date) means "not
+-- marked yet", not "absent" - summary stats exclude unmarked days from
+-- their percentage math rather than silently treating them as absences.
+CREATE TABLE attendance (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email       TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    date        DATE NOT NULL,
+    status      TEXT NOT NULL CHECK (status IN ('present', 'absent', 'late')),
+    note        TEXT NOT NULL DEFAULT '',
+    marked_by   TEXT NOT NULL DEFAULT '',
+    marked_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (email, date)
+);
+CREATE INDEX idx_attendance_email ON attendance (email);
+CREATE INDEX idx_attendance_date ON attendance (date);

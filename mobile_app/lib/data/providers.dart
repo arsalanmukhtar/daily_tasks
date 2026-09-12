@@ -5,6 +5,7 @@ import '../core/api/auth_token_store.dart';
 import '../core/api/realtime_client.dart';
 import 'models/allowlist_entry.dart';
 import 'repositories/attachment_repository.dart';
+import 'repositories/attendance_repository.dart';
 import 'repositories/auth_repository.dart';
 import 'repositories/leave_repository.dart';
 import 'repositories/push_repository.dart';
@@ -49,11 +50,20 @@ final uninformedLeaveRepositoryProvider = Provider((ref) {
 });
 final pushRepositoryProvider = Provider((ref) => PushRepository(apiClient: ref.watch(apiClientProvider)));
 final attachmentRepositoryProvider = Provider((ref) => AttachmentRepository(apiClient: ref.watch(apiClientProvider)));
-final usersRepositoryProvider = Provider((ref) => UsersRepository(apiClient: ref.watch(apiClientProvider)));
+final usersRepositoryProvider = Provider((ref) {
+  return UsersRepository(apiClient: ref.watch(apiClientProvider), realtime: ref.watch(realtimeClientProvider));
+});
+final attendanceRepositoryProvider = Provider((ref) {
+  return AttendanceRepository(apiClient: ref.watch(apiClientProvider), realtime: ref.watch(realtimeClientProvider));
+});
 
-/// The full team roster - used by manager screens' developer pickers/filters.
-final rosterProvider = FutureProvider<List<AllowlistEntry>>((ref) {
-  return ref.watch(usersRepositoryProvider).listAll();
+/// The full team roster - used by manager screens' developer pickers/filters
+/// and the Team tab's directory. Realtime-backed (upgraded from a one-shot
+/// FutureProvider) so an edit made in one manager's Team tab shows up live
+/// everywhere else - both expose `AsyncValue<T>`, so this is a drop-in swap
+/// for every existing `.valueOrNull ?? const []` call site.
+final rosterProvider = StreamProvider<List<AllowlistEntry>>((ref) {
+  return ref.watch(usersRepositoryProvider).watchAll();
 });
 
 /// Set by DeepLinkListener when a techewapp://reset link is malformed
