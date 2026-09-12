@@ -201,6 +201,19 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     }
   }
 
+  // Borderless, filled - just the ambient InputDecorationTheme
+  // (app_theme.dart's inputDecorationTheme: filled AppColors.surface2,
+  // BorderSide.none) plus a leading glyph naming the field. Every password/
+  // email field on this screen goes through this one helper so they read
+  // consistently.
+  InputDecoration _fieldDecoration({required String hint, required IconData icon, Widget? suffixIcon}) {
+    return InputDecoration(
+      hintText: hint,
+      prefixIcon: Icon(icon, color: AppColors.ink500, size: 20),
+      suffixIcon: suffixIcon,
+    );
+  }
+
   // Show/hide eye icon, floated at the field's trailing edge - mirrors the
   // web app's .pw-toggle-btn on every password input (index.html).
   Widget _obscureToggle(bool obscured, VoidCallback onPressed) {
@@ -217,15 +230,23 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         controller: _emailController,
         keyboardType: TextInputType.emailAddress,
         autocorrect: false,
-        decoration: const InputDecoration(hintText: 'you@example.com', border: OutlineInputBorder()),
+        decoration: _fieldDecoration(hint: 'you@example.com', icon: Icons.mail_outline),
       ),
       const SizedBox(height: 10),
+      Align(
+        alignment: Alignment.centerRight,
+        child: TextButton(
+          style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
+          onPressed: () => _setMode(_AuthMode.forgot),
+          child: const Text('Forgot password?', style: TextStyle(fontSize: 12.5, color: AppColors.ink500)),
+        ),
+      ),
       TextField(
         controller: _passwordController,
         obscureText: _obscureSignInPassword,
-        decoration: InputDecoration(
-          hintText: 'Password',
-          border: const OutlineInputBorder(),
+        decoration: _fieldDecoration(
+          hint: 'Password',
+          icon: Icons.lock_outline,
           suffixIcon: _obscureToggle(
             _obscureSignInPassword,
             () => setState(() => _obscureSignInPassword = !_obscureSignInPassword),
@@ -243,8 +264,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               : const Text('Sign in'),
         ),
       ),
-      const SizedBox(height: 16),
-      TextButton(onPressed: () => _setMode(_AuthMode.forgot), child: const Text('Forgot password?')),
     ];
   }
 
@@ -254,7 +273,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         controller: _emailController,
         keyboardType: TextInputType.emailAddress,
         autocorrect: false,
-        decoration: const InputDecoration(hintText: 'you@example.com', border: OutlineInputBorder()),
+        decoration: _fieldDecoration(hint: 'you@example.com', icon: Icons.mail_outline),
         onSubmitted: (_) => _isBusy ? null : _sendResetLink(),
       ),
       const SizedBox(height: 16),
@@ -294,9 +313,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       TextField(
         controller: _resetPasswordController,
         obscureText: _obscureResetPassword,
-        decoration: InputDecoration(
-          hintText: 'New password (min. 8 characters)',
-          border: const OutlineInputBorder(),
+        decoration: _fieldDecoration(
+          hint: 'New password (min. 8 characters)',
+          icon: Icons.lock_outline,
           suffixIcon: _obscureToggle(
             _obscureResetPassword,
             () => setState(() => _obscureResetPassword = !_obscureResetPassword),
@@ -307,9 +326,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       TextField(
         controller: _resetConfirmController,
         obscureText: _obscureResetConfirm,
-        decoration: InputDecoration(
-          hintText: 'Confirm new password',
-          border: const OutlineInputBorder(),
+        decoration: _fieldDecoration(
+          hint: 'Confirm new password',
+          icon: Icons.lock_outline,
           suffixIcon: _obscureToggle(
             _obscureResetConfirm,
             () => setState(() => _obscureResetConfirm = !_obscureResetConfirm),
