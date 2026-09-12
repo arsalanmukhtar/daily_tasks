@@ -68,7 +68,7 @@ class AppColors {
   // references the Kotlin app's light theme was built from.
   static const bg = Color(0xFFF6F6F4);
   static const surface = Color(0xFFFFFFFF);
-  static const surface2 = Color(0xFFF5F5F4); // filled chip/tile background
+  static const surface2 = Color(0xFFDDDDDC); // filled chip/tile background - #F5F5F4 darkened ~10%, was blending into bg
   static const surface3 = Color(0xFFE0DEDA);
   static const ink900 = Color(0xFF131316); // headings, primary text
   static const ink700 = Color(0xFF75757A); // muted captions/secondary text
