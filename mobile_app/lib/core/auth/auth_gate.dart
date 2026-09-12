@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
+import '../../widgets/pulsing_logo.dart';
 import '../theme/app_colors.dart';
 import 'sign_in_screen.dart';
 
@@ -38,7 +39,7 @@ class _SplashScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Scaffold(
       backgroundColor: AppColors.bg,
-      body: Center(child: CircularProgressIndicator(color: AppColors.brandPrimary)),
+      body: Center(child: PulsingLogo()),
     );
   }
 }
