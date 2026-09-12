@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
+import '../../widgets/sign_out_button.dart';
 import 'manager_providers.dart';
 import 'report/report_screen.dart';
 import 'requests/archived_screen.dart';
@@ -45,11 +46,7 @@ class _ManagerHomeScreenState extends ConsumerState<ManagerHomeScreen> {
       appBar: AppBar(
         title: Text(_titles[_tabIndex]),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Sign out',
-            onPressed: () => ref.read(authRepositoryProvider).signOut(),
-          ),
+          const SignOutButton(),
         ],
       ),
       body: Column(

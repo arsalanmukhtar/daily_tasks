@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
+import '../../widgets/sign_out_button.dart';
 import '../leave/my_leaves/my_leaves_screen.dart';
 import '../submissions/submissions_screen.dart';
 
@@ -42,11 +43,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(
         title: Text(_tabIndex == 0 ? 'My Submissions' : 'My Leaves'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Sign out',
-            onPressed: () => ref.read(authRepositoryProvider).signOut(),
-          ),
+          const SignOutButton(),
         ],
       ),
       body: entry == null

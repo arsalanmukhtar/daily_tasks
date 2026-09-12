@@ -117,7 +117,10 @@ class _RequestDetailSheetState extends State<RequestDetailSheet> {
                   ],
                 ),
               ),
-              if (r.status == 'requested') _buildFooter(context),
+              if (r.status == 'requested') ...[
+                const SizedBox(height: 16),
+                _buildFooter(context),
+              ],
             ],
           ),
         );
