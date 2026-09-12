@@ -7,6 +7,7 @@ import '../../../../data/models/leave_request.dart';
 import '../../../../utils/rich_text.dart';
 import '../../../../widgets/attachment_chip.dart';
 import '../../../../widgets/avatar.dart';
+import '../../../../widgets/note_field_decoration.dart';
 import '../../../../widgets/status_chip.dart';
 import 'leave_dates_calendar_sheet.dart';
 
@@ -220,9 +221,8 @@ class _RequestDetailSheetState extends State<RequestDetailSheet> {
         TextField(
           controller: _noteController,
           maxLines: 2,
-          decoration: InputDecoration(
-            hintText: approving ? 'Add a note with this approval (optional)' : 'Reason for rejecting (optional)',
-            border: const OutlineInputBorder(),
+          decoration: noteFieldDecoration(
+            approving ? 'Add a note with this approval (optional)' : 'Reason for rejecting (optional)',
           ),
         ),
         const SizedBox(height: 10),

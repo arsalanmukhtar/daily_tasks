@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_colors.dart';
+import 'note_field_decoration.dart';
 
 /// A single text replacement: [start, oldEnd) in the old text became
 /// [start, newEnd) in the new text - derived from the old/new strings'
@@ -268,7 +269,7 @@ class RichTextEditor extends StatelessWidget {
               controller: controller,
               minLines: minLines,
               maxLines: null,
-              decoration: InputDecoration(hintText: placeholder),
+              decoration: noteFieldDecoration(placeholder),
             ),
           ],
         );
