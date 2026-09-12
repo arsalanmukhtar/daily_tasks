@@ -7,10 +7,11 @@ import '../data/providers.dart';
 /// AppBar sign-out control, used by both HomeScreen (developer) and
 /// ManagerHomeScreen. Two things a bare `IconButton(Icons.logout)` didn't
 /// give us:
-/// - a filled, circular chip (the same brandTint-circle-with-dark-icon motif
-///   as the sign-in screen's logo mark) so it reads as one deliberate,
-///   substantial control - not a thin stray glyph floating in the AppBar -
-///   while the glyph inside stays a light, single-weight stroke.
+/// - a bordered, circular chip (white fill, the same grayish outline as
+///   Cancel/OutlinedButton elsewhere, and a subtle-red glyph - the same
+///   destructive-but-quiet color the confirm sheet's own Sign out button
+///   uses) so it reads as one deliberate, substantial control - not a thin
+///   stray glyph floating in the AppBar.
 /// - a bottom-sheet confirmation before it actually signs out, matching
 ///   every other panel in this app (LeaveDatesCalendarSheet, request/
 ///   uninformed detail sheets) rather than a modal AlertDialog - a stray tap
@@ -23,15 +24,22 @@ class SignOutButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: Material(
-        color: AppColors.brandTint,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: () => _confirmSignOut(context, ref),
-          child: const Padding(
-            padding: EdgeInsets.all(9),
-            child: Icon(Icons.logout_rounded, size: 19, color: AppColors.brandPrimaryDark),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          shape: BoxShape.circle,
+          border: Border.fromBorderSide(BorderSide(color: AppColors.lineStrong)),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: () => _confirmSignOut(context, ref),
+            child: const Padding(
+              padding: EdgeInsets.all(9),
+              child: Icon(Icons.logout_rounded, size: 19, color: AppColors.statusRejected),
+            ),
           ),
         ),
       ),
@@ -94,9 +102,12 @@ class _SignOutConfirmSheet extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: OutlinedButton(
+                  child: ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(true),
-                    style: OutlinedButton.styleFrom(foregroundColor: AppColors.statusRejected),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.statusRejected,
+                      foregroundColor: Colors.white,
+                    ),
                     child: const Text('Sign out'),
                   ),
                 ),
