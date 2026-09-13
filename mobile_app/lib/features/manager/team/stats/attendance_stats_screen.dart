@@ -142,7 +142,8 @@ class _AttendanceStatsScreenState extends ConsumerState<AttendanceStatsScreen> {
 
     Widget tile(AttendanceStatus s) => Expanded(
           child: KpiTile(
-            label: '${s.label} · ${pct(s)}',
+            label: s.label,
+            sublabel: pct(s),
             value: '${counts[s] ?? 0}',
             foreground: s.foreground,
             background: s.background,
