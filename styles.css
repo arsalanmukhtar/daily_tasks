@@ -684,7 +684,7 @@ textarea {
    Absence" tab has something open needing the developer's attention. */
 .rail-badge {
   position: absolute; top: 4px; right: 4px; width: 8px; height: 8px;
-  border-radius: 999px; background: #DC2626; border: 1.5px solid #fff; box-sizing: border-box;
+  border-radius: 999px; background: #2563EB; border: 1.5px solid #fff; box-sizing: border-box;
 }
 
 /* ---------- Custom designation dropdown ---------- */
