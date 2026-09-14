@@ -49,6 +49,25 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- The API/WS backend is bare HTTP on a raw IP by design (no domain, no
+	     TLS - see PROJECT.md's web-cutover notes), but iOS's App Transport
+	     Security blocks ALL plaintext HTTP by default with no visible error
+	     on-device - it just fails every request as if the server were
+	     unreachable. This carves out an exception for that one IP only,
+	     rather than disabling ATS globally (NSAllowsArbitraryLoads). -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>182.188.28.163</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<false/>
+			</dict>
+		</dict>
+	</dict>
 	<!-- Catches the techewapp://reset?token=... password-reset deep link
 	     (see server/src/auth.js's platform:'mobile' branch and
 	     lib/core/auth/deep_link_listener.dart). A custom scheme is used

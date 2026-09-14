@@ -214,6 +214,7 @@ leaveRequestsRouter.patch('/:id/dismiss', requireAuth, async (req, res) => {
     [req.params.id, req.user.email]
   );
   if (rows.length === 0) return res.status(404).json({ error: 'Request not found.' });
+  broadcast({ resource: 'leaveRequests', id: rows[0].id }, req.user.email);
   res.json(toClientShape(rows[0]));
 });
 
@@ -226,6 +227,8 @@ leaveRequestsRouter.patch('/:id/attachments', requireAuth, async (req, res) => {
     [JSON.stringify(attachments), req.params.id, req.user.email]
   );
   if (rows.length === 0) return res.status(409).json({ error: 'Could not attach files to this request.' });
+  broadcast({ resource: 'leaveRequests', id: rows[0].id }, 'owners');
+  broadcast({ resource: 'leaveRequests', id: rows[0].id }, req.user.email);
   res.json(toClientShape(rows[0]));
 });
 

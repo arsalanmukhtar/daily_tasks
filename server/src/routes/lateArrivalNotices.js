@@ -79,5 +79,6 @@ lateArrivalNoticesRouter.patch('/:id/acknowledge', requireAuth, requireOwner, as
     [req.user.email, req.params.id]
   );
   if (rows.length === 0) return res.status(404).json({ error: 'Notice not found.' });
+  broadcast({ resource: 'lateArrivalNotices', id: rows[0].id }, 'owners');
   res.json(toClientShape(rows[0]));
 });

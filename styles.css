@@ -59,6 +59,17 @@
    above. */
 ::placeholder { color: var(--ink-400); font-weight: 300; opacity: 1; }
 
+/* Native date/time inputs (late-notice, reschedule modals, etc.) - the
+   picker popup itself is drawn by the browser/OS and can't be restyled via
+   CSS, but accent-color re-themes its selected-state highlights (day
+   circle, AM/PM toggle, hour/minute wheel) from browser-default blue to
+   our brand orange. Field chrome (border/padding/focus ring) is already
+   set per-input via Tailwind classes in index.html - left alone here. */
+input[type="date"],
+input[type="time"] {
+  accent-color: var(--brand-600);
+}
+
 html,
 body,
 button,

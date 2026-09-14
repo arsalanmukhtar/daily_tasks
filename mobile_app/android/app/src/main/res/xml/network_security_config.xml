@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The API/WS backend is bare HTTP on a raw IP by design (no domain, no
+     TLS - see PROJECT.md's web-cutover notes), but Android blocks ALL
+     cleartext (plain HTTP) traffic by default for apps targeting API 28+,
+     with no visible error on-device - every request just fails as if the
+     server were unreachable. This carves out an exception for that one IP
+     only, rather than a blanket usesCleartextTraffic="true". -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">182.188.28.163</domain>
+    </domain-config>
+</network-security-config>
