@@ -736,7 +736,7 @@ const FORE_COLORS = [
   '#78350f', // Brown
   '#991b1b', // Burgundy
   '#b45309', // Dark amber
-  '#166534', // Forest
+  '#49453C', // Forest
   '#115e59', // Teal
   '#1e3a8a', // Navy
   '#5b21b6', // Royal purple
@@ -745,13 +745,13 @@ const FORE_COLORS = [
 const HILITE_COLORS = [
   '#fef9c3', // Pale yellow
   '#fef3c7', // Cream
-  '#DCFCE7', // Peach
+  '#EEECE8', // Peach
   '#fecdd3', // Soft pink
   '#fce7f3', // Light pink
   '#f3e8ff', // Lavender
-  '#CFFAFE', // Periwinkle
+  '#E8E6F5', // Periwinkle
   '#dbeafe', // Sky
-  '#cffafe', // Cyan
+  '#E8E6F5', // Cyan
   '#d1fae5', // Mint
   '#ecfccb', // Sage
   '#f5f5f4'  // Stone
@@ -6063,9 +6063,9 @@ document.addEventListener('keydown', function (e) {
 // ========================================================================
 
 const AN_DEV_COLORS = [
-  '#16A34A', '#0891b2', '#7c3aed', '#15803d', '#be123c',
-  '#0284c7', '#a16207', '#0E7490', '#0d9488', '#15803D',
-  '#65a30d', '#9333ea', '#0369a1', '#166534', '#b45309'
+  '#6F6A5D', '#574B90', '#7c3aed', '#5C574C', '#be123c',
+  '#0284c7', '#a16207', '#463C77', '#0d9488', '#5C574C',
+  '#65a30d', '#9333ea', '#0369a1', '#49453C', '#b45309'
 ];
 
 let analyticsCache = null;      // { roster, submissions } from the analytics endpoint
@@ -6251,9 +6251,9 @@ function heatColor_(v, maxVal) {
 }
 
 function colorForRank_(i, total) {
-  if (i === 0) return '#16A34A';                 // top - accent orange
+  if (i === 0) return '#6F6A5D';                 // top - accent orange
   if (total > 1 && i === total - 1) return '#94a3b8'; // last - muted slate, not alarm red
-  return '#86EFAC';                               // mid pack - soft orange
+  return '#9C978C';                               // mid pack - soft orange
 }
 
 // Returns { startMs, endMs } for the given filter - either bound may be null
@@ -6565,8 +6565,8 @@ function renderTeamTrendChart_(model, Chart) {
       datasets: [{
         label: 'Tasks logged',
         data: model.weeks.map(function (w) { return model.teamWeekly[w.key] || 0; }),
-        borderColor: '#16A34A', backgroundColor: 'rgba(22, 163, 74, 0.12)',
-        fill: true, tension: 0.35, pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: '#16A34A'
+        borderColor: '#6F6A5D', backgroundColor: 'rgba(111, 106, 93, 0.12)',
+        fill: true, tension: 0.35, pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: '#6F6A5D'
       }]
     },
     options: {
@@ -6658,7 +6658,7 @@ function renderDowChart_(model, Chart) {
     type: 'bar',
     data: {
       labels: order.map(function (d) { return TASK_DAY_LONG[d]; }),
-      datasets: [{ data: order.map(function (d) { return model.dowTotals[d] || 0; }), backgroundColor: '#4ADE80', borderRadius: 8, maxBarThickness: 46 }]
+      datasets: [{ data: order.map(function (d) { return model.dowTotals[d] || 0; }), backgroundColor: '#8E887B', borderRadius: 8, maxBarThickness: 46 }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,

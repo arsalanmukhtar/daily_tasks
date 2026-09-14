@@ -15,25 +15,30 @@
        through Tailwind's own "orange" palette key - overriding it here
        (after the CDN script, which is what defines the `tailwind` global
        this assigns to) recolors every one of those instances at once to
-       the app's mint-green brand color, with #7BED9E (the exact shade
-       specified) at the 200 step and the rest of the ramp derived from it.
-       "indigo" is overridden the same way to the new cyan accent, #17C0EB
-       at its own 200 step. Mirrors styles.css's own --brand-*/--indigo-*
-       custom-property scale so both systems render identically. -->
+       the app's muted taupe brand color. #AAA69D (the exact shade given)
+       sits at the 200 step (light accents/borders); 600 - the slot this
+       app treats as the main action/button color - is a darker step of
+       the same warm-gray hue instead, since #AAA69D itself measures
+       ~2.4:1 contrast with white text (confirmed live - Sign in/Submit
+       buttons were barely readable), well under the ~4.5:1 buttons need.
+       "indigo" is overridden the same way, but its given shade (#574B90)
+       already had good contrast (~7.5:1) so it sits at 600 directly, no
+       shift needed. Mirrors styles.css's own --brand-*/--indigo-* custom-
+       property scale so both systems render identically. -->
   <script>
     tailwind.config = {
       theme: {
         extend: {
           colors: {
             orange: {
-              50: '#F0FDF4', 100: '#DCFCE7', 200: '#7BED9E', 300: '#86EFAC',
-              400: '#4ADE80', 500: '#22C55E', 600: '#16A34A', 700: '#15803D',
-              800: '#166534', 900: '#14532D', 950: '#052E16'
+              50: '#F9F8F6', 100: '#EEECE8', 200: '#AAA69D', 300: '#9C978C',
+              400: '#8E887B', 500: '#7F796B', 600: '#6F6A5D', 700: '#5C574C',
+              800: '#49453C', 900: '#36322B', 950: '#22201B'
             },
             indigo: {
-              50: '#ECFEFF', 100: '#CFFAFE', 200: '#17C0EB', 300: '#67E8F9',
-              400: '#22D3EE', 500: '#06B6D4', 600: '#0891B2', 700: '#0E7490',
-              800: '#155E75', 900: '#164E63', 950: '#083344'
+              50: '#F5F4FB', 100: '#E8E6F5', 200: '#CFC9E8', 300: '#ACA4D6',
+              400: '#8275BD', 500: '#6557A8', 600: '#574B90', 700: '#463C77',
+              800: '#352D5D', 900: '#262046', 950: '#16122B'
             }
           }
         }
@@ -1334,7 +1339,7 @@
                 </div>
 
                 <div id="leaveDatePicked" class="picked hidden">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#15803D" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C574C" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
                   <div id="leaveDatePickedSingle" class="min-w-0">
                     <b id="leaveDatePickedLabel"></b><span id="leaveDatePickedMeta"></span>
                   </div>
