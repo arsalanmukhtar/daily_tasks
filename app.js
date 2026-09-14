@@ -4324,7 +4324,6 @@ emergencyLeaveConfirmBtn.addEventListener('click', async () => {
       type: 'emergency'
     });
     closeEmergencyLeaveModal_();
-    showToast_('Emergency leave submitted - add your reason and a document when you can.', 'success');
     await refreshApplyLeaveButton();
     await loadMyLeavesData_();
     openSubmitDocsModal_(created.requestId);
