@@ -2342,6 +2342,15 @@ function closeMyLeavesDrawer() {
 async function loadMyLeavesData_() {
   const data = await fetchLeaveStatus_();
   if (data) latestLeaveStatusData = data;
+  // The Overview drawer's "Apply for Leave"/"Requested for Approval"/etc.
+  // banner button has its own refresh path (refreshApplyLeaveButton) that
+  // this function never used to call, so a realtime WS broadcast (e.g. a
+  // manager deciding this request from mobile while the requester has the
+  // web app open) updated the History list/KPIs below instantly but left
+  // that one banner showing the stale pre-decision state until the 60s
+  // poll caught up, or a manual reload. Called here too so every path that
+  // refreshes leave data refreshes the banner along with it.
+  refreshApplyLeaveButton().catch(function () {});
   // Fetched before any renderMyLeaveCard_ call below - replacementInfoForRequest_
   // reads this cache synchronously while building each card.
   latestLeaveReplacements_ = await fetchMyLeaveReplacements_();
