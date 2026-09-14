@@ -11,7 +11,7 @@ import {
   buildDocsReminderEmail,
   addWorkingDays
 } from '../emailTemplate.cjs';
-import { sweepExpiredReplacements } from './leaveReplacements.js';
+import { sweepExpiredReplacements, expandLeaveDays, isOccupiedForDays } from './leaveReplacements.js';
 
 export const leaveRequestsRouter = Router();
 
@@ -92,14 +92,15 @@ leaveRequestsRouter.get('/', requireAuth, async (req, res) => {
 });
 
 // Create a request - optionally naming a replacement (leave_replacements
-// row, "occupied until free" - see db/schema.sql), and optionally as an
-// emergency leave (type='emergency'), which starts in a distinct
+// row, occupied for whatever days their assignment actually overlaps - see
+// leaveReplacements.js's isOccupiedForDays), and optionally as an emergency
+// leave (type='emergency'), which starts in a distinct
 // 'pending_documentation' state rather than the normal 'requested' one - see
 // PATCH /:id/submit-docs below. Both additions are wrapped in one
 // transaction with the leave_requests insert itself: if the named
-// replacement is already occupied (the partial unique index on
-// leave_replacements rejects it), the whole request fails atomically rather
-// than leaving an orphaned leave request with no replacement attached.
+// replacement is already occupied over these specific dates, the whole
+// request fails atomically rather than leaving an orphaned leave request
+// with no replacement attached.
 leaveRequestsRouter.post('/', requireAuth, async (req, res) => {
   const b = req.body || {};
   const type = b.type || 'casualShort';
@@ -152,9 +153,13 @@ leaveRequestsRouter.post('/', requireAuth, async (req, res) => {
       // Lazily frees any of this person's stale 'accepted' rows whose leave
       // is over/withdrawn/rejected but was never explicitly cancelled - see
       // leaveReplacements.js's sweepExpiredReplacements doc comment. Without
-      // this, the unique index below could wrongly reject a legitimate
+      // this, the overlap check below could wrongly reject a legitimate
       // reassignment based on a long-finished leave nobody ever cleaned up.
       await sweepExpiredReplacements(client);
+      const days = expandLeaveDays(startDate, endDate, customDates);
+      if (await isOccupiedForDays(client, replacementEmail, days)) {
+        throw Object.assign(new Error('That person is already covering someone else over those dates - pick someone else.'), { statusCode: 409 });
+      }
       const repResult = await client.query(
         `INSERT INTO leave_replacements (leave_request_id, replacement_email) VALUES ($1, $2) RETURNING id`,
         [created.id, replacementEmail]
@@ -189,8 +194,8 @@ leaveRequestsRouter.post('/', requireAuth, async (req, res) => {
     res.status(201).json({ ...toClientShape(created), replacementId });
   } catch (err) {
     await client.query('ROLLBACK');
-    if (err.code === '23505') {
-      return res.status(409).json({ error: 'That person is already covering someone else right now - pick someone else.' });
+    if (err.statusCode === 409) {
+      return res.status(409).json({ error: err.message });
     }
     console.error('Failed to create leave request:', err);
     res.status(500).json({ error: 'Could not submit this request - please try again.' });

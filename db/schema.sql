@@ -161,11 +161,13 @@ CREATE INDEX idx_attendance_date ON attendance (date);
 CREATE INDEX idx_attendance_batch ON attendance (batch_id);
 
 -- ---------- leave_replacements ----------
--- Optional cover-person on a leave request. "Occupied until free": a person
--- can be the pending/accepted replacement for at most one leave request at a
--- time, enforced by the partial unique index below rather than a date-range
--- overlap check - simpler, and matches "stays occupied until free" literally.
--- A row frees up (no longer counts as occupying anyone) once it's
+-- Optional cover-person on a leave request. Occupancy is date-overlap
+-- based, not a flat one-at-a-time lock: a person can be the pending/accepted
+-- replacement for any number of leave requests at once, as long as none of
+-- them share a calendar day - enforced in application code (see
+-- server/src/routes/leaveReplacements.js's isOccupiedForDays), since a plain
+-- unique index can't express "unless the dates don't overlap". A row frees
+-- up (no longer counts as occupying anyone, for any date) once it's
 -- rejected/cancelled, or once its parent leave_requests row is
 -- withdrawn/rejected or its last leave day has passed - all computed at
 -- query time by joining to leave_requests, same "derive, don't store"
@@ -181,8 +183,6 @@ CREATE TABLE leave_replacements (
 );
 CREATE INDEX idx_leave_replacements_request ON leave_replacements (leave_request_id);
 CREATE INDEX idx_leave_replacements_email ON leave_replacements (replacement_email);
-CREATE UNIQUE INDEX idx_leave_replacements_one_active
-  ON leave_replacements (replacement_email) WHERE status IN ('pending', 'accepted');
 
 -- ---------- late_arrival_notices ----------
 -- Self-service: a developer tells their manager ahead of time (or same-day)
@@ -253,3 +253,13 @@ CREATE INDEX idx_late_notices_email ON late_arrival_notices (email);
 --     acknowledged_by        TEXT NOT NULL DEFAULT ''
 -- );
 -- CREATE INDEX idx_late_notices_email ON late_arrival_notices (email);
+
+-- ============================================================
+-- Migration for an ALREADY-existing database (replacement occupancy moved
+-- from a flat one-at-a-time lock to a date-overlap check - see
+-- leaveReplacements.js's isOccupiedForDays). Hand-run this once against
+-- every database created before this change (this session's local dev DB,
+-- and separately, by hand, the production VM's DB):
+--   psql -U daily_tasks_app -d daily_tasks -h localhost
+-- ============================================================
+-- DROP INDEX IF EXISTS idx_leave_replacements_one_active;

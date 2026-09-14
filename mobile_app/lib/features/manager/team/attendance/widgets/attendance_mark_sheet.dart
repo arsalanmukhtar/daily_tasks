@@ -81,6 +81,12 @@ class _AttendanceMarkSheetState extends ConsumerState<AttendanceMarkSheet> {
               end: range.end,
               note: _noteController.text.trim(),
             );
+        // Belt-and-braces alongside the server's realtime broadcast (see
+        // attendance.js's PUT /:email/range): invalidating every cached
+        // attendanceRangeProvider instance forces whatever day/period the
+        // roster or stats screen is currently showing to refetch right now,
+        // instead of waiting on the WS round-trip to land.
+        ref.invalidate(attendanceRangeProvider);
         if (mounted) {
           Navigator.of(context).pop();
           if (result.skipped.isNotEmpty) {
@@ -102,6 +108,7 @@ class _AttendanceMarkSheetState extends ConsumerState<AttendanceMarkSheet> {
                   ? '${_arrivalTime!.hour.toString().padLeft(2, '0')}:${_arrivalTime!.minute.toString().padLeft(2, '0')}'
                   : null,
             );
+        ref.invalidate(attendanceRangeProvider);
         if (mounted) Navigator.of(context).pop();
       }
     } catch (e) {
@@ -117,6 +124,7 @@ class _AttendanceMarkSheetState extends ConsumerState<AttendanceMarkSheet> {
     setState(() => _isSubmitting = true);
     try {
       await ref.read(attendanceRepositoryProvider).unmark(widget.email, widget.date);
+      ref.invalidate(attendanceRangeProvider);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {

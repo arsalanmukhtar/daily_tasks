@@ -7,7 +7,7 @@ import { broadcast } from '../realtime.js';
 import { buildReplacementRequestEmail, buildReplacementResolvedEmail } from '../emailTemplate.cjs';
 
 export const leaveReplacementsRouter = Router();
-export { sweepExpiredReplacements };
+export { sweepExpiredReplacements, expandLeaveDays, isOccupiedForDays };
 
 // The partial unique index on (replacement_email) WHERE status IN
 // ('pending','accepted') is what actually enforces "occupied until free" -
@@ -33,16 +33,84 @@ async function sweepExpiredReplacements(queryable) {
   );
 }
 
+// Occupancy is date-overlap based, not a flat "one assignment at a time"
+// lock: someone covering leave A is still available as a replacement for
+// leave B as long as A and B's days don't actually overlap. `days` is every
+// calendar day ('YYYY-MM-DD') the *candidate* leave being applied for would
+// cover - a plain range expands to every day in it, a Custom pick is used
+// as-is (mirrors leaveRequests.js's own spansMultipleDays/customDates
+// convention and attendance.js's isOnApprovedLeave day-membership check).
+function expandLeaveDays(startDate, endDate, customDates) {
+  if (Array.isArray(customDates) && customDates.length > 1) return customDates;
+  if (!startDate) return [];
+  const days = [];
+  let cur = new Date(startDate + 'T00:00:00Z');
+  const end = new Date((endDate || startDate) + 'T00:00:00Z');
+  while (cur <= end) {
+    days.push(cur.toISOString().slice(0, 10));
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  return days;
+}
+
+// True if `email` has an active (pending/accepted) replacement assignment
+// whose parent leave request's days overlap any of `days`. Takes a
+// queryable (pool or an in-flight transaction client) like
+// sweepExpiredReplacements does, so a create-time check can run inside the
+// same transaction as the insert it's guarding.
+async function isOccupiedForDays(queryable, email, days) {
+  if (!days.length) return false;
+  const { rows } = await queryable.query(
+    `SELECT EXISTS (
+       SELECT 1 FROM leave_replacements lr
+       JOIN leave_requests req ON req.id = lr.leave_request_id
+       WHERE lr.replacement_email = $1 AND lr.status IN ('pending', 'accepted')
+         AND EXISTS (
+           SELECT 1 FROM unnest($2::date[]) AS cand(day)
+           WHERE (jsonb_array_length(req.custom_dates) > 1 AND req.custom_dates @> to_jsonb(cand.day::text))
+              OR (jsonb_array_length(req.custom_dates) <= 1 AND cand.day BETWEEN req.start_date AND COALESCE(req.end_date, req.start_date))
+         )
+     ) AS occupied`,
+    [email, days]
+  );
+  return rows[0].occupied;
+}
+
 // Any signed-in user can check this (not just an owner) - the leave-apply
 // form's replacement picker needs to grey out occupied candidates for
 // *whoever* is applying, not just for a manager. Deliberately minimal: just
 // the occupied emails, nothing about who they're covering for or why -
 // that detail stays scoped to the people actually involved (see GET '/'
-// below).
+// below). Accepts the candidate leave's own dates (?start=&end= for a plain
+// range, or ?dates=<JSON array> for a Custom pick) so occupancy reflects
+// actual date overlap rather than a flat "covering someone, anyone" lock -
+// with no dates given (nothing picked yet), nobody is reported occupied.
 leaveReplacementsRouter.get('/occupied', requireAuth, async (req, res) => {
   await sweepExpiredReplacements(pool);
+
+  let days = [];
+  if (typeof req.query.dates === 'string') {
+    try {
+      const parsed = JSON.parse(req.query.dates);
+      if (Array.isArray(parsed)) days = parsed;
+    } catch (_e) { /* ignore malformed input, treat as no dates */ }
+  } else if (req.query.start) {
+    days = expandLeaveDays(String(req.query.start), req.query.end ? String(req.query.end) : null, []);
+  }
+
+  if (!days.length) return res.json({ occupiedEmails: [] });
+
   const { rows } = await pool.query(
-    `SELECT DISTINCT replacement_email FROM leave_replacements WHERE status IN ('pending', 'accepted')`
+    `SELECT DISTINCT lr.replacement_email
+     FROM leave_replacements lr
+     JOIN leave_requests req ON req.id = lr.leave_request_id
+     WHERE lr.status IN ('pending', 'accepted')
+       AND EXISTS (
+         SELECT 1 FROM unnest($1::date[]) AS cand(day)
+         WHERE (jsonb_array_length(req.custom_dates) > 1 AND req.custom_dates @> to_jsonb(cand.day::text))
+            OR (jsonb_array_length(req.custom_dates) <= 1 AND cand.day BETWEEN req.start_date AND COALESCE(req.end_date, req.start_date))
+       )`,
+    [days]
   );
   res.json({ occupiedEmails: rows.map((r) => r.replacement_email) });
 });
@@ -51,11 +119,18 @@ leaveReplacementsRouter.get('/occupied', requireAuth, async (req, res) => {
 // leave_requests row and the replacement's own name - covers every caller
 // (the list route, and the accept/reject/reassign routes, which all need
 // the same shape to build an email and a client response).
+// start_date/end_date are cast to text in SQL (not left as node-pg's default
+// parsed Date) for the same reason leaveRequests.js's dateOnly() exists -
+// .toISOString() on a plain-DATE-parsed local-midnight Date shifts it onto
+// the previous day's evening on this UTC+5 server. See leaveRequests.js's
+// dateOnly() doc comment for the full explanation.
 const SELECT_JOINED = `
   SELECT lr.id, lr.leave_request_id, lr.replacement_email, lr.status,
          lr.requested_at, lr.responded_at,
          req.email AS requester_email, req.name AS requester_name, req.type,
-         req.start_date, req.end_date, req.custom_dates, req.week_label,
+         to_char(req.start_date, 'YYYY-MM-DD') AS start_date,
+         to_char(req.end_date, 'YYYY-MM-DD') AS end_date,
+         req.custom_dates, req.week_label,
          req.status AS request_status,
          u.name AS replacement_name
   FROM leave_replacements lr
@@ -159,20 +234,26 @@ leaveReplacementsRouter.patch('/:id', requireAuth, requireOwner, async (req, res
   if (!newEmail) return res.status(400).json({ error: 'replacementEmail is required.' });
 
   await sweepExpiredReplacements(pool);
-  let rows;
-  try {
-    ({ rows } = await pool.query(
-      `UPDATE leave_replacements SET replacement_email = $1, status = 'pending', responded_at = NULL
-       WHERE id = $2 AND status IN ('pending', 'rejected')
-       RETURNING id`,
-      [newEmail, req.params.id]
-    ));
-  } catch (err) {
-    if (err.code === '23505') {
-      return res.status(409).json({ error: 'That person is already covering someone else right now - pick someone else.' });
-    }
-    throw err;
+
+  const { rows: parentRows } = await pool.query(
+    `SELECT to_char(req.start_date, 'YYYY-MM-DD') AS start_date,
+            to_char(req.end_date, 'YYYY-MM-DD') AS end_date, req.custom_dates
+     FROM leave_replacements lr JOIN leave_requests req ON req.id = lr.leave_request_id
+     WHERE lr.id = $1`,
+    [req.params.id]
+  );
+  if (parentRows.length === 0) return res.status(404).json({ error: 'Replacement not found.' });
+  const days = expandLeaveDays(parentRows[0].start_date, parentRows[0].end_date, parentRows[0].custom_dates);
+  if (await isOccupiedForDays(pool, newEmail, days)) {
+    return res.status(409).json({ error: 'That person is already covering someone else over those dates - pick someone else.' });
   }
+
+  const { rows } = await pool.query(
+    `UPDATE leave_replacements SET replacement_email = $1, status = 'pending', responded_at = NULL
+     WHERE id = $2 AND status IN ('pending', 'rejected')
+     RETURNING id`,
+    [newEmail, req.params.id]
+  );
   if (rows.length === 0) {
     return res.status(409).json({ error: 'Cannot reassign - this replacement has already been accepted.' });
   }

@@ -185,16 +185,25 @@ const submitDocsError      = document.getElementById('submitDocsError');
 const submitDocsSubmitBtn  = document.getElementById('submitDocsSubmitBtn');
 
 // ---------- Reschedule ----------
-const rescheduleModal      = document.getElementById('rescheduleModal');
-const rescheduleBackdrop   = document.getElementById('rescheduleBackdrop');
-const closeRescheduleBtn   = document.getElementById('closeRescheduleBtn');
-const rescheduleStartDate  = document.getElementById('rescheduleStartDate');
-const rescheduleEndDate    = document.getElementById('rescheduleEndDate');
+const rescheduleModal            = document.getElementById('rescheduleModal');
+const rescheduleBackdrop         = document.getElementById('rescheduleBackdrop');
+const closeRescheduleBtn         = document.getElementById('closeRescheduleBtn');
+const rescheduleDatesTrigger     = document.getElementById('rescheduleDatesTrigger');
+const rescheduleDatesLabel       = document.getElementById('rescheduleDatesLabel');
+const rescheduleDatesPopover     = document.getElementById('rescheduleDatesPopover');
+const rescheduleCalPrevBtn       = document.getElementById('rescheduleCalPrevBtn');
+const rescheduleCalNextBtn       = document.getElementById('rescheduleCalNextBtn');
+const rescheduleCalMonthYearLabel = document.getElementById('rescheduleCalMonthYearLabel');
+const rescheduleCalGrid          = document.getElementById('rescheduleCalGrid');
+const rescheduleCalFooterLabel   = document.getElementById('rescheduleCalFooterLabel');
+const rescheduleCalClearBtn      = document.getElementById('rescheduleCalClearBtn');
 const rescheduleError      = document.getElementById('rescheduleError');
 const rescheduleSubmitBtn  = document.getElementById('rescheduleSubmitBtn');
 
 // ---------- Replacement (cover person) ----------
-const leaveReplacementSelect  = document.getElementById('leaveReplacementSelect');
+const leaveReplacementTrigger  = document.getElementById('leaveReplacementTrigger');
+const leaveReplacementLabel    = document.getElementById('leaveReplacementLabel');
+const leaveReplacementPopover  = document.getElementById('leaveReplacementPopover');
 const replacementInviteBanner = document.getElementById('replacementInviteBanner');
 const replacementInviteMeta   = document.getElementById('replacementInviteMeta');
 const replacementInviteAcceptBtn = document.getElementById('replacementInviteAcceptBtn');
@@ -320,6 +329,7 @@ const myLeavesBannerViewBtn   = document.getElementById('myLeavesBannerViewBtn')
 // Uninformed-leave banner + "Explain the Absence" tab (see myLeavesUninformedWrap
 // in index.html - used to be a separate drawer, now one more leaves-rail tab).
 const uninformedRailBadge      = document.getElementById('uninformedRailBadge');
+const historyRailBadge         = document.getElementById('historyRailBadge');
 const myLeavesUninformedWrap   = document.getElementById('myLeavesUninformedWrap');
 const myLeavesUninformedFooter = document.getElementById('myLeavesUninformedFooter');
 const uninformedBanner         = document.getElementById('uninformedBanner');
@@ -1326,44 +1336,112 @@ async function getAllowlistMap_() {
   return map;
 }
 
-// Fills the leave-apply form's replacement <select> with every active,
-// non-manager teammate other than the signed-in user, greying out anyone
-// currently occupied elsewhere (see server/src/routes/leaveReplacements.js's
-// "occupied until free" rule) with a disabled option so it's clear *why*
-// they're not pickable rather than just missing. Re-run each time the Apply
-// tab opens, since who's occupied can change between visits.
+// ---------- Replacement picker: custom dropdown (not a native <select>) ----------
+// A native <select>'s open option list can't be themed cross-browser (same
+// limitation as the date/time inputs elsewhere in this file), so this is a
+// trigger button + a .select-pop popover, mirroring the month/year dropdown
+// pattern already established by lcalBuildDropdown_ above.
+let leaveReplacementCandidates = []; // active, non-manager teammates other than self
+let leaveReplacementOccupied = new Set(); // emails unavailable for the *currently selected* leave dates
+let leaveReplacementValue = ''; // selected replacement email, '' = none
+
+// Fills leaveReplacementCandidates with every active, non-manager teammate
+// other than the signed-in user, then refreshes who's occupied. Re-run each
+// time the Apply tab opens, since the roster rarely changes but can.
 async function populateLeaveReplacementSelect_() {
   const self = currentUserEmail_();
-  const previousValue = leaveReplacementSelect.value;
   try {
-    const [allowlist, occupiedResp] = await Promise.all([
-      getAllowlistMap_(),
-      apiRequest_('GET', '/leave-replacements/occupied')
-    ]);
-    const occupied = new Set((occupiedResp.occupiedEmails || []));
-    const candidates = Object.values(allowlist)
+    const allowlist = await getAllowlistMap_();
+    leaveReplacementCandidates = Object.values(allowlist)
       .filter(function (u) { return u.active && !u.isOwner && u.email !== self; })
       .sort(function (a, b) { return (a.name || a.email).localeCompare(b.name || b.email); });
-
-    leaveReplacementSelect.innerHTML = '<option value="">No replacement</option>' +
-      candidates.map(function (u) {
-        const isOccupied = occupied.has(u.email);
-        return '<option value="' + escapeHtml(u.email) + '"' + (isOccupied ? ' disabled' : '') + '>' +
-          escapeHtml(u.name || u.email) + (isOccupied ? ' (already covering someone else)' : '') +
-        '</option>';
-      }).join('');
-    // Re-selects whatever was picked before, as long as it's still a valid,
-    // non-occupied option - preserves the choice across a rail-navigation
-    // re-population (see switchLeavesTab_) the same way the rest of the
-    // form's in-progress values already survive that navigation.
-    if (previousValue && !occupied.has(previousValue) && candidates.some(function (u) { return u.email === previousValue; })) {
-      leaveReplacementSelect.value = previousValue;
-    }
   } catch (_e) {
-    // Offline/error - leave whatever the select already had (usually just
-    // "No replacement") rather than blocking the rest of the form.
+    // Offline/error - keep whatever candidates were already cached.
   }
+  await refreshLeaveReplacementOccupancy_();
 }
+
+// A replacement is only unavailable if their existing assignment's dates
+// actually overlap the dates being applied for *here* - see server/src/
+// routes/leaveReplacements.js's date-overlap occupancy check. Re-run every
+// time the calendar selection changes (not just once when the tab opens) so
+// someone already covering a different, non-overlapping date range still
+// shows up pickable.
+async function refreshLeaveReplacementOccupancy_() {
+  try {
+    const qs = leaveReplacementDateQuery_();
+    const occupiedResp = await apiRequest_('GET', '/leave-replacements/occupied' + qs);
+    leaveReplacementOccupied = new Set(occupiedResp.occupiedEmails || []);
+  } catch (_e) {
+    leaveReplacementOccupied = new Set();
+  }
+  if (leaveReplacementValue && leaveReplacementOccupied.has(leaveReplacementValue)) {
+    leaveReplacementValue = '';
+  }
+  renderLeaveReplacementTriggerLabel_();
+  if (!leaveReplacementPopover.classList.contains('hidden')) renderLeaveReplacementPopoverList_();
+}
+
+function leaveReplacementDateQuery_() {
+  if (!leaveSelectedDates.length) return '';
+  if (leaveDateMode === 'multiple' && leaveSelectedDates.length > 1) {
+    return '?dates=' + encodeURIComponent(JSON.stringify(leaveSelectedDates.map(fmtISO)));
+  }
+  const start = leaveSelectedDates[0];
+  const end = leaveSelectedDates[leaveSelectedDates.length - 1];
+  return '?start=' + fmtISO(start) + '&end=' + fmtISO(end);
+}
+
+function renderLeaveReplacementTriggerLabel_() {
+  if (!leaveReplacementValue) {
+    leaveReplacementLabel.textContent = 'No replacement';
+    return;
+  }
+  const match = leaveReplacementCandidates.find(function (u) { return u.email === leaveReplacementValue; });
+  leaveReplacementLabel.textContent = match ? (match.name || match.email) : leaveReplacementValue;
+}
+
+function renderLeaveReplacementPopoverList_() {
+  if (!leaveReplacementCandidates.length) {
+    leaveReplacementPopover.innerHTML =
+      '<button type="button" class="select-pop-item is-selected" data-value="">No replacement</button>' +
+      '<div class="select-pop-empty">No teammates available</div>';
+    return;
+  }
+  leaveReplacementPopover.innerHTML =
+    '<button type="button" class="select-pop-item' + (leaveReplacementValue === '' ? ' is-selected' : '') + '" data-value="">No replacement</button>' +
+    leaveReplacementCandidates.map(function (u) {
+      const isOccupied = leaveReplacementOccupied.has(u.email);
+      const isSelected = leaveReplacementValue === u.email;
+      return '<button type="button" class="select-pop-item' + (isSelected ? ' is-selected' : '') + '" data-value="' + escapeHtml(u.email) + '"' + (isOccupied ? ' disabled' : '') + '>' +
+        '<span>' + escapeHtml(u.name || u.email) + '</span>' +
+        (isOccupied ? '<span class="select-pop-note">covering someone else these dates</span>' : '') +
+      '</button>';
+    }).join('');
+}
+
+function openLeaveReplacementPopover_() {
+  renderLeaveReplacementPopoverList_();
+  leaveReplacementPopover.classList.remove('hidden');
+}
+function closeLeaveReplacementPopover_() { leaveReplacementPopover.classList.add('hidden'); }
+leaveReplacementTrigger.addEventListener('click', function (e) {
+  e.stopPropagation();
+  leaveReplacementPopover.classList.contains('hidden') ? openLeaveReplacementPopover_() : closeLeaveReplacementPopover_();
+});
+leaveReplacementPopover.addEventListener('click', function (e) {
+  const btn = e.target.closest('.select-pop-item');
+  if (!btn || btn.disabled) return;
+  e.stopPropagation();
+  leaveReplacementValue = btn.dataset.value || '';
+  renderLeaveReplacementTriggerLabel_();
+  closeLeaveReplacementPopover_();
+});
+document.addEventListener('click', function (e) {
+  if (!leaveReplacementPopover.classList.contains('hidden') && !leaveReplacementPopover.contains(e.target) && e.target !== leaveReplacementTrigger) {
+    closeLeaveReplacementPopover_();
+  }
+});
 
 function currentWeekLabel_() {
   const info = weekdaysFor(weekInput.value);
@@ -1988,6 +2066,7 @@ function selectLeaveDateMode_(mode) {
   lcalRenderGrid_();
   updateLeaveDatePickedSummary_();
   updateLeaveDrawerSummaryChips_();
+  refreshLeaveReplacementOccupancy_();
 }
 
 // Applies a click on a day button - the only place leaveSelectedDates is
@@ -2016,6 +2095,7 @@ function lcalPickDate_(date) {
   leaveDateRangeError.classList.add('hidden');
   updateLeaveDatePickedSummary_();
   updateLeaveDrawerSummaryChips_();
+  refreshLeaveReplacementOccupancy_();
 }
 
 function lcalRenderGrid_() {
@@ -2130,6 +2210,7 @@ function lcalApplyPreset_(name, btnEl) {
   leaveDateRangeError.classList.add('hidden');
   updateLeaveDatePickedSummary_();
   updateLeaveDrawerSummaryChips_();
+  refreshLeaveReplacementOccupancy_();
 }
 
 // Custom-styled month/year dropdowns (a real popover, not a native <select>
@@ -2297,7 +2378,9 @@ function resetLeaveApplyForm_() {
   if (leaveOutCheckOutCtl_) leaveOutCheckOutCtl_.refresh();
   if (leaveOutCheckInCtl_) leaveOutCheckInCtl_.refresh();
   selectLeaveCategory_('casual');
-  leaveReplacementSelect.value = '';
+  leaveReplacementValue = '';
+  renderLeaveReplacementTriggerLabel_();
+  closeLeaveReplacementPopover_();
 }
 
 async function openApplyLeaveTab_() {
@@ -2338,6 +2421,39 @@ function closeMyLeavesDrawer() {
   myLeavesDrawer.classList.remove('open');
   myLeavesBackdrop.classList.remove('open');
   closeMyLeavesDateFilterPanel_();
+}
+
+// Patches one already-known record in place with fields the server just
+// returned (e.g. from a reschedule/withdraw/dismiss PATCH response) and
+// re-renders the History/KPI panels from that patched data immediately,
+// instead of waiting on loadMyLeavesData_()'s full re-fetch (two sequential
+// network round-trips - the leave-status GET, then the replacements GET) to
+// resolve before the user sees anything change. loadMyLeavesData_() should
+// still be called afterward (fire-and-forget) to reconcile with the server,
+// but the visible chip/status update no longer waits on it.
+function applyLeaveRecordPatch_(updated) {
+  if (!latestLeaveStatusData || !updated || !updated.requestId) return;
+  const fields = [
+    'status', 'startDate', 'endDate', 'customDates', 'rescheduled', 'allowReschedule',
+    'resolvedAt', 'resolvedBy', 'decisionNote', 'dismissed', 'withdrawnAt', 'docsDueAt'
+  ];
+  const patchOne = function (rec) {
+    fields.forEach(function (f) { if (f in updated) rec[f] = updated[f]; });
+  };
+  [latestLeaveStatusData.records, latestLeaveStatusData.allRecords].forEach(function (list) {
+    if (!Array.isArray(list)) return;
+    const match = list.find(function (r) { return r.requestId === updated.requestId; });
+    if (match) patchOne(match);
+  });
+  const records = latestLeaveStatusData.allRecords || [];
+  renderMyLeavesBanner_(records);
+  renderUpcomingLeaveCard_(records);
+  renderMyLeavesKpis_(records);
+  renderMyLeavesYearChips_(records);
+  renderMyLeavesQuarterTiles_(records);
+  renderMyLeavesTrendChart_(records);
+  renderMyLeavesHistorySection_(records);
+  updateNavStatBadges_();
 }
 
 async function loadMyLeavesData_() {
@@ -2815,6 +2931,14 @@ const MY_LEAVES_HISTORY_FILTERS_ = [
 ];
 
 function renderMyLeavesHistorySection_(records) {
+  // Red dot on the rail's History (clock) icon - same "something needs your
+  // attention in here" convention as uninformedRailBadge on the Flag icon -
+  // lit while a rejected request is sitting there with a manager-granted
+  // reschedule not yet used (see the identical condition on rescheduleBtn
+  // in renderMyLeaveCard_ below).
+  historyRailBadge.classList.toggle('hidden', !records.some(function (r) {
+    return r.status === 'rejected' && r.allowReschedule && !r.rescheduled;
+  }));
   const scoped = quarterScopedLeaveRecords_(records);
   myLeavesHistoryFilters.innerHTML = '<span class="t">HISTORY</span>' + MY_LEAVES_HISTORY_FILTERS_.map(function (f) {
     const count = scoped.filter(f.match).length;
@@ -3422,8 +3546,8 @@ leaveSendBtn.addEventListener('click', async () => {
       leaveDocPayload.checkOutTime = leaveTimeLabel_(leaveOutPassCheckOutTime) + ' ' + leaveOutPassCheckOutTime.period;
       leaveDocPayload.checkInTime = leaveTimeLabel_(leaveOutPassCheckInTime) + ' ' + leaveOutPassCheckInTime.period;
     }
-    if (leaveReplacementSelect.value) {
-      leaveDocPayload.replacementEmail = leaveReplacementSelect.value;
+    if (leaveReplacementValue) {
+      leaveDocPayload.replacementEmail = leaveReplacementValue;
     }
     const created = await apiRequest_('POST', '/leave-requests', leaveDocPayload);
 
@@ -4591,22 +4715,164 @@ submitDocsSubmitBtn.addEventListener('click', async () => {
   }
 });
 
+// ---------- Reschedule modal: custom range-select date popover ----------
+// Same reasoning as the late-notice date/time popovers above - a native
+// <input type="date"> pair can't be themed to match the app, so this reuses
+// the .cal2-* calendar look with a lightweight range-click behavior (first
+// click sets the start, a second click completes [min, max]), mirroring
+// the Apply-for-Leave calendar's own Range mode (see lcalPickDate_).
+let rescheduleSelectedDates = []; // [] | [start] | [start, end], plain JS Date objects
+let rescheduleCalViewYear, rescheduleCalViewMonth;
+// openRescheduleModal_ pre-fills rescheduleSelectedDates with the request's
+// *current* dates so the trigger label/grid show something meaningful
+// before the user touches anything - but that means length can already be 1
+// (or 2) the moment the popover opens. Without this flag, the very first
+// tap in a fresh popover session would be misread as "completing" a range
+// against those old, unrelated dates instead of starting a new pick.
+let rescheduleFreshPick = true;
+
+function rcDateKey_(d) { return d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate(); }
+function rcShortFmt_(d) { return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
+function rcIsoDate_(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function rescheduleRenderCalGrid_() {
+  rescheduleCalMonthYearLabel.textContent = new Date(rescheduleCalViewYear, rescheduleCalViewMonth, 1)
+    .toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const lead = new Date(rescheduleCalViewYear, rescheduleCalViewMonth, 1).getDay();
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const todayKey = rcDateKey_(today);
+  const start = rescheduleSelectedDates.length ? rescheduleSelectedDates[0] : null;
+  const end = rescheduleSelectedDates.length > 1 ? rescheduleSelectedDates[1] : null;
+  const hasRange = start && end && rcDateKey_(start) !== rcDateKey_(end);
+
+  let html = '';
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(rescheduleCalViewYear, rescheduleCalViewMonth, 1 - lead + i);
+    const dKey = rcDateKey_(d);
+    const isPast = dKey < todayKey;
+    const isStart = start ? rcDateKey_(start) === dKey : false;
+    const isEnd = end ? rcDateKey_(end) === dKey : false;
+    const isMid = hasRange ? (dKey > rcDateKey_(start) && dKey < rcDateKey_(end)) : false;
+
+    let links = '';
+    if (hasRange && (isMid || isStart || isEnd)) {
+      const col = d.getDay();
+      if ((isMid || isEnd) && col !== 0) links += '<span class="cal2-link l"></span>';
+      if ((isMid || isStart) && col !== 6) links += '<span class="cal2-link r"></span>';
+    }
+
+    const classes = ['cal2-day'];
+    if (d.getMonth() !== rescheduleCalViewMonth) classes.push('is-adjacent');
+    if (d.getDay() === 0 || d.getDay() === 6) classes.push('is-weekend');
+    if (dKey === todayKey) classes.push('is-today');
+    if (isStart || isEnd) classes.push('is-edge');
+    else if (isMid) classes.push('is-mid');
+
+    html += '<div class="cal2-cell">' + links +
+      '<button type="button" class="' + classes.join(' ') + '" data-time="' + d.getTime() + '"' + (isPast ? ' disabled' : '') + '>' +
+      d.getDate() + '</button></div>';
+  }
+  rescheduleCalGrid.innerHTML = html;
+
+  if (!rescheduleSelectedDates.length) {
+    rescheduleCalFooterLabel.innerHTML = '<em>No dates selected</em>';
+  } else if (rescheduleSelectedDates.length === 1) {
+    rescheduleCalFooterLabel.innerHTML = rcShortFmt_(start) + ' <em>&ndash; pick an end date</em>';
+  } else {
+    rescheduleCalFooterLabel.textContent = rcShortFmt_(start) + ' – ' + rcShortFmt_(end) + ' ' + end.getFullYear();
+  }
+}
+
+function rcPickDate_(date) {
+  const completingRange = !rescheduleFreshPick && rescheduleSelectedDates.length === 1;
+  rescheduleFreshPick = false;
+  if (!completingRange) {
+    rescheduleSelectedDates = [date];
+  } else {
+    const s = rescheduleSelectedDates[0];
+    rescheduleSelectedDates = date < s ? [date, s] : [s, date];
+  }
+  rescheduleRenderCalGrid_();
+  rescheduleUpdateTriggerLabel_();
+  // Same "closes itself once the pick is complete" behavior as the
+  // late-notice single-date popover (see pickLnDate_) - a range needs two
+  // clicks, so only the one that *completes* the range closes it.
+  if (completingRange) closeRescheduleDatesPopover_();
+}
+
+function rescheduleUpdateTriggerLabel_() {
+  if (!rescheduleSelectedDates.length) {
+    rescheduleDatesLabel.textContent = 'Select dates';
+    rescheduleDatesLabel.classList.add('text-slate-400');
+    return;
+  }
+  rescheduleDatesLabel.classList.remove('text-slate-400');
+  const start = rescheduleSelectedDates[0];
+  const end = rescheduleSelectedDates.length > 1 ? rescheduleSelectedDates[1] : start;
+  rescheduleDatesLabel.textContent = rcDateKey_(start) === rcDateKey_(end)
+    ? rcShortFmt_(start) + ' ' + start.getFullYear()
+    : rcShortFmt_(start) + ' – ' + rcShortFmt_(end) + ' ' + end.getFullYear();
+}
+
+rescheduleCalGrid.addEventListener('click', (e) => {
+  const btn = e.target.closest('.cal2-day');
+  if (btn && !btn.disabled) { e.stopPropagation(); rcPickDate_(new Date(Number(btn.dataset.time))); }
+});
+rescheduleCalClearBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  rescheduleSelectedDates = [];
+  rescheduleRenderCalGrid_();
+  rescheduleUpdateTriggerLabel_();
+});
+rescheduleCalPrevBtn.addEventListener('click', () => {
+  rescheduleCalViewMonth--; if (rescheduleCalViewMonth < 0) { rescheduleCalViewMonth = 11; rescheduleCalViewYear--; }
+  rescheduleRenderCalGrid_();
+});
+rescheduleCalNextBtn.addEventListener('click', () => {
+  rescheduleCalViewMonth++; if (rescheduleCalViewMonth > 11) { rescheduleCalViewMonth = 0; rescheduleCalViewYear++; }
+  rescheduleRenderCalGrid_();
+});
+
+function openRescheduleDatesPopover_() {
+  rescheduleFreshPick = true;
+  const base = rescheduleSelectedDates[0] || new Date();
+  rescheduleCalViewYear = base.getFullYear();
+  rescheduleCalViewMonth = base.getMonth();
+  rescheduleRenderCalGrid_();
+  rescheduleDatesPopover.classList.remove('hidden');
+}
+function closeRescheduleDatesPopover_() { rescheduleDatesPopover.classList.add('hidden'); }
+rescheduleDatesTrigger.addEventListener('click', (e) => {
+  e.stopPropagation();
+  rescheduleDatesPopover.classList.contains('hidden') ? openRescheduleDatesPopover_() : closeRescheduleDatesPopover_();
+});
+document.addEventListener('click', (e) => {
+  if (!rescheduleDatesPopover.classList.contains('hidden') && !rescheduleDatesPopover.contains(e.target) && e.target !== rescheduleDatesTrigger) {
+    closeRescheduleDatesPopover_();
+  }
+});
+
 // ---------- Reschedule modal ----------
 function openRescheduleModal_(requestId, startDate, endDate) {
   rescheduleSubmitBtn.dataset.requestId = requestId;
-  rescheduleStartDate.value = startDate ? fmtISO(new Date(startDate)) : '';
-  rescheduleEndDate.value = endDate ? fmtISO(new Date(endDate)) : rescheduleStartDate.value;
+  const s = startDate ? new Date(startDate) : null;
+  const e = endDate ? new Date(endDate) : s;
+  rescheduleSelectedDates = s ? (e && rcDateKey_(e) !== rcDateKey_(s) ? [s, e] : [s]) : [];
+  rescheduleUpdateTriggerLabel_();
+  closeRescheduleDatesPopover_();
   rescheduleError.classList.add('hidden');
   rescheduleModal.classList.remove('hidden');
 }
-function closeRescheduleModal_() { rescheduleModal.classList.add('hidden'); }
+function closeRescheduleModal_() { rescheduleModal.classList.add('hidden'); closeRescheduleDatesPopover_(); }
 closeRescheduleBtn.addEventListener('click', closeRescheduleModal_);
 rescheduleBackdrop.addEventListener('click', closeRescheduleModal_);
 
 rescheduleSubmitBtn.addEventListener('click', async () => {
   const requestId = rescheduleSubmitBtn.dataset.requestId;
   if (!requestId) return;
-  if (!rescheduleStartDate.value) {
+  if (!rescheduleSelectedDates.length) {
     rescheduleError.textContent = 'Please pick a start date.';
     rescheduleError.classList.remove('hidden');
     return;
@@ -4616,12 +4882,15 @@ rescheduleSubmitBtn.addEventListener('click', async () => {
   const originalLabel = rescheduleSubmitBtn.innerHTML;
   rescheduleSubmitBtn.innerHTML = '<span class="loader loader-sm on-brand" style="vertical-align: middle; margin-right: 6px;"></span>Saving...';
   try {
-    await apiRequest_('PATCH', '/leave-requests/' + requestId + '/reschedule', {
-      startDate: rescheduleStartDate.value,
-      endDate: rescheduleEndDate.value || rescheduleStartDate.value
+    const start = rescheduleSelectedDates[0];
+    const end = rescheduleSelectedDates.length > 1 ? rescheduleSelectedDates[1] : start;
+    const updated = await apiRequest_('PATCH', '/leave-requests/' + requestId + '/reschedule', {
+      startDate: rcIsoDate_(start),
+      endDate: rcIsoDate_(end)
     });
     closeRescheduleModal_();
     showToast_('Rescheduled - sent back to your manager.', 'success');
+    applyLeaveRecordPatch_(updated);
     loadMyLeavesData_();
   } catch (err) {
     rescheduleError.textContent = err.message || 'Could not reschedule this request.';

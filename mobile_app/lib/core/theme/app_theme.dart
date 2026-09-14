@@ -102,6 +102,51 @@ final appTheme = ThemeData(
     hintStyle: const TextStyle(color: AppColors.ink400, fontWeight: FontWeight.w300),
   ),
   dividerTheme: const DividerThemeData(color: AppColors.line, thickness: 1, space: 1),
+  // Every showDatePicker/showDateRangePicker/showTimePicker call in the app
+  // (attendance date navigator, On Duty range, report backdate, apply-leave
+  // date fields, Late's arrival-time wheel) goes through Material's own
+  // dialog rather than a custom widget - themed centrally here instead of
+  // per call site, so none of them fall back to Material's stock blue.
+  datePickerTheme: DatePickerThemeData(
+    backgroundColor: AppColors.surface,
+    headerBackgroundColor: AppColors.brandPrimary,
+    headerForegroundColor: Colors.white,
+    todayBorder: const BorderSide(color: AppColors.brandPrimary),
+    dayForegroundColor: WidgetStateProperty.resolveWith(
+      (states) => states.contains(WidgetState.selected) ? Colors.white : AppColors.ink900,
+    ),
+    dayBackgroundColor: WidgetStateProperty.resolveWith(
+      (states) => states.contains(WidgetState.selected) ? AppColors.brandPrimary : null,
+    ),
+    yearForegroundColor: WidgetStateProperty.resolveWith(
+      (states) => states.contains(WidgetState.selected) ? Colors.white : AppColors.ink900,
+    ),
+    yearBackgroundColor: WidgetStateProperty.resolveWith(
+      (states) => states.contains(WidgetState.selected) ? AppColors.brandPrimary : null,
+    ),
+    rangePickerBackgroundColor: AppColors.surface,
+    rangePickerHeaderBackgroundColor: AppColors.brandPrimary,
+    rangePickerHeaderForegroundColor: Colors.white,
+    rangeSelectionBackgroundColor: AppColors.brandTint,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+  ),
+  timePickerTheme: TimePickerThemeData(
+    backgroundColor: AppColors.surface,
+    dialHandColor: AppColors.brandPrimary,
+    dialBackgroundColor: AppColors.surface2,
+    hourMinuteColor: WidgetStateColor.resolveWith(
+      (states) => states.contains(WidgetState.selected) ? AppColors.brandTint : AppColors.surface2,
+    ),
+    hourMinuteTextColor: WidgetStateColor.resolveWith(
+      (states) => states.contains(WidgetState.selected) ? AppColors.brandPrimaryDark : AppColors.ink900,
+    ),
+    dayPeriodColor: WidgetStateColor.resolveWith(
+      (states) => states.contains(WidgetState.selected) ? AppColors.brandPrimary : AppColors.surface2,
+    ),
+    dayPeriodTextColor: WidgetStateColor.resolveWith(
+      (states) => states.contains(WidgetState.selected) ? Colors.white : AppColors.ink700,
+    ),
+  ),
   textTheme: _baseTextTheme.copyWith(
     headlineSmall: _baseTextTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: AppColors.ink900),
     titleLarge: _baseTextTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: AppColors.ink900),

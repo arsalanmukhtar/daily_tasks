@@ -155,6 +155,7 @@ class AttendanceRosterScreen extends ConsumerWidget {
               Text(
                 '${name.isNotEmpty ? name : email} is on an approved leave this day, so attendance can\'t be '
                 'marked for it. If this looks wrong, review the leave request in Requests/Archived first.',
+                textAlign: TextAlign.justify,
                 style: TextStyle(color: AppColors.ink500, fontSize: 13, height: 1.4),
               ),
               const SizedBox(height: 18),
