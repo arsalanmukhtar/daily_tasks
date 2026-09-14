@@ -2964,6 +2964,13 @@ myLeavesDateFilterClearBtn.addEventListener('click', () => {
 // scrolls it into view - used by the pending banner's "View" button.
 function viewLeaveRequestInHistory_(requestId) {
   if (!requestId) return;
+  // Renders the (now 'all'-filtered) history list further down via
+  // setMyLeavesDateFilter_, but that alone is invisible unless the History
+  // tab is actually the one showing - without this, the only visible
+  // effect from the still-showing Overview tab was its own trend
+  // chart/quarter tiles re-rendering (setMyLeavesDateFilter_ updates those
+  // too), which read as "the View button just refreshes the chart."
+  switchLeavesTab_('history');
   myLeavesHistoryFilter = 'all';
   myLeavesExpandedReasons.add(requestId);
   setMyLeavesDateFilter_({});
@@ -4548,6 +4555,14 @@ submitDocsSubmitBtn.addEventListener('click', async () => {
   const requestId = submitDocsSubmitBtn.dataset.requestId;
   if (!requestId) return;
   submitDocsError.classList.add('hidden');
+  // A written reason alone can't move this out of "Awaiting docs" - the
+  // document is the actual proof an emergency leave needs (server enforces
+  // this too; this is just the faster, no-round-trip version of that check).
+  if (submitDocsAttachmentPicker.files.length === 0) {
+    submitDocsError.textContent = "Please attach a supporting document - a written reason on its own isn't enough.";
+    submitDocsError.classList.remove('hidden');
+    return;
+  }
   submitDocsSubmitBtn.disabled = true;
   const originalLabel = submitDocsSubmitBtn.innerHTML;
   submitDocsSubmitBtn.innerHTML = '<span class="loader loader-sm on-brand" style="vertical-align: middle; margin-right: 6px;"></span>Submitting...';

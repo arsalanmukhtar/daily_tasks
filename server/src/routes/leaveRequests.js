@@ -297,9 +297,15 @@ leaveRequestsRouter.patch('/:id/reschedule', requireAuth, async (req, res) => {
 // Self only - submits the reason/attachment an emergency leave was created
 // without, moving it from 'pending_documentation' into the normal
 // 'requested' flow (decided exactly like any other request from here on).
+// An attachment is required, not just optional alongside a reason - a
+// written reason is easy to fabricate after the fact, the document is the
+// actual proof an emergency leave needs, so status can't advance without one.
 leaveRequestsRouter.patch('/:id/submit-docs', requireAuth, async (req, res) => {
   const b = req.body || {};
   const attachments = Array.isArray(b.attachments) ? b.attachments : [];
+  if (attachments.length === 0) {
+    return res.status(400).json({ error: 'Please attach a supporting document - a written reason on its own isn\'t enough for an emergency leave.' });
+  }
   const { rows } = await pool.query(
     `UPDATE leave_requests
        SET reason_html = $1, attachments = $2, status = 'requested', docs_due_at = NULL
