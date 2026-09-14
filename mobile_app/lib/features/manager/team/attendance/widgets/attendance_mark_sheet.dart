@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -10,11 +11,18 @@ import '../../../../../widgets/note_field_decoration.dart';
 import '../../team_providers.dart';
 
 final _dateFmt = DateFormat('EEEE, d MMMM yyyy');
+final _dayFmt = DateFormat('d MMM');
 
-/// Present/Absent/Late picker + optional note for one person on one day -
-/// opened from AttendanceRosterScreen. Only the 3 manual statuses are
-/// selectable here (On Leave/Unmarked are never written, see
-/// team_providers.dart's resolveAttendanceStatus).
+/// Present/Late/Absent/Night Duty/On Duty picker + optional note for one
+/// person on one day - opened from AttendanceRosterScreen. On Leave/Unmarked
+/// are never written here (see team_providers.dart's resolveAttendanceStatus)
+/// - the roster screen refuses to open this sheet at all for an On Leave day.
+///
+/// Two of the five statuses reveal an extra inline "dock" once selected:
+/// Late asks for an expected arrival time (a Cupertino wheel picker, opened
+/// in its own small bottom sheet), On Duty asks for a date range (defaulting
+/// to just this day) and saves via markRange() instead of mark() so a
+/// multi-day field visit doesn't need remarking one day at a time.
 class AttendanceMarkSheet extends ConsumerStatefulWidget {
   const AttendanceMarkSheet({
     required this.email,
@@ -33,17 +41,25 @@ class AttendanceMarkSheet extends ConsumerStatefulWidget {
   ConsumerState<AttendanceMarkSheet> createState() => _AttendanceMarkSheetState();
 }
 
-const _selectableStatuses = [AttendanceStatus.present, AttendanceStatus.late, AttendanceStatus.absent];
-
 class _AttendanceMarkSheetState extends ConsumerState<AttendanceMarkSheet> {
-  String? _status;
+  AttendanceStatus? _status;
   bool _isSubmitting = false;
   late final _noteController = TextEditingController(text: widget.existing?.note ?? '');
+
+  TimeOfDay? _arrivalTime;
+  DateTimeRange? _onDutyRange;
 
   @override
   void initState() {
     super.initState();
-    _status = widget.existing?.status;
+    final matchingStatus = manualAttendanceStatuses.where((s) => s.apiValue == widget.existing?.status);
+    _status = matchingStatus.isEmpty ? null : matchingStatus.first;
+    final existingTime = widget.existing?.arrivalTime;
+    if (existingTime != null && existingTime.contains(':')) {
+      final parts = existingTime.split(':');
+      _arrivalTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+    }
+    _onDutyRange = DateTimeRange(start: widget.date, end: widget.date);
   }
 
   @override
@@ -57,10 +73,37 @@ class _AttendanceMarkSheetState extends ConsumerState<AttendanceMarkSheet> {
     if (status == null) return;
     setState(() => _isSubmitting = true);
     try {
-      await ref
-          .read(attendanceRepositoryProvider)
-          .mark(widget.email, widget.date, status: status, note: _noteController.text.trim());
-      if (mounted) Navigator.of(context).pop();
+      if (status == AttendanceStatus.onDuty) {
+        final range = _onDutyRange ?? DateTimeRange(start: widget.date, end: widget.date);
+        final result = await ref.read(attendanceRepositoryProvider).markRange(
+              widget.email,
+              start: range.start,
+              end: range.end,
+              note: _noteController.text.trim(),
+            );
+        if (mounted) {
+          Navigator.of(context).pop();
+          if (result.skipped.isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(
+                '${result.marked.length} of ${result.marked.length + result.skipped.length} days marked - '
+                '${result.skipped.length} already on approved leave.',
+              ),
+            ));
+          }
+        }
+      } else {
+        await ref.read(attendanceRepositoryProvider).mark(
+              widget.email,
+              widget.date,
+              status: status.apiValue,
+              note: _noteController.text.trim(),
+              arrivalTime: status == AttendanceStatus.late && _arrivalTime != null
+                  ? '${_arrivalTime!.hour.toString().padLeft(2, '0')}:${_arrivalTime!.minute.toString().padLeft(2, '0')}'
+                  : null,
+            );
+        if (mounted) Navigator.of(context).pop();
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not save: $e')));
@@ -84,8 +127,56 @@ class _AttendanceMarkSheetState extends ConsumerState<AttendanceMarkSheet> {
     }
   }
 
+  Future<void> _pickArrivalTime() async {
+    var picked = _arrivalTime ?? TimeOfDay.now();
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      builder: (sheetContext) => SafeArea(
+        child: SizedBox(
+          height: 260,
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      setState(() => _arrivalTime = picked);
+                      Navigator.of(sheetContext).pop();
+                    },
+                    child: const Text('Done'),
+                  ),
+                ],
+              ),
+              Expanded(
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.time,
+                  use24hFormat: false,
+                  initialDateTime: DateTime(2020, 1, 1, picked.hour, picked.minute),
+                  onDateTimeChanged: (dt) => picked = TimeOfDay(hour: dt.hour, minute: dt.minute),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickOnDutyRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      initialDateRange: _onDutyRange,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(widget.date.year + 2),
+    );
+    if (picked != null) setState(() => _onDutyRange = picked);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final status = _status;
     return SafeArea(
       top: false,
       child: Padding(
@@ -123,12 +214,72 @@ class _AttendanceMarkSheetState extends ConsumerState<AttendanceMarkSheet> {
             const SizedBox(height: 8),
             Row(
               children: [
-                for (final s in _selectableStatuses) ...[
-                  if (s != _selectableStatuses.first) const SizedBox(width: 10),
+                for (final s in manualAttendanceStatuses.take(3)) ...[
+                  if (s != manualAttendanceStatuses.first) const SizedBox(width: 10),
                   Expanded(child: _statusOption(s)),
                 ],
               ],
             ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(child: _statusOption(AttendanceStatus.nightDuty)),
+                const SizedBox(width: 10),
+                Expanded(child: _statusOption(AttendanceStatus.onDuty)),
+                const SizedBox(width: 10),
+                const Expanded(child: SizedBox()), // keeps the 3-column grid even on the second row
+              ],
+            ),
+            if (status == AttendanceStatus.late) ...[
+              const SizedBox(height: 14),
+              _dock(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: _pickArrivalTime,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                    child: Row(
+                      children: [
+                        Icon(Icons.schedule_rounded, size: 18, color: AppColors.statusRequested),
+                        const SizedBox(width: 10),
+                        Text(
+                          _arrivalTime == null ? 'Set expected arrival time' : 'Arrived at ${_arrivalTime!.format(context)}',
+                          style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink900),
+                        ),
+                        const Spacer(),
+                        Icon(Icons.chevron_right_rounded, color: AppColors.ink500),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            if (status == AttendanceStatus.onDuty) ...[
+              const SizedBox(height: 14),
+              _dock(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: _pickOnDutyRange,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                    child: Row(
+                      children: [
+                        Icon(Icons.date_range_rounded, size: 18, color: AppColors.typeUmrah),
+                        const SizedBox(width: 10),
+                        Text(
+                          _onDutyRange == null || _onDutyRange!.start == _onDutyRange!.end
+                              ? 'Just ${_dayFmt.format(widget.date)} - tap to extend'
+                              : '${_dayFmt.format(_onDutyRange!.start)} - ${_dayFmt.format(_onDutyRange!.end)}',
+                          style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink900),
+                        ),
+                        const Spacer(),
+                        Icon(Icons.chevron_right_rounded, color: AppColors.ink500),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             TextField(controller: _noteController, decoration: noteFieldDecoration('Note (optional)')),
             const SizedBox(height: 18),
@@ -164,14 +315,24 @@ class _AttendanceMarkSheetState extends ConsumerState<AttendanceMarkSheet> {
     );
   }
 
+  Widget _dock({required Widget child}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.bg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: child,
+    );
+  }
+
   Widget _statusOption(AttendanceStatus status) {
-    final value = status.name; // enum names match the server's status strings exactly.
-    final selected = _status == value;
+    final selected = _status == status;
     return GestureDetector(
-      onTap: () => setState(() => _status = value),
+      onTap: () => setState(() => _status = status),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: selected ? status.background : AppColors.surface,
@@ -180,10 +341,11 @@ class _AttendanceMarkSheetState extends ConsumerState<AttendanceMarkSheet> {
         ),
         child: Text(
           status.label,
+          textAlign: TextAlign.center,
           style: TextStyle(
             color: selected ? status.foreground : AppColors.ink700,
             fontWeight: FontWeight.w700,
-            fontSize: 13,
+            fontSize: 12.5,
           ),
         ),
       ),

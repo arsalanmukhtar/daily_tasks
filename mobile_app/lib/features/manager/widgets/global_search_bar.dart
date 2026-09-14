@@ -70,7 +70,7 @@ class _GlobalSearchBarState extends ConsumerState<GlobalSearchBar> {
                 filled: false,
                 border: InputBorder.none,
                 hintText: 'Search requests, reports, developers…',
-                hintStyle: TextStyle(color: AppColors.ink500, fontSize: 14),
+                hintStyle: TextStyle(color: AppColors.ink400, fontSize: 14, fontWeight: FontWeight.w300),
               ),
             ),
           ),

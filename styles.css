@@ -52,6 +52,13 @@
 *::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 *::-webkit-scrollbar-corner { background: transparent; }
 
+/* Global placeholder styling - thin weight + a light neutral everywhere, so
+   a placeholder always reads as an instruction rather than content, clearly
+   quieter than whatever gets typed into the field. Overrides the browser
+   default rather than any one input, same pattern as the scrollbar rule
+   above. */
+::placeholder { color: var(--ink-400); font-weight: 300; opacity: 1; }
+
 html,
 body,
 button,
@@ -276,7 +283,7 @@ textarea {
 .cell-editor:empty::before {
   content: attr(data-placeholder);
   color: #cbd5e1;
-  font-style: italic;
+  font-weight: 300;
   pointer-events: none;
 }
 .cell-editor:focus {
@@ -1139,7 +1146,7 @@ textarea {
   background: #f8fafc;
   transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
 }
-.an-custom-search::placeholder { color: #94a3b8; }
+.an-custom-search::placeholder { color: #94a3b8; font-weight: 300; }
 .an-custom-search:focus {
   outline: none;
   background: #ffffff;

@@ -106,5 +106,31 @@ void main() {
       );
       expect(status, AttendanceStatus.unmarked);
     });
+
+    test('night_duty and on_duty manual marks resolve to their own statuses, not Absent', () {
+      final date = DateTime(2026, 9, 19);
+      for (final entry in {
+        'night_duty': AttendanceStatus.nightDuty,
+        'on_duty': AttendanceStatus.onDuty,
+      }.entries) {
+        final status = resolveAttendanceStatus(
+          email: _email,
+          date: date,
+          attendanceOnDate: [AttendanceRecord(id: 'a1', email: _email, date: date, status: entry.key)],
+          approvedLeaveRequests: const [],
+        );
+        expect(status, entry.value, reason: "server status '${entry.key}' should resolve to ${entry.value}");
+      }
+    });
+  });
+
+  group('AttendanceStatus.apiValue', () {
+    test('nightDuty/onDuty map to their snake_case server strings; the rest match their enum name', () {
+      expect(AttendanceStatus.nightDuty.apiValue, 'night_duty');
+      expect(AttendanceStatus.onDuty.apiValue, 'on_duty');
+      expect(AttendanceStatus.present.apiValue, 'present');
+      expect(AttendanceStatus.late.apiValue, 'late');
+      expect(AttendanceStatus.absent.apiValue, 'absent');
+    });
   });
 }

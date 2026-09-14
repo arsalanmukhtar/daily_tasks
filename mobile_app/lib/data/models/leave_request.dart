@@ -30,6 +30,9 @@ class LeaveRequest {
     this.decisionNote = '',
     this.withdrawnAt,
     this.dismissed = false,
+    this.allowReschedule = false,
+    this.rescheduled = false,
+    this.docsDueAt,
   });
 
   final String requestId;
@@ -58,6 +61,14 @@ class LeaveRequest {
   final String decisionNote;
   final DateTime? withdrawnAt;
   final bool dismissed;
+  // Granted by a manager alongside a 'rejected' decision - lets the
+  // requester pick new dates on this same row (via the web app) instead of
+  // filing a brand new request. One-shot: `rescheduled` flips true once used.
+  final bool allowReschedule;
+  final bool rescheduled;
+  // type == 'emergency' only, while status == 'pending_documentation' - the
+  // deadline to submit a reason/attachment (see PATCH /:id/submit-docs).
+  final DateTime? docsDueAt;
 
   bool get isArchived {
     if (status == 'withdrawn') return true;
@@ -137,6 +148,9 @@ class LeaveRequest {
       decisionNote: json['decisionNote'] as String? ?? '',
       withdrawnAt: dt('withdrawnAt'),
       dismissed: json['dismissed'] as bool? ?? false,
+      allowReschedule: json['allowReschedule'] as bool? ?? false,
+      rescheduled: json['rescheduled'] as bool? ?? false,
+      docsDueAt: dt('docsDueAt'),
     );
   }
 }

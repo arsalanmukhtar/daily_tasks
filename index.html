@@ -57,6 +57,18 @@
                 <div id="userName" class="font-medium truncate text-sm"></div>
                 <div id="userEmail" class="text-slate-300 text-xs truncate"></div>
               </div>
+              <!-- Late-arrival notice - a normal-user-only action (see
+                   PROJECT.md's manager-in-mobile/normal-user-on-web split),
+                   so it lives here on the web header rather than in the
+                   mobile app. A standalone icon (not folded into the
+                   settings gear's menu) since it's a frequent, one-tap
+                   action, not an account-settings item. -->
+              <button id="lateNoticeBtn" type="button" title="I'll be late" aria-label="I'll be late"
+                class="w-8 h-8 rounded-md bg-white/15 hover:bg-white/25 transition inline-flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+                </svg>
+              </button>
               <div class="relative shrink-0">
                 <button id="settingsBtn" type="button" aria-haspopup="true" aria-expanded="false" title="Settings"
                   class="w-8 h-8 rounded-md bg-white/15 hover:bg-white/25 transition inline-flex items-center justify-center">
@@ -275,6 +287,158 @@
             <span>Update password</span>
           </button>
         </form>
+      </div>
+    </div>
+
+    <!-- ============ LATE-ARRIVAL NOTICE MODAL ============ -->
+    <!-- Opened from the header's clock icon - a normal-user self-service
+         notice, purely informational on the manager's side (see
+         server/src/routes/lateArrivalNotices.js). Same plain client-side
+         modal shell as #changePasswordModal above. -->
+    <div id="lateNoticeModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4">
+      <div id="lateNoticeBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
+      <div class="relative bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-lg font-semibold text-slate-800">I'll be late</h3>
+          <button id="closeLateNoticeBtn" type="button" aria-label="Close" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+        </div>
+        <p class="text-slate-500 text-sm mb-4">Let your manager know ahead of time - they'll see this right away.</p>
+
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Date</label>
+            <input type="date" id="lateNoticeDate" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-orange-500" />
+          </div>
+          <div>
+            <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Expected arrival <span class="text-slate-400 normal-case font-medium">&middot; optional</span></label>
+            <input type="time" id="lateNoticeTime" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-orange-500" />
+          </div>
+        </div>
+
+        <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Reason</label>
+        <div id="lateNoticeToolbar" class="flex flex-wrap items-center gap-0.5 px-2 py-1.5 rounded-t-lg border border-slate-300 border-b-0 bg-slate-50">
+          <button type="button" data-cmd="bold"          class="tb-btn" title="Bold (Ctrl+B)"><b>B</b></button>
+          <button type="button" data-cmd="italic"        class="tb-btn" title="Italic (Ctrl+I)"><i>I</i></button>
+          <button type="button" data-cmd="underline"     class="tb-btn" title="Underline (Ctrl+U)"><u>U</u></button>
+          <button type="button" data-cmd="strikethrough" class="tb-btn" title="Strikethrough"><s>S</s></button>
+          <span class="w-px h-5 bg-slate-300 mx-1 sm:mx-1.5" aria-hidden="true"></span>
+          <button type="button" data-cmd="insertUnorderedList" class="tb-btn" title="Bulleted list" aria-label="Bulleted list">
+            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><circle cx="3" cy="5" r="1.5"/><circle cx="3" cy="10" r="1.5"/><circle cx="3" cy="15" r="1.5"/><rect x="7" y="4" width="11" height="2" rx="1"/><rect x="7" y="9" width="11" height="2" rx="1"/><rect x="7" y="14" width="11" height="2" rx="1"/></svg>
+          </button>
+        </div>
+        <div id="lateNoticeEditor" class="cell-editor lv-reason-editor rich-text border border-t-0 border-slate-300 rounded-b-lg mb-3" contenteditable="true" data-placeholder="What's going on?"></div>
+
+        <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Attachments <span class="text-slate-400 normal-case font-medium">&middot; optional, images/video welcome</span></label>
+        <input type="file" id="lateNoticeAttachmentInput" class="hidden" multiple
+          accept=".pdf,.txt,.doc,.docx,.zip,.png,.jpg,.jpeg,.mp4,.mov,.webm,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/zip,application/x-zip-compressed,image/*,video/*" />
+        <label for="lateNoticeAttachmentInput" id="lateNoticeAttachmentDrop" class="drop">
+          <b>Drop files here or <em>browse</em></b>
+          <p>Documents, images, or video &middot; max 8MB each, up to 5 files</p>
+        </label>
+        <div id="lateNoticeAttachmentList" class="hidden files"></div>
+        <p id="lateNoticeError" class="hidden mt-2 text-xs text-red-600"></p>
+
+        <button id="lateNoticeSubmitBtn" type="button"
+          class="mt-4 w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-orange-600 text-white text-sm font-semibold shadow-sm hover:bg-orange-700 active:bg-orange-800 transition">
+          <span>Send notice</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ EMERGENCY LEAVE MODAL ============ -->
+    <!-- A one-tap "I can't report to the office and can't explain why yet"
+         action - deliberately NOT folded into the main apply-for-leave
+         form's type/date/reason state machine (a different shape of action
+         entirely, see PROJECT.md). Creates a bare request server-side
+         (status='pending_documentation', dated today); the reason/document
+         are added afterwards via #submitDocsModal, from the request's own
+         card once it appears in My Leaves. -->
+    <div id="emergencyLeaveModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4">
+      <div id="emergencyLeaveBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
+      <div class="relative bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 w-full max-w-sm p-6">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-lg font-semibold text-slate-800">Emergency leave</h3>
+          <button id="closeEmergencyLeaveBtn" type="button" aria-label="Close" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+        </div>
+        <p class="text-slate-500 text-sm mb-4">
+          Use this only if you can't report to the office and can't explain why just yet.
+          You'll have the next 3 working days to add your reason and a supporting document.
+        </p>
+        <p id="emergencyLeaveError" class="hidden error-callout mb-3"></p>
+        <button id="emergencyLeaveConfirmBtn" type="button"
+          class="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 text-white text-sm font-semibold shadow-sm hover:bg-red-700 active:bg-red-800 transition">
+          <span>Submit emergency leave for today</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ ADD REASON & DOCUMENTS MODAL ============ -->
+    <!-- Finishes an emergency leave created via #emergencyLeaveModal - only
+         PDF/DOC/DOCX/PNG/JPG accepted here (see server/src/routes/
+         attachments.js's ?restrict=docs fileFilter), unlike every other
+         attachment picker in this app. -->
+    <div id="submitDocsModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4">
+      <div id="submitDocsBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
+      <div class="relative bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-lg font-semibold text-slate-800">Add reason &amp; document</h3>
+          <button id="closeSubmitDocsBtn" type="button" aria-label="Close" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+        </div>
+        <p class="text-slate-500 text-sm mb-4">Finish your emergency leave request so your manager can decide.</p>
+
+        <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Reason</label>
+        <div id="submitDocsToolbar" class="flex flex-wrap items-center gap-0.5 px-2 py-1.5 rounded-t-lg border border-slate-300 border-b-0 bg-slate-50">
+          <button type="button" data-cmd="bold"          class="tb-btn" title="Bold (Ctrl+B)"><b>B</b></button>
+          <button type="button" data-cmd="italic"        class="tb-btn" title="Italic (Ctrl+I)"><i>I</i></button>
+          <button type="button" data-cmd="underline"     class="tb-btn" title="Underline (Ctrl+U)"><u>U</u></button>
+          <button type="button" data-cmd="strikethrough" class="tb-btn" title="Strikethrough"><s>S</s></button>
+          <span class="w-px h-5 bg-slate-300 mx-1 sm:mx-1.5" aria-hidden="true"></span>
+          <button type="button" data-cmd="insertUnorderedList" class="tb-btn" title="Bulleted list" aria-label="Bulleted list">
+            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><circle cx="3" cy="5" r="1.5"/><circle cx="3" cy="10" r="1.5"/><circle cx="3" cy="15" r="1.5"/><rect x="7" y="4" width="11" height="2" rx="1"/><rect x="7" y="9" width="11" height="2" rx="1"/><rect x="7" y="14" width="11" height="2" rx="1"/></svg>
+          </button>
+        </div>
+        <div id="submitDocsEditor" class="cell-editor lv-reason-editor rich-text border border-t-0 border-slate-300 rounded-b-lg mb-3" contenteditable="true" data-placeholder="What happened?"></div>
+
+        <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Document <span class="text-slate-400 normal-case font-medium">&middot; PDF, DOC, DOCX, PNG, or JPG only</span></label>
+        <input type="file" id="submitDocsAttachmentInput" class="hidden" multiple
+          accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg" />
+        <label for="submitDocsAttachmentInput" id="submitDocsAttachmentDrop" class="drop">
+          <b>Drop files here or <em>browse</em></b>
+          <p>PDF, DOC, DOCX, PNG, or JPG &middot; max 8MB each, up to 5 files</p>
+        </label>
+        <div id="submitDocsAttachmentList" class="hidden files"></div>
+        <p id="submitDocsError" class="hidden mt-2 text-xs text-red-600"></p>
+
+        <button id="submitDocsSubmitBtn" type="button" data-request-id=""
+          class="mt-4 w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-orange-600 text-white text-sm font-semibold shadow-sm hover:bg-orange-700 active:bg-orange-800 transition">
+          <span>Submit</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ RESCHEDULE MODAL ============ -->
+    <!-- Only reachable from a rejected request that a manager granted
+         allowReschedule on (see server/src/routes/leaveRequests.js's
+         /:id/reschedule) - plain native date inputs rather than the full
+         apply-form calendar widget, since this only ever needs a single
+         contiguous range. -->
+    <div id="rescheduleModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4">
+      <div id="rescheduleBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
+      <div class="relative bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 w-full max-w-sm p-6">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-lg font-semibold text-slate-800">Reschedule</h3>
+          <button id="closeRescheduleBtn" type="button" aria-label="Close" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+        </div>
+        <p class="text-slate-500 text-sm mb-4">Pick new dates - this goes back to your manager for another look, and can only be done once.</p>
+        <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Start date</label>
+        <input type="date" id="rescheduleStartDate" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 mb-3 focus:outline-none focus:border-orange-500" />
+        <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">End date</label>
+        <input type="date" id="rescheduleEndDate" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 mb-3 focus:outline-none focus:border-orange-500" />
+        <p id="rescheduleError" class="hidden error-callout mb-3"></p>
+        <button id="rescheduleSubmitBtn" type="button" data-request-id=""
+          class="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-orange-600 text-white text-sm font-semibold shadow-sm hover:bg-orange-700 active:bg-orange-800 transition">
+          <span>Save new dates</span>
+        </button>
       </div>
     </div>
 
@@ -707,6 +871,10 @@
                     <span id="applyLeaveBtnLabel">Apply for Leave</span>
                   </button>
                   <p id="myLeavesNoWeekNote" class="hidden text-xs text-slate-400 text-center py-1.5 my-auto">Pick a week on the left to apply for leave.</p>
+                  <button type="button" id="emergencyLeaveBtn"
+                    class="mt-2 text-[11px] text-red-600 hover:text-red-700 font-semibold underline decoration-dotted underline-offset-2 text-center">
+                    Need emergency leave?
+                  </button>
                 </div>
 
                 <!-- Right: the nearest upcoming approved leave, independent of
@@ -737,6 +905,24 @@
                 <span id="myLeavesBannerMeta"></span>
               </div>
               <button type="button" id="myLeavesBannerViewBtn" class="link">View</button>
+            </div>
+
+            <!-- A pending request naming *this* user as a replacement/cover -
+                 at most one can ever be active at once (see the "occupied
+                 until free" one-slot-per-person rule), so unlike
+                 myLeavesBanner above there's never a queue to page through. -->
+            <div id="replacementInviteBanner" class="banner hidden">
+              <div class="bic">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </div>
+              <div class="min-w-0">
+                <b>Cover request</b>
+                <span id="replacementInviteMeta"></span>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button type="button" id="replacementInviteRejectBtn" class="link" style="color:#dc2626;">Decline</button>
+                <button type="button" id="replacementInviteAcceptBtn" class="link">Accept</button>
+              </div>
             </div>
 
             <!-- Stats summary - flex-1/min-h-0 so it absorbs whatever height
@@ -817,6 +1003,18 @@
                   <button type="button" id="leaveTypeShortBtn" data-type="casualShort" data-d="short" class="dopt"><b>Short</b><span>Part of day</span></button>
                   <button type="button" id="leaveTypeFullBtn" data-type="casualFull" data-d="full" class="dopt"><b>Full</b><span>Whole day</span></button>
                 </div>
+              </div>
+
+              <!-- Optional cover person - "occupied until free" (see
+                   server/src/routes/leaveReplacements.js): someone already
+                   pending/accepted elsewhere shows disabled with a reason
+                   rather than being silently omitted, so it's clear why
+                   they're not pickable. -->
+              <div class="mt-4">
+                <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2">Replacement <span class="text-slate-400 normal-case font-medium">&middot; optional</span></div>
+                <select id="leaveReplacementSelect" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-orange-500">
+                  <option value="">No replacement</option>
+                </select>
               </div>
             </div>
 

@@ -50,7 +50,7 @@ class RequestCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  StatusChip(label: request.status.toUpperCase(), foreground: statusFg, background: statusBg),
+                  StatusChip(label: AppColors.labelForStatus(request.status), foreground: statusFg, background: statusBg),
                 ],
               ),
               const SizedBox(height: 10),

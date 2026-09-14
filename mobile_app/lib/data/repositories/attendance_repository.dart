@@ -31,12 +31,41 @@ class AttendanceRepository {
         fetch: () => _fetchRange(start, end),
       );
 
-  Future<AttendanceRecord> mark(String email, DateTime date, {required String status, String note = ''}) async {
+  Future<AttendanceRecord> mark(
+    String email,
+    DateTime date, {
+    required String status,
+    String note = '',
+    String? arrivalTime,
+  }) async {
     final json = await _api.put(
       '/attendance/${Uri.encodeComponent(email)}/${_iso(date)}',
-      {'status': status, 'note': note},
+      {'status': status, 'note': note, if (arrivalTime != null) 'arrivalTime': arrivalTime},
     ) as Map<String, dynamic>;
     return AttendanceRecord.fromJson(json);
+  }
+
+  /// Marks 'on_duty' across a contiguous range in one call instead of one
+  /// PUT per day - see server/src/routes/attendance.js's PUT /:email/range.
+  /// Returns which dates actually got marked vs. skipped (already covered
+  /// by an approved leave), so the caller can tell the manager e.g. "4 of 5
+  /// marked, 1 already on leave".
+  Future<({List<String> marked, List<String> skipped})> markRange(
+    String email, {
+    required DateTime start,
+    required DateTime end,
+    String note = '',
+  }) async {
+    final json = await _api.put('/attendance/${Uri.encodeComponent(email)}/range', {
+      'startDate': _iso(start),
+      'endDate': _iso(end),
+      'status': 'on_duty',
+      'note': note,
+    }) as Map<String, dynamic>;
+    return (
+      marked: (json['marked'] as List<dynamic>).cast<String>(),
+      skipped: (json['skipped'] as List<dynamic>).cast<String>(),
+    );
   }
 
   Future<void> unmark(String email, DateTime date) =>

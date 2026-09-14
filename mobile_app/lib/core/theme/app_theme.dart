@@ -96,6 +96,10 @@ final appTheme = ThemeData(
       borderSide: BorderSide.none,
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    // Thin weight + a light neutral everywhere a field's hint isn't given
+    // its own hintStyle - a placeholder should read as an instruction, not
+    // content, so it stays clearly quieter than whatever gets typed into it.
+    hintStyle: const TextStyle(color: AppColors.ink400, fontWeight: FontWeight.w300),
   ),
   dividerTheme: const DividerThemeData(color: AppColors.line, thickness: 1, space: 1),
   textTheme: _baseTextTheme.copyWith(

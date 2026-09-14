@@ -85,7 +85,19 @@ class AppColors {
         'approved' => (statusApproved, statusApprovedBg),
         'rejected' => (statusRejected, statusRejectedBg),
         'withdrawn' => (statusWithdrawn, statusWithdrawnBg),
-        _ => (statusRequested, statusRequestedBg), // 'requested'
+        // 'requested', and 'pending_documentation' (an emergency leave still
+        // waiting on its reason/attachment) - same amber family as
+        // 'requested' since both are "not yet resolved", kept distinct via
+        // a different label ("Awaiting docs") rather than a different color.
+        _ => (statusRequested, statusRequestedBg),
+      };
+
+  /// The status chip's label text - every raw `status` value reads fine
+  /// uppercased ("REQUESTED", "APPROVED"...) except 'pending_documentation',
+  /// whose raw form would be an ugly wall of text.
+  static String labelForStatus(String status) => switch (status) {
+        'pending_documentation' => 'AWAITING DOCS',
+        _ => status.toUpperCase(),
       };
 
   /// (foreground, background) pair for a leave type family - mirrors

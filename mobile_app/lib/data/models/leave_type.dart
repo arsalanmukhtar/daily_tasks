@@ -12,7 +12,12 @@ enum LeaveType {
   umrah('umrah', 'Umrah', 'Umrah'),
   // Read-only: created server-side by push-daemon when a manager's
   // uninformed-leave report is accepted. Never selectable when applying.
-  uninformedAbsence('uninformedAbsence', 'Uninformed Leave', 'Uninformed Leave');
+  uninformedAbsence('uninformedAbsence', 'Uninformed Leave', 'Uninformed Leave'),
+  // Created via the web app's "Emergency leave" action (normal-user-only,
+  // see PROJECT.md) - starts life as status='pending_documentation' rather
+  // than 'requested'. Not in `selectable` below since mobile doesn't host
+  // that creation flow (manager-in-mobile/normal-user-on-web split).
+  emergency('emergency', 'Emergency Leave', 'Emergency');
 
   const LeaveType(this.value, this.label, this.familyLabel);
 

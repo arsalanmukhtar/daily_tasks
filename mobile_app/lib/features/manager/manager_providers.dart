@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/models/late_arrival_notice.dart';
+import '../../data/models/leave_replacement.dart';
 import '../../data/models/leave_request.dart';
 import '../../data/models/leave_type.dart';
 import '../../data/models/uninformed_leave.dart';
@@ -16,6 +18,18 @@ final allLeaveRequestsProvider = StreamProvider<List<LeaveRequest>>((ref) {
 /// and the Summary tab's "by leave type" chart.
 final allUninformedLeavesProvider = StreamProvider<List<UninformedLeave>>((ref) {
   return ref.watch(uninformedLeaveRepositoryProvider).watchAllReports();
+});
+
+/// Every leave-replacement row (manager-only view) - feeds
+/// ReplacementSection on a request's detail sheet.
+final allLeaveReplacementsProvider = StreamProvider<List<LeaveReplacement>>((ref) {
+  return ref.watch(leaveReplacementsRepositoryProvider).watchAll();
+});
+
+/// Every developer's self-filed late-arrival notice - feeds the Report tab's
+/// Late notices section.
+final allLateArrivalNoticesProvider = StreamProvider<List<LateArrivalNotice>>((ref) {
+  return ref.watch(lateArrivalNoticesRepositoryProvider).watchAll();
 });
 
 /// Status/type/person filter shared between the Requests and Archived tabs

@@ -110,11 +110,14 @@ class LeaveRepository {
   /// Manager-only: approve or reject a still-pending request, with an
   /// optional decision note (plain text, never HTML - see
   /// LeaveRequest.decisionNote's doc comment). Mirrors the Kotlin app's
-  /// LeaveApiClient.decideLeave().
-  Future<void> decide(String requestId, {required bool approve, String? note}) {
+  /// LeaveApiClient.decideLeave(). `allowReschedule` is only meaningful
+  /// alongside a rejection (see LeaveRequest.allowReschedule's doc comment)
+  /// but is harmless to pass either way.
+  Future<void> decide(String requestId, {required bool approve, String? note, bool allowReschedule = false}) {
     return _api.patch('/leave-requests/$requestId/decide', {
       'decision': approve ? 'approved' : 'rejected',
       if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+      if (allowReschedule) 'allowReschedule': true,
     });
   }
 }

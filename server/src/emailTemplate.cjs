@@ -119,6 +119,39 @@ function pluralWorkingDays(n) {
   return `${n} working day${n === 1 ? '' : 's'}`;
 }
 
+// Adds `n` working days (Mon-Fri, TIME_ZONE-aware) to `from` - used for the
+// emergency-leave documentation deadline (see leaveRequests.js's POST
+// route). There's no scheduled job in this codebase to enforce the deadline
+// automatically (flagged in PROJECT.md as a deliberate, known gap) - this is
+// advisory, so the exact time-of-day is deliberately approximate: it returns
+// UTC midnight of the Nth working day, i.e. "by the end of that day" in
+// TIME_ZONE, give or take the few hours between UTC and Asia/Karachi
+// midnight - close enough for a manager glancing at an "overdue" flag.
+function addWorkingDays(from, n) {
+  const dayFormatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  const toUtcMidnight = (date) => {
+    const parts = dayFormatter.formatToParts(date).reduce((acc, p) => {
+      acc[p.type] = p.value;
+      return acc;
+    }, {});
+    return Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day));
+  };
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  let cursor = toUtcMidnight(from);
+  let added = 0;
+  while (added < n) {
+    cursor += MS_PER_DAY;
+    const weekday = new Date(cursor).getUTCDay(); // 0=Sun ... 6=Sat
+    if (weekday >= 1 && weekday <= 5) added += 1;
+  }
+  return new Date(cursor);
+}
+
 // First letters of the first and last "word" in a name, e.g.
 // "Farah Bukhari" -> "FB", "Alice" -> "A".
 function initials(name) {
@@ -633,6 +666,355 @@ function buildExplanationRejectedEmail(data, reportId) {
   return { subject, html };
 }
 
+const RESOLVE_REPLACEMENT_URL_PREFIX = `${APP_URL}#resolve-replacement=`;
+
+// Emails the person picked as a cover/replacement when a colleague applies
+// for leave and names them - the deep link opens the same "resolve" pattern
+// as buildUninformedReportEmail's CTA (one link into the web app, which
+// signs the recipient in if needed and shows Accept/Reject there, rather
+// than an unauthenticated action link).
+function buildReplacementRequestEmail(data, replacementId) {
+  const name = data.replacementName || 'there';
+  const firstName = String(name).trim().split(/\s+/)[0] || name;
+  const requesterName = data.requesterName || 'a colleague';
+  const typeLabel = leaveTypeLabel(data.type);
+  const dateDetail = leaveDateDetailHtml(data);
+  const resolveUrl = RESOLVE_REPLACEMENT_URL_PREFIX + encodeURIComponent(replacementId);
+
+  const html = `
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(
+    `${requesterName} would like you to cover for them - ${dateDetail.dateLine}.`
+  )}</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF0F4;">
+<tr><td align="center" style="padding:32px 12px;">
+
+  <table role="presentation" class="wrap" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;">
+
+    <!-- masthead -->
+    <tr><td style="padding:0 4px 12px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td style="font:700 13px/1.2 ${FONT};color:#0F172A;letter-spacing:-.01em;">
+          <span style="display:inline-block;width:9px;height:9px;background:#E8590C;border-radius:2px;margin-right:8px;"></span>Daily Tasks
+        </td>
+        <td align="right" style="font:400 12px/1.2 ${FONT};color:#7A8698;">Replacement request</td>
+      </tr></table>
+    </td></tr>
+
+    <!-- card -->
+    <tr><td style="background:#FFFFFF;border:1px solid #E3E8EF;border-radius:14px;overflow:hidden;">
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td height="4" style="height:4px;line-height:4px;font-size:0;background:#D97706;">&nbsp;</td>
+      </tr></table>
+
+      <!-- headline -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:26px 32px 0;">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+            <td style="background:#FEF3C7;border:1px solid #FDE68A;color:#92400E;border-radius:999px;padding:5px 12px;
+                       font:700 11px/1 ${FONT};letter-spacing:.06em;">COVER REQUESTED</td>
+          </tr></table>
+
+          <p style="margin:16px 0 0;font:700 23px/1.3 ${FONT};color:#0F172A;letter-spacing:-.02em;">
+            ${escapeHtml(requesterName)} would like you to cover for them
+          </p>
+          <p style="margin:9px 0 0;font:400 14px/1.6 ${FONT};color:#5A6879;">
+            Hello ${escapeHtml(firstName)} — they've named you as their replacement while they're away. Accept or decline below.
+          </p>
+        </td>
+      </tr></table>
+
+      <!-- details -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:22px 32px 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                 style="border:1px solid #E9EDF3;border-radius:12px;background:#FAFBFD;">
+            <tr>
+              <td width="50%" class="stackcell" style="padding:14px 16px;border-right:1px solid #E9EDF3;">
+                <div style="font:700 10px/1 ${FONT};color:#93A0B0;letter-spacing:.07em;">LEAVE TYPE</div>
+                <div style="margin-top:6px;">${leaveTypeChipsHtml(data.type)}</div>
+              </td>
+              <td width="50%" class="stackcell" style="padding:14px 16px;">
+                <div style="font:700 10px/1 ${FONT};color:#93A0B0;letter-spacing:.07em;">${dateDetail.label}</div>
+                <div style="margin-top:6px;font:600 14px/1.35 ${FONT};color:#0F172A;">${dateDetail.dateLine}</div>
+                <div style="margin-top:2px;font:400 12px/1.35 ${FONT};color:#7A8698;">${dateDetail.subLine}</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr></table>
+
+      <!-- cta -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:22px 32px 26px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" class="btn"><tr>
+            <td style="background:#E8590C;border-radius:9px;">
+              <a href="${escapeAttr(resolveUrl)}" style="display:inline-block;padding:12px 22px;font:600 14px/1 ${FONT};color:#FFFFFF;text-decoration:none;">Accept or decline</a>
+            </td>
+          </tr></table>
+        </td>
+      </tr></table>
+
+    </td></tr>
+
+    <!-- footer -->
+    <tr><td class="gut" style="padding:16px 8px 0;">
+      <p style="margin:0;font:400 11.5px/1.7 ${FONT};color:#8593A5;">
+        Sent by Daily Tasks because ${escapeHtml(requesterName)} named you as a replacement. Internal use only.<br>
+        Replies to this address are not monitored — raise anything else with ${escapeHtml(requesterName)}.
+      </p>
+    </td></tr>
+
+  </table>
+
+</td></tr>
+</table>`.trim();
+
+  const subject = `${requesterName} needs you to cover for them — ${typeLabel}, ${dateDetail.dateLine}`;
+
+  return { subject, html };
+}
+
+// Emails the original requester once their named replacement accepts or
+// declines - same green/red decision-family styling as buildDecisionEmail.
+function buildReplacementResolvedEmail(data) {
+  const accepted = data.status === 'accepted';
+  const name = data.requesterName || 'there';
+  const firstName = String(name).trim().split(/\s+/)[0] || name;
+  const replacementName = data.replacementName || 'Your replacement';
+  const dateDetail = leaveDateDetailHtml(data);
+
+  const statusPillStyle = accepted
+    ? 'background:#E9F7F1;border:1px solid #B4E3CF;color:#0A6B4A;'
+    : 'background:#FCEDED;border:1px solid #F2C4C4;color:#A32C2C;';
+  const ruleColor = accepted ? '#12996B' : '#D64545';
+
+  const html = `
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(
+    `${replacementName} ${accepted ? 'accepted' : 'declined'} your replacement request for ${dateDetail.dateLine}.`
+  )}</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF0F4;">
+<tr><td align="center" style="padding:32px 12px;">
+
+  <table role="presentation" class="wrap" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;">
+
+    <!-- masthead -->
+    <tr><td style="padding:0 4px 12px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td style="font:700 13px/1.2 ${FONT};color:#0F172A;letter-spacing:-.01em;">
+          <span style="display:inline-block;width:9px;height:9px;background:#E8590C;border-radius:2px;margin-right:8px;"></span>Daily Tasks
+        </td>
+        <td align="right" style="font:400 12px/1.2 ${FONT};color:#7A8698;">Replacement request</td>
+      </tr></table>
+    </td></tr>
+
+    <!-- card -->
+    <tr><td style="background:#FFFFFF;border:1px solid #E3E8EF;border-radius:14px;overflow:hidden;">
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td height="4" style="height:4px;line-height:4px;font-size:0;background:${ruleColor};">&nbsp;</td>
+      </tr></table>
+
+      <!-- headline -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:26px 32px 0;">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+            <td style="${statusPillStyle}border-radius:999px;padding:5px 12px;
+                       font:700 11px/1 ${FONT};letter-spacing:.06em;">${accepted ? 'ACCEPTED' : 'DECLINED'}</td>
+          </tr></table>
+
+          <p style="margin:16px 0 0;font:700 23px/1.3 ${FONT};color:#0F172A;letter-spacing:-.02em;">
+            ${escapeHtml(replacementName)} ${accepted ? 'will cover for you' : 'can’t cover for you'}
+          </p>
+          <p style="margin:9px 0 0;font:400 14px/1.6 ${FONT};color:#5A6879;">
+            Hello ${escapeHtml(firstName)} — this is about your leave for ${escapeHtml(dateDetail.dateLine)}.
+            ${accepted ? 'Nothing further is needed from you.' : 'You may want to pick someone else, or let your manager know.'}
+          </p>
+        </td>
+      </tr></table>
+
+      <!-- cta -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:22px 32px 26px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" class="btn"><tr>
+            <td style="border:1px solid #DDE3EB;border-radius:9px;">
+              <a href="${escapeAttr(HISTORY_URL)}" style="display:inline-block;padding:11px 20px;font:600 14px/1 ${FONT};color:#475569;text-decoration:none;">View leave history</a>
+            </td>
+          </tr></table>
+        </td>
+      </tr></table>
+
+    </td></tr>
+
+    <!-- footer -->
+    <tr><td class="gut" style="padding:16px 8px 0;">
+      <p style="margin:0;font:400 11.5px/1.7 ${FONT};color:#8593A5;">
+        Sent by Daily Tasks because you named a replacement on a leave request. Internal use only.<br>
+        Replies to this address are not monitored.
+      </p>
+    </td></tr>
+
+  </table>
+
+</td></tr>
+</table>`.trim();
+
+  const subject = `${replacementName} ${accepted ? 'accepted' : 'declined'} your replacement request`;
+
+  return { subject, html };
+}
+
+// Emails a manager when a developer self-reports they'll be late - purely
+// informational (no accept/reject workflow, see PROJECT.md), so a single
+// "Open in Daily Tasks" CTA is enough.
+function buildLateNoticeEmail(data) {
+  const name = data.name || 'A developer';
+  const dateText = formatWeekdayDayMonthYear(data.date) || formatDayMonthYear(data.date);
+  const timeText = data.expectedArrivalTime ? ` — expected around ${escapeHtml(data.expectedArrivalTime)}` : '';
+
+  const html = `
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(
+    `${name} will be late on ${dateText}${timeText}.`
+  )}</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF0F4;">
+<tr><td align="center" style="padding:32px 12px;">
+
+  <table role="presentation" class="wrap" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;">
+
+    <!-- masthead -->
+    <tr><td style="padding:0 4px 12px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td style="font:700 13px/1.2 ${FONT};color:#0F172A;letter-spacing:-.01em;">
+          <span style="display:inline-block;width:9px;height:9px;background:#E8590C;border-radius:2px;margin-right:8px;"></span>Daily Tasks
+        </td>
+        <td align="right" style="font:400 12px/1.2 ${FONT};color:#7A8698;">Late arrival notice</td>
+      </tr></table>
+    </td></tr>
+
+    <!-- card -->
+    <tr><td style="background:#FFFFFF;border:1px solid #E3E8EF;border-radius:14px;overflow:hidden;">
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td height="4" style="height:4px;line-height:4px;font-size:0;background:#D97706;">&nbsp;</td>
+      </tr></table>
+
+      <!-- headline -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:26px 32px 0;">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+            <td style="background:#FEF3C7;border:1px solid #FDE68A;color:#92400E;border-radius:999px;padding:5px 12px;
+                       font:700 11px/1 ${FONT};letter-spacing:.06em;">LATE ARRIVAL</td>
+          </tr></table>
+
+          <p style="margin:16px 0 0;font:700 23px/1.3 ${FONT};color:#0F172A;letter-spacing:-.02em;">
+            ${escapeHtml(name)} will be late on ${escapeHtml(dateText)}${timeText}
+          </p>
+        </td>
+      </tr></table>
+
+      <!-- reason -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:22px 32px 0;">
+          <div style="font:700 10px/1 ${FONT};color:#93A0B0;letter-spacing:.07em;">REASON</div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
+            <tr><td style="border-left:3px solid #E3E8EF;padding:2px 0 2px 14px;
+                           font:400 14px/1.6 ${FONT};color:#334155;">
+              ${htmlOrFallback(data.reasonHtml, '<i>No reason provided.</i>')}
+            </td></tr>
+          </table>
+        </td>
+      </tr></table>
+
+      <!-- cta -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:22px 32px 26px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" class="btn"><tr>
+            <td style="border:1px solid #DDE3EB;border-radius:9px;">
+              <a href="${escapeAttr(APP_URL)}" style="display:inline-block;padding:11px 20px;font:600 14px/1 ${FONT};color:#475569;text-decoration:none;">Open in Daily Tasks</a>
+            </td>
+          </tr></table>
+        </td>
+      </tr></table>
+
+    </td></tr>
+
+    <!-- footer -->
+    <tr><td class="gut" style="padding:16px 8px 0;">
+      <p style="margin:0;font:400 11.5px/1.7 ${FONT};color:#8593A5;">
+        Sent by Daily Tasks because a team member filed a late-arrival notice. Internal use only.
+      </p>
+    </td></tr>
+
+  </table>
+
+</td></tr>
+</table>`.trim();
+
+  const subject = `${name} will be late on ${dateText}`;
+
+  return { subject, html };
+}
+
+// Tiny, deliberately plain notice email - sent to whoever decided a request
+// when the requester uses a granted reschedule to pick new dates on it. Not
+// worth the full decision-card treatment (there's no decision to review yet,
+// just a heads-up that one is needed again) - a single CTA back into the app.
+function buildRescheduleNoticeEmail(data) {
+  const requesterName = data.requesterName || 'A team member';
+  const dateDetail = leaveDateDetailHtml(data);
+  const managerName = data.managerName || 'there';
+  const firstName = String(managerName).trim().split(/\s+/)[0] || managerName;
+
+  const html = `
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(
+    `${requesterName} rescheduled their leave request to ${dateDetail.dateLine} - please take another look.`
+  )}</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF0F4;">
+<tr><td align="center" style="padding:32px 12px;">
+  <table role="presentation" class="wrap" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;">
+    <tr><td style="padding:0 4px 12px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td style="font:700 13px/1.2 ${FONT};color:#0F172A;letter-spacing:-.01em;">
+          <span style="display:inline-block;width:9px;height:9px;background:#E8590C;border-radius:2px;margin-right:8px;"></span>Daily Tasks
+        </td>
+        <td align="right" style="font:400 12px/1.2 ${FONT};color:#7A8698;">Leave request rescheduled</td>
+      </tr></table>
+    </td></tr>
+    <tr><td style="background:#FFFFFF;border:1px solid #E3E8EF;border-radius:14px;overflow:hidden;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td height="4" style="height:4px;line-height:4px;font-size:0;background:#D97706;">&nbsp;</td>
+      </tr></table>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:26px 32px 26px;">
+          <p style="margin:0;font:700 20px/1.3 ${FONT};color:#0F172A;letter-spacing:-.02em;">
+            ${escapeHtml(requesterName)} rescheduled their request to ${escapeHtml(dateDetail.dateLine)}
+          </p>
+          <p style="margin:9px 0 0;font:400 14px/1.6 ${FONT};color:#5A6879;">
+            Hello ${escapeHtml(firstName)} — they used the reschedule you granted to pick new dates. It's back in your queue for another look.
+          </p>
+          <table role="presentation" cellpadding="0" cellspacing="0" class="btn" style="margin-top:18px;"><tr>
+            <td style="background:#E8590C;border-radius:9px;">
+              <a href="${escapeAttr(APP_URL)}" style="display:inline-block;padding:12px 22px;font:600 14px/1 ${FONT};color:#FFFFFF;text-decoration:none;">Review in Daily Tasks</a>
+            </td>
+          </tr></table>
+        </td>
+      </tr></table>
+    </td></tr>
+    <tr><td class="gut" style="padding:16px 8px 0;">
+      <p style="margin:0;font:400 11.5px/1.7 ${FONT};color:#8593A5;">Sent by Daily Tasks. Internal use only.</p>
+    </td></tr>
+  </table>
+</td></tr>
+</table>`.trim();
+
+  const subject = `${requesterName} rescheduled their leave request — please review`;
+  return { subject, html };
+}
+
 // A rich-text field with no real content isn't always an empty string - a
 // contenteditable box that was focused and left untouched can save as
 // "<br>", "<p></p>" or "<p><br></p>". Left unguarded, `data.x || fallback`
@@ -677,4 +1059,14 @@ function escapeAttr(s) {
   return escapeHtml(s).replace(/"/g, '&quot;');
 }
 
-module.exports = { buildDecisionEmail, buildUninformedReportEmail, buildExplanationRejectedEmail, htmlToPlainText };
+module.exports = {
+  buildDecisionEmail,
+  buildUninformedReportEmail,
+  buildExplanationRejectedEmail,
+  buildReplacementRequestEmail,
+  buildReplacementResolvedEmail,
+  buildLateNoticeEmail,
+  buildRescheduleNoticeEmail,
+  htmlToPlainText,
+  addWorkingDays
+};

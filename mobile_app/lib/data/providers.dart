@@ -8,6 +8,8 @@ import 'repositories/attachment_repository.dart';
 import 'repositories/attendance_repository.dart';
 import 'repositories/auth_repository.dart';
 import 'repositories/leave_repository.dart';
+import 'repositories/leave_replacements_repository.dart';
+import 'repositories/late_arrival_notices_repository.dart';
 import 'repositories/push_repository.dart';
 import 'repositories/submission_repository.dart';
 import 'repositories/uninformed_leave_repository.dart';
@@ -55,6 +57,18 @@ final usersRepositoryProvider = Provider((ref) {
 });
 final attendanceRepositoryProvider = Provider((ref) {
   return AttendanceRepository(apiClient: ref.watch(apiClientProvider), realtime: ref.watch(realtimeClientProvider));
+});
+final leaveReplacementsRepositoryProvider = Provider((ref) {
+  return LeaveReplacementsRepository(
+    apiClient: ref.watch(apiClientProvider),
+    realtime: ref.watch(realtimeClientProvider),
+  );
+});
+final lateArrivalNoticesRepositoryProvider = Provider((ref) {
+  return LateArrivalNoticesRepository(
+    apiClient: ref.watch(apiClientProvider),
+    realtime: ref.watch(realtimeClientProvider),
+  );
 });
 
 /// The full team roster - used by manager screens' developer pickers/filters

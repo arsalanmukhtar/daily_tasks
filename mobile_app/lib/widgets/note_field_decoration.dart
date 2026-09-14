@@ -22,6 +22,9 @@ InputDecoration noteFieldDecoration(String hint) {
   );
   return InputDecoration(
     hintText: hint,
+    // Thin weight + a light neutral, deliberately much quieter than typed
+    // text - a placeholder should read as an instruction, not content.
+    hintStyle: const TextStyle(color: AppColors.ink400, fontWeight: FontWeight.w300),
     filled: true,
     fillColor: AppColors.surface,
     border: border,

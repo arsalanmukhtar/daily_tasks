@@ -15,6 +15,8 @@ import { uninformedLeavesRouter } from './routes/uninformedLeaves.js';
 import { pushTokensRouter } from './routes/pushTokens.js';
 import { attachmentsRouter } from './routes/attachments.js';
 import { attendanceRouter } from './routes/attendance.js';
+import { leaveReplacementsRouter } from './routes/leaveReplacements.js';
+import { lateArrivalNoticesRouter } from './routes/lateArrivalNotices.js';
 
 for (const required of ['JWT_SECRET', 'DB_USER', 'DB_PASSWORD']) {
   if (!process.env[required]) {
@@ -39,6 +41,8 @@ app.use('/api/uninformed-leaves', uninformedLeavesRouter);
 app.use('/api/push-tokens', pushTokensRouter);
 app.use('/api/attachments', attachmentsRouter);
 app.use('/api/attendance', attendanceRouter);
+app.use('/api/leave-replacements', leaveReplacementsRouter);
+app.use('/api/late-arrival-notices', lateArrivalNoticesRouter);
 
 // The web app's static files (index.html/app.js/styles.css) live one level
 // up from server/ in the same repo checkout - served directly here rather

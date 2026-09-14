@@ -35,10 +35,11 @@ class RequestListView extends StatelessWidget {
             isScrollControlled: true,
             builder: (_) => RequestDetailSheet(
               request: request,
-              onDecide: ({required approve, note}) => leaveRepository.decide(
+              onDecide: ({required approve, note, allowReschedule = false}) => leaveRepository.decide(
                 request.requestId,
                 approve: approve,
                 note: note,
+                allowReschedule: allowReschedule,
               ),
             ),
           ),

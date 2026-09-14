@@ -17,6 +17,8 @@ const _countedStatuses = [
   AttendanceStatus.present,
   AttendanceStatus.late,
   AttendanceStatus.absent,
+  AttendanceStatus.nightDuty,
+  AttendanceStatus.onDuty,
   AttendanceStatus.onLeave,
 ];
 
@@ -150,15 +152,27 @@ class _AttendanceStatsScreenState extends ConsumerState<AttendanceStatsScreen> {
           ),
         );
 
-    return Row(
+    return Column(
       children: [
-        tile(AttendanceStatus.present),
-        const SizedBox(width: 8),
-        tile(AttendanceStatus.late),
-        const SizedBox(width: 8),
-        tile(AttendanceStatus.absent),
-        const SizedBox(width: 8),
-        tile(AttendanceStatus.onLeave),
+        Row(
+          children: [
+            tile(AttendanceStatus.present),
+            const SizedBox(width: 8),
+            tile(AttendanceStatus.late),
+            const SizedBox(width: 8),
+            tile(AttendanceStatus.absent),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            tile(AttendanceStatus.nightDuty),
+            const SizedBox(width: 8),
+            tile(AttendanceStatus.onDuty),
+            const SizedBox(width: 8),
+            tile(AttendanceStatus.onLeave),
+          ],
+        ),
       ],
     );
   }

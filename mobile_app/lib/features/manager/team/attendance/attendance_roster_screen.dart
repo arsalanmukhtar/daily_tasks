@@ -66,24 +66,34 @@ class AttendanceRosterScreen extends ConsumerWidget {
                     approvedLeaveRequests: approvedLeave,
                   );
                   final existing = records.where((a) => a.email == user.email && _sameDay(a.date, dayOnly));
+                  // An On Leave day is derived from an approved leave request,
+                  // never a manual mark - locked against remarking here (and
+                  // refused server-side too, see attendance.js's
+                  // assertMarkable-equivalent guard) so a correction can't be
+                  // made from a stale UI or drift out of sync with the leave
+                  // record. A short info sheet explains why, instead of the
+                  // tap silently doing nothing.
+                  final locked = status == AttendanceStatus.onLeave;
                   return Card(
                     margin: const EdgeInsets.only(bottom: 10),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(12),
-                      onTap: () => showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: AppColors.surface,
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                        ),
-                        builder: (_) => AttendanceMarkSheet(
-                          email: user.email,
-                          name: user.name,
-                          date: dayOnly,
-                          existing: existing.isNotEmpty ? existing.first : null,
-                        ),
-                      ),
+                      onTap: () => locked
+                          ? _showOnLeaveLockedSheet(context, user.name, user.email)
+                          : showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: AppColors.surface,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                              ),
+                              builder: (_) => AttendanceMarkSheet(
+                                email: user.email,
+                                name: user.name,
+                                date: dayOnly,
+                                existing: existing.isNotEmpty ? existing.first : null,
+                              ),
+                            ),
                       child: Padding(
                         padding: const EdgeInsets.all(14),
                         child: Row(
@@ -114,6 +124,51 @@ class AttendanceRosterScreen extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+
+  void _showOnLeaveLockedSheet(BuildContext context, String name, String email) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.event_busy_rounded, color: AppColors.meta),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'On approved leave',
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '${name.isNotEmpty ? name : email} is on an approved leave this day, so attendance can\'t be '
+                'marked for it. If this looks wrong, review the leave request in Requests/Archived first.',
+                style: TextStyle(color: AppColors.ink500, fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 18),
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(sheetContext).pop(),
+                  child: const Text('Close'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

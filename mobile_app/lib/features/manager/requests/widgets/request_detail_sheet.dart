@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:intl/intl.dart';
 
@@ -10,6 +11,7 @@ import '../../../../widgets/avatar.dart';
 import '../../../../widgets/note_field_decoration.dart';
 import '../../../../widgets/status_chip.dart';
 import 'leave_dates_calendar_sheet.dart';
+import 'replacement_section.dart';
 
 final _fullDateFmt = DateFormat('EEEE, d MMMM yyyy');
 final _timeFmt = DateFormat('d MMM yyyy, h:mm a');
@@ -18,20 +20,23 @@ final _timeFmt = DateFormat('d MMM yyyy, h:mm a');
 /// still `requested`) an Approve/Reject flow that reveals an inline
 /// optional decision-note field before confirming. Mirrors the Kotlin
 /// app's RequestDetailSheet.kt.
-class RequestDetailSheet extends StatefulWidget {
+class RequestDetailSheet extends ConsumerStatefulWidget {
   const RequestDetailSheet({required this.request, required this.onDecide, super.key});
 
   final LeaveRequest request;
-  final Future<void> Function({required bool approve, String? note}) onDecide;
+  final Future<void> Function({required bool approve, String? note, bool allowReschedule}) onDecide;
 
   @override
-  State<RequestDetailSheet> createState() => _RequestDetailSheetState();
+  ConsumerState<RequestDetailSheet> createState() => _RequestDetailSheetState();
 }
 
-class _RequestDetailSheetState extends State<RequestDetailSheet> {
+class _RequestDetailSheetState extends ConsumerState<RequestDetailSheet> {
   final _noteController = TextEditingController();
   bool? _decidingApprove; // null = not deciding, true/false = which action's note is showing
   bool _isSubmitting = false;
+  // Only ever meaningful (and only ever shown) alongside a rejection - see
+  // LeaveRequest.allowReschedule's doc comment.
+  bool _allowReschedule = false;
 
   @override
   void dispose() {
@@ -42,7 +47,11 @@ class _RequestDetailSheetState extends State<RequestDetailSheet> {
   Future<void> _confirm() async {
     setState(() => _isSubmitting = true);
     try {
-      await widget.onDecide(approve: _decidingApprove!, note: _noteController.text);
+      await widget.onDecide(
+        approve: _decidingApprove!,
+        note: _noteController.text,
+        allowReschedule: !_decidingApprove! && _allowReschedule,
+      );
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
@@ -82,7 +91,7 @@ class _RequestDetailSheetState extends State<RequestDetailSheet> {
                       ],
                     ),
                   ),
-                  StatusChip(label: r.status.toUpperCase(), foreground: statusFg, background: statusBg),
+                  StatusChip(label: AppColors.labelForStatus(r.status), foreground: statusFg, background: statusBg),
                 ],
               ),
               const Divider(height: 28),
@@ -94,6 +103,7 @@ class _RequestDetailSheetState extends State<RequestDetailSheet> {
                     _dateFact(context, r),
                     if (r.weekLabel.isNotEmpty) _fact('Week', r.weekLabel),
                     if (r.requestedAt != null) _fact('Applied', _timeFmt.format(r.requestedAt!)),
+                    ReplacementSection(leaveRequestId: r.requestId),
                     if (r.attachments.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text('Attachments', style: Theme.of(context).textTheme.labelLarge),
@@ -228,6 +238,22 @@ class _RequestDetailSheetState extends State<RequestDetailSheet> {
             approving ? 'Add a note with this approval (optional)' : 'Reason for rejecting (optional)',
           ),
         ),
+        // Only offered on a rejection - e.g. "you can only take 2 of the 3
+        // days" - lets the requester pick new dates on this same request
+        // (via the web app) instead of filing a brand new one. See
+        // LeaveRequest.allowReschedule's doc comment.
+        if (!approving)
+          CheckboxListTile(
+            value: _allowReschedule,
+            onChanged: (v) => setState(() => _allowReschedule = v ?? false),
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            title: const Text(
+              'Allow them to reschedule instead of submitting a new request',
+              style: TextStyle(fontSize: 13),
+            ),
+          ),
         const SizedBox(height: 10),
         Row(
           children: [

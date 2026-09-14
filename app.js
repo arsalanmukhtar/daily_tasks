@@ -138,6 +138,56 @@ const confirmNewPasswordInput = document.getElementById('confirmNewPasswordInput
 const changePasswordError    = document.getElementById('changePasswordError');
 const changePasswordSuccess  = document.getElementById('changePasswordSuccess');
 const changePasswordSubmitBtn = document.getElementById('changePasswordSubmitBtn');
+
+// ---------- Late-arrival notice ----------
+const lateNoticeBtn        = document.getElementById('lateNoticeBtn');
+const lateNoticeModal      = document.getElementById('lateNoticeModal');
+const lateNoticeBackdrop   = document.getElementById('lateNoticeBackdrop');
+const closeLateNoticeBtn   = document.getElementById('closeLateNoticeBtn');
+const lateNoticeDate       = document.getElementById('lateNoticeDate');
+const lateNoticeTime       = document.getElementById('lateNoticeTime');
+const lateNoticeToolbar    = document.getElementById('lateNoticeToolbar');
+const lateNoticeEditor     = document.getElementById('lateNoticeEditor');
+const lateNoticeAttachmentInput = document.getElementById('lateNoticeAttachmentInput');
+const lateNoticeAttachmentDrop  = document.getElementById('lateNoticeAttachmentDrop');
+const lateNoticeAttachmentList  = document.getElementById('lateNoticeAttachmentList');
+const lateNoticeError      = document.getElementById('lateNoticeError');
+const lateNoticeSubmitBtn  = document.getElementById('lateNoticeSubmitBtn');
+
+// ---------- Emergency leave + its follow-up "add docs" ----------
+const emergencyLeaveBtn        = document.getElementById('emergencyLeaveBtn');
+const emergencyLeaveModal      = document.getElementById('emergencyLeaveModal');
+const emergencyLeaveBackdrop   = document.getElementById('emergencyLeaveBackdrop');
+const closeEmergencyLeaveBtn   = document.getElementById('closeEmergencyLeaveBtn');
+const emergencyLeaveError      = document.getElementById('emergencyLeaveError');
+const emergencyLeaveConfirmBtn = document.getElementById('emergencyLeaveConfirmBtn');
+const submitDocsModal      = document.getElementById('submitDocsModal');
+const submitDocsBackdrop   = document.getElementById('submitDocsBackdrop');
+const closeSubmitDocsBtn   = document.getElementById('closeSubmitDocsBtn');
+const submitDocsToolbar    = document.getElementById('submitDocsToolbar');
+const submitDocsEditor     = document.getElementById('submitDocsEditor');
+const submitDocsAttachmentInput = document.getElementById('submitDocsAttachmentInput');
+const submitDocsAttachmentDrop  = document.getElementById('submitDocsAttachmentDrop');
+const submitDocsAttachmentList  = document.getElementById('submitDocsAttachmentList');
+const submitDocsError      = document.getElementById('submitDocsError');
+const submitDocsSubmitBtn  = document.getElementById('submitDocsSubmitBtn');
+
+// ---------- Reschedule ----------
+const rescheduleModal      = document.getElementById('rescheduleModal');
+const rescheduleBackdrop   = document.getElementById('rescheduleBackdrop');
+const closeRescheduleBtn   = document.getElementById('closeRescheduleBtn');
+const rescheduleStartDate  = document.getElementById('rescheduleStartDate');
+const rescheduleEndDate    = document.getElementById('rescheduleEndDate');
+const rescheduleError      = document.getElementById('rescheduleError');
+const rescheduleSubmitBtn  = document.getElementById('rescheduleSubmitBtn');
+
+// ---------- Replacement (cover person) ----------
+const leaveReplacementSelect  = document.getElementById('leaveReplacementSelect');
+const replacementInviteBanner = document.getElementById('replacementInviteBanner');
+const replacementInviteMeta   = document.getElementById('replacementInviteMeta');
+const replacementInviteAcceptBtn = document.getElementById('replacementInviteAcceptBtn');
+const replacementInviteRejectBtn = document.getElementById('replacementInviteRejectBtn');
+
 const userChip         = document.getElementById('userChip');
 const userPhoto        = document.getElementById('userPhoto');
 const userName         = document.getElementById('userName');
@@ -775,6 +825,16 @@ wireColorButtons_(uninformedResolveToolbar);
 uninformedResolveEditor.addEventListener('focus', () => { activeCell = uninformedResolveEditor; activeToolbarEl = uninformedResolveToolbar; });
 uninformedResolveEditor.addEventListener('beforeinput', handleListAutoformat);
 
+// ---------- Late-arrival notice editor: same shared toolbar wiring ----------
+wireFormatToolbar_(lateNoticeToolbar);
+lateNoticeEditor.addEventListener('focus', () => { activeCell = lateNoticeEditor; activeToolbarEl = lateNoticeToolbar; });
+lateNoticeEditor.addEventListener('beforeinput', handleListAutoformat);
+
+// ---------- Emergency-leave "add docs" editor: same shared toolbar wiring ----------
+wireFormatToolbar_(submitDocsToolbar);
+submitDocsEditor.addEventListener('focus', () => { activeCell = submitDocsEditor; activeToolbarEl = submitDocsToolbar; });
+submitDocsEditor.addEventListener('beforeinput', handleListAutoformat);
+
 // ---------- Rich-text sanitizing (paste-in and display-out) ----------
 // Every contenteditable in this app (daily-task cells, the leave-reason box,
 // the uninformed-explanation box) shares this one toolbar/execCommand
@@ -1253,6 +1313,45 @@ async function getAllowlistMap_() {
   return map;
 }
 
+// Fills the leave-apply form's replacement <select> with every active,
+// non-manager teammate other than the signed-in user, greying out anyone
+// currently occupied elsewhere (see server/src/routes/leaveReplacements.js's
+// "occupied until free" rule) with a disabled option so it's clear *why*
+// they're not pickable rather than just missing. Re-run each time the Apply
+// tab opens, since who's occupied can change between visits.
+async function populateLeaveReplacementSelect_() {
+  const self = currentUserEmail_();
+  const previousValue = leaveReplacementSelect.value;
+  try {
+    const [allowlist, occupiedResp] = await Promise.all([
+      getAllowlistMap_(),
+      apiRequest_('GET', '/leave-replacements/occupied')
+    ]);
+    const occupied = new Set((occupiedResp.occupiedEmails || []));
+    const candidates = Object.values(allowlist)
+      .filter(function (u) { return u.active && !u.isOwner && u.email !== self; })
+      .sort(function (a, b) { return (a.name || a.email).localeCompare(b.name || b.email); });
+
+    leaveReplacementSelect.innerHTML = '<option value="">No replacement</option>' +
+      candidates.map(function (u) {
+        const isOccupied = occupied.has(u.email);
+        return '<option value="' + escapeHtml(u.email) + '"' + (isOccupied ? ' disabled' : '') + '>' +
+          escapeHtml(u.name || u.email) + (isOccupied ? ' (already covering someone else)' : '') +
+        '</option>';
+      }).join('');
+    // Re-selects whatever was picked before, as long as it's still a valid,
+    // non-occupied option - preserves the choice across a rail-navigation
+    // re-population (see switchLeavesTab_) the same way the rest of the
+    // form's in-progress values already survive that navigation.
+    if (previousValue && !occupied.has(previousValue) && candidates.some(function (u) { return u.email === previousValue; })) {
+      leaveReplacementSelect.value = previousValue;
+    }
+  } catch (_e) {
+    // Offline/error - leave whatever the select already had (usually just
+    // "No replacement") rather than blocking the rest of the form.
+  }
+}
+
 function currentWeekLabel_() {
   const info = weekdaysFor(weekInput.value);
   return info ? `Week ${info.week}, ${info.year}` : '';
@@ -1311,7 +1410,10 @@ async function fetchLeaveStatus_() {
         resolvedBy: entry.resolvedBy || '',
         attachments: normalizeLeaveAttachments_(entry),
         dismissed: entry.dismissed === true,
-        withdrawnAt: entry.withdrawnAt || ''
+        withdrawnAt: entry.withdrawnAt || '',
+        allowReschedule: entry.allowReschedule === true,
+        rescheduled: entry.rescheduled === true,
+        docsDueAt: entry.docsDueAt || ''
       };
     }
     const byNewest = function (a, b) { return new Date(b.requestedAt) - new Date(a.requestedAt); };
@@ -2156,7 +2258,10 @@ function switchLeavesTab_(tab) {
   // chip highlights/sub-row visibility in sync with whatever category/type
   // is already selected - on a session that never opened Apply before,
   // nothing has painted those yet even though the state defaults exist.
-  if (tab === 'apply') paintLeaveApplyForm_();
+  if (tab === 'apply') {
+    paintLeaveApplyForm_();
+    populateLeaveReplacementSelect_();
+  }
 }
 
 // Blanks the Apply form back to its defaults - used both when the user
@@ -2179,12 +2284,13 @@ function resetLeaveApplyForm_() {
   if (leaveOutCheckOutCtl_) leaveOutCheckOutCtl_.refresh();
   if (leaveOutCheckInCtl_) leaveOutCheckInCtl_.refresh();
   selectLeaveCategory_('casual');
+  leaveReplacementSelect.value = '';
 }
 
 async function openApplyLeaveTab_() {
   if (!currentUserContext || !weekInput.value) return;
   resetLeaveApplyForm_();
-  switchLeavesTab_('apply');
+  switchLeavesTab_('apply'); // also (re)populates the replacement select
   // Focus immediately so activeCell/activeToolbarEl point at this editor
   // before the user can touch the toolbar - otherwise a stale activeCell
   // from the task table would silently take the formatting instead.
@@ -2224,6 +2330,10 @@ function closeMyLeavesDrawer() {
 async function loadMyLeavesData_() {
   const data = await fetchLeaveStatus_();
   if (data) latestLeaveStatusData = data;
+  // Fetched before any renderMyLeaveCard_ call below - replacementInfoForRequest_
+  // reads this cache synchronously while building each card.
+  latestLeaveReplacements_ = await fetchMyLeaveReplacements_();
+  renderReplacementInviteBanner_();
   // The full permanent history (dismissed included) - dismissing a request
   // only acknowledges it (see fetchLeaveStatus_), it must stay visible here
   // so an employee can always track everything they've ever applied for.
@@ -2393,6 +2503,27 @@ function renderMyLeavesBanner_(records) {
   const approver = (currentUserContext && currentUserContext.reportedTo) || '';
   if (approver) bits.push('with ' + approver);
   myLeavesBannerMeta.textContent = bits.join(' · ');
+}
+
+// A pending invite to cover someone else's leave - "occupied until free"
+// means there's at most one of these active per person at a time (see
+// server/src/routes/leaveReplacements.js), so unlike the pending-request
+// banner above there's never more than one to show.
+function renderReplacementInviteBanner_() {
+  const self = currentUserEmail_();
+  const invite = latestLeaveReplacements_.find(function (r) {
+    return r.status === 'pending' && r.replacementEmail === self;
+  });
+  if (!invite) {
+    replacementInviteBanner.classList.add('hidden');
+    replacementInviteBanner.dataset.replacementId = '';
+    return;
+  }
+  replacementInviteBanner.classList.remove('hidden');
+  replacementInviteBanner.dataset.replacementId = invite.id;
+  const bits = [leaveTypeLabel_(invite.type)];
+  if (invite.startDate) { const d = new Date(invite.startDate); if (!isNaN(d.getTime())) bits.push(fmtDateLocal_(d)); }
+  replacementInviteMeta.textContent = (invite.requesterName || invite.requesterEmail) + ' asked you to cover - ' + bits.join(' · ');
 }
 
 // The overview's right-column card - the closest approved leave that hasn't
@@ -2597,13 +2728,14 @@ async function renderMyLeavesTrendChart_(records) {
 function leaveStatusTone_(status) {
   if (status === 'approved') return 'ok';
   if (status === 'rejected') return 'no';
-  if (status === 'requested') return 'wait';
+  if (status === 'requested' || status === 'pending_documentation') return 'wait';
   return 'neutral'; // withdrawn, or anything else
 }
 function leaveStatusLabel_(status) {
   if (status === 'approved') return 'Approved';
   if (status === 'rejected') return 'Rejected';
   if (status === 'requested') return 'Pending';
+  if (status === 'pending_documentation') return 'Awaiting docs';
   if (status === 'withdrawn') return 'Withdrawn';
   return status || '';
 }
@@ -2926,7 +3058,11 @@ function renderMyLeaveCard_(rec) {
 
   const viewBtn = '<button type="button" class="mini brand lv-view-btn" data-request-id="' + escapeHtml(rec.requestId) + '">' + (expanded ? 'Close' : 'View') + '</button>';
   let byText, actions;
-  if (rec.status === 'requested') {
+  if (rec.status === 'pending_documentation') {
+    const dueDate = rec.docsDueAt ? new Date(rec.docsDueAt) : null;
+    byText = 'Add your reason and a document' + (dueDate && !isNaN(dueDate.getTime()) ? ' by <b>' + escapeHtml(fmtDateLocal_(dueDate)) + '</b>' : '');
+    actions = '<button type="button" class="mini brand lv-add-docs-btn" data-request-id="' + escapeHtml(rec.requestId) + '">Add reason &amp; document</button>';
+  } else if (rec.status === 'requested') {
     const approver = (currentUserContext && currentUserContext.reportedTo) || '';
     byText = approver ? 'With <b>' + escapeHtml(approver) + '</b>' : 'Awaiting a decision';
     actions = '<button type="button" class="mini lv-withdraw-btn" data-request-id="' + escapeHtml(rec.requestId) + '">Withdraw</button>' + viewBtn;
@@ -2934,13 +3070,26 @@ function renderMyLeaveCard_(rec) {
     byText = leaveStatusLabel_(rec.status) +
       (rec.resolvedBy ? ' by <b>' + escapeHtml(rec.resolvedBy) + '</b>' : '') +
       (rec.resolvedAt && !isNaN(new Date(rec.resolvedAt).getTime()) ? ' · ' + escapeHtml(fmtDateLocal_(new Date(rec.resolvedAt))) : '');
-    actions = (rec.dismissed
+    // A manager can grant exactly one reschedule alongside a rejection (see
+    // server/src/routes/leaveRequests.js's /:id/decide + /:id/reschedule) -
+    // once used, `rescheduled` flips true and this button stops showing.
+    const rescheduleBtn = (rec.status === 'rejected' && rec.allowReschedule && !rec.rescheduled)
+      ? '<button type="button" class="mini brand lv-reschedule-btn" data-request-id="' + escapeHtml(rec.requestId) +
+        '" data-start-date="' + escapeHtml(rec.startDate || '') + '" data-end-date="' + escapeHtml(rec.endDate || '') + '">Reschedule</button>'
+      : '';
+    actions = rescheduleBtn + (rec.dismissed
       ? ''
       : '<button type="button" class="mini my-leave-dismiss-btn" data-request-id="' + escapeHtml(rec.requestId) + '">Ok, got it</button>') + viewBtn;
   } else {
     byText = leaveStatusLabel_(rec.status);
     actions = viewBtn;
   }
+
+  const replacement = replacementInfoForRequest_(rec.requestId);
+  const replacementHtml = replacement
+    ? '<div class="lv-replacement text-xs text-slate-500 mt-1.5">Replacement: <b>' + escapeHtml(replacement.replacementName || replacement.replacementEmail) + '</b>' +
+      ' <span class="mchip n" style="margin-left:4px;">' + escapeHtml(replacement.status) + '</span></div>'
+    : '';
 
   let expiryNoticeHtml = '';
   if (rec.status === 'withdrawn') {
@@ -2958,8 +3107,26 @@ function renderMyLeaveCard_(rec) {
     '<div class="lv-r rich-text' + (expanded ? ' is-expanded' : '') + '">' + reasonHtml + '</div>' +
     filesHtml +
     expiryNoticeHtml +
+    replacementHtml +
     '<div class="lv-f"><span class="by">' + byText + '</span><span class="act">' + actions + '</span></div>' +
   '</div>';
+}
+
+// Every replacement row involving the signed-in user (either their own
+// request's cover person, or an invite they were asked to accept/decline) -
+// refreshed alongside every other My Leaves read (loadMyLeavesData_) so a
+// card's replacement status stays live without a dedicated fetch per card.
+let latestLeaveReplacements_ = [];
+async function fetchMyLeaveReplacements_() {
+  if (!currentUserContext) return [];
+  try {
+    return await apiRequest_('GET', '/leave-replacements');
+  } catch (_e) {
+    return [];
+  }
+}
+function replacementInfoForRequest_(requestId) {
+  return latestLeaveReplacements_.find(function (r) { return r.leaveRequestId === requestId; }) || null;
 }
 
 async function dismissLeaveRequest_(requestId, buttonEl) {
@@ -3069,11 +3236,38 @@ myLeavesList.addEventListener('click', (e) => {
     if (myLeavesExpandedReasons.has(id)) myLeavesExpandedReasons.delete(id); else myLeavesExpandedReasons.add(id);
     const recs = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
     renderMyLeavesHistorySection_(recs);
+    return;
   }
+  const rescheduleBtn = e.target.closest('.lv-reschedule-btn');
+  if (rescheduleBtn) {
+    openRescheduleModal_(rescheduleBtn.dataset.requestId, rescheduleBtn.dataset.startDate, rescheduleBtn.dataset.endDate);
+    return;
+  }
+  const addDocsBtn = e.target.closest('.lv-add-docs-btn');
+  if (addDocsBtn) { openSubmitDocsModal_(addDocsBtn.dataset.requestId); }
 });
 myLeavesBannerViewBtn.addEventListener('click', () => {
   viewLeaveRequestInHistory_(myLeavesBanner.dataset.requestId);
 });
+async function respondToReplacementInvite_(accept, buttonEl) {
+  const id = replacementInviteBanner.dataset.replacementId;
+  if (!id) return;
+  const otherBtn = accept ? replacementInviteRejectBtn : replacementInviteAcceptBtn;
+  buttonEl.disabled = true;
+  otherBtn.disabled = true;
+  try {
+    await apiRequest_('PATCH', '/leave-replacements/' + id + '/' + (accept ? 'accept' : 'reject'));
+    showToast_(accept ? 'You accepted - thanks for covering.' : 'You declined this request.', 'success');
+    loadMyLeavesData_();
+  } catch (err) {
+    showToast_('Could not respond: ' + err.message, 'error');
+  } finally {
+    buttonEl.disabled = false;
+    otherBtn.disabled = false;
+  }
+}
+replacementInviteAcceptBtn.addEventListener('click', (e) => respondToReplacementInvite_(true, e.currentTarget));
+replacementInviteRejectBtn.addEventListener('click', (e) => respondToReplacementInvite_(false, e.currentTarget));
 uninformedResolveSubmitBtn.addEventListener('click', submitUninformedResolution_);
 myLeavesQuarterTiles.addEventListener('click', (e) => {
   const btn = e.target.closest('.q');
@@ -3198,6 +3392,9 @@ leaveSendBtn.addEventListener('click', async () => {
     } else if (selectedLeaveType === 'casualOutPass') {
       leaveDocPayload.checkOutTime = leaveTimeLabel_(leaveOutPassCheckOutTime) + ' ' + leaveOutPassCheckOutTime.period;
       leaveDocPayload.checkInTime = leaveTimeLabel_(leaveOutPassCheckInTime) + ' ' + leaveOutPassCheckInTime.period;
+    }
+    if (leaveReplacementSelect.value) {
+      leaveDocPayload.replacementEmail = leaveReplacementSelect.value;
     }
     const created = await apiRequest_('POST', '/leave-requests', leaveDocPayload);
 
@@ -3801,6 +3998,7 @@ async function restoreSession_() {
     .catch(function () { /* offline - badge just stays hidden */ });
   openMyLeavesDeepLinkOnce_();
   openResolveUninformedDeepLinkOnce_();
+  openResolveReplacementDeepLinkOnce_();
 }
 
 // Deep link used by the decision email's "View leave history" CTA
@@ -3847,6 +4045,23 @@ async function openResolveUninformedDeepLinkOnce_() {
     await openMyLeavesDrawer();
     switchLeavesTab_('uninformed');
   } catch (_e) { /* offline or permission-denied - nothing to open */ }
+}
+
+// Deep link used by the replacement-request email's "Accept or decline"
+// button (#resolve-replacement=<id>) - there's at most one active invite per
+// person at a time (see the "occupied until free" rule), so this just opens
+// My Leaves and lets renderReplacementInviteBanner_ (already run by
+// openMyLeavesDrawer's data load) show whichever one is pending - no need to
+// find/scroll to this exact id, and no separate resolve view to build.
+let resolveReplacementDeepLinkOpened_ = false;
+async function openResolveReplacementDeepLinkOnce_() {
+  const match = /^#resolve-replacement=/.test(location.hash);
+  if (resolveReplacementDeepLinkOpened_ || !match) return;
+  resolveReplacementDeepLinkOpened_ = true;
+  try {
+    await openMyLeavesDrawer();
+    if (/^#resolve-replacement=/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search);
+  } catch (_e) { /* offline - nothing to open */ }
 }
 
 // Email + password sign-in: POST /auth/login -> store the JWT -> restore.
@@ -3974,6 +4189,236 @@ signOutBtn.addEventListener('click', () => {
   if (realtimeSocket_) { realtimeSocket_.onclose = null; realtimeSocket_.close(); realtimeSocket_ = null; }
   currentUserContext = null;
   showAuthGate();
+});
+
+// ---------- Generic small attachment-picker helper ----------
+// Shared by the late-notice and add-docs modals below - a slimmed-down
+// version of the leave-apply form's attachment picker (no running byte-count
+// footer, since neither of these forms needs one), parametrized by its
+// input/drop/list elements, allowed extensions, and an error label. Returns
+// an object exposing the current File[] and a reset() so each modal's own
+// open/submit code can read/clear it without duplicating this wiring twice.
+function wireSimpleAttachmentPicker_(inputEl, dropEl, listEl, exts, badLabel) {
+  let files = [];
+  function render() {
+    if (!files.length) {
+      listEl.classList.add('hidden');
+      listEl.innerHTML = '';
+      dropEl.classList.remove('hidden');
+      return;
+    }
+    listEl.classList.remove('hidden');
+    dropEl.classList.toggle('hidden', files.length >= 5);
+    listEl.innerHTML = files.map(function (file, i) {
+      return '<div class="file">' +
+        fileTypeBadgeHtml_(file.name) +
+        '<div class="fname"><b>' + escapeHtml(file.name) + '</b><span>' + escapeHtml(formatBytes_(file.size)) + '</span></div>' +
+        '<button type="button" class="rm" data-index="' + i + '" aria-label="Remove attachment">&times;</button>' +
+      '</div>';
+    }).join('');
+  }
+  inputEl.addEventListener('change', () => {
+    const picked = Array.from(inputEl.files || []);
+    inputEl.value = '';
+    for (const file of picked) {
+      if (files.length >= 5) { showToast_('You can attach up to 5 files.', 'warning'); break; }
+      const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+      if (exts.indexOf(ext) === -1) { showToast_('Unsupported file type: ' + file.name + ' - ' + badLabel, 'warning'); continue; }
+      if (file.size > 8 * 1024 * 1024) { showToast_(file.name + ' is too large - max 8MB.', 'warning'); continue; }
+      files.push(file);
+    }
+    render();
+  });
+  listEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('.rm');
+    if (!btn) return;
+    files.splice(parseInt(btn.dataset.index, 10), 1);
+    render();
+  });
+  return {
+    get files() { return files; },
+    reset() { files = []; inputEl.value = ''; render(); }
+  };
+}
+
+const lateNoticeAttachmentPicker = wireSimpleAttachmentPicker_(
+  lateNoticeAttachmentInput, lateNoticeAttachmentDrop, lateNoticeAttachmentList,
+  ['.pdf', '.txt', '.doc', '.docx', '.zip', '.png', '.jpg', '.jpeg', '.mp4', '.mov', '.webm'],
+  'use a document, image, or video file.'
+);
+const submitDocsAttachmentPicker = wireSimpleAttachmentPicker_(
+  submitDocsAttachmentInput, submitDocsAttachmentDrop, submitDocsAttachmentList,
+  ['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg'],
+  'use PDF, DOC, DOCX, PNG, or JPG.'
+);
+
+// ---------- Late-arrival notice modal ----------
+function openLateNoticeModal_() {
+  lateNoticeDate.value = fmtISO(new Date());
+  lateNoticeTime.value = '';
+  lateNoticeEditor.innerHTML = '';
+  lateNoticeAttachmentPicker.reset();
+  lateNoticeError.classList.add('hidden');
+  lateNoticeModal.classList.remove('hidden');
+}
+function closeLateNoticeModal_() { lateNoticeModal.classList.add('hidden'); }
+lateNoticeBtn.addEventListener('click', openLateNoticeModal_);
+closeLateNoticeBtn.addEventListener('click', closeLateNoticeModal_);
+lateNoticeBackdrop.addEventListener('click', closeLateNoticeModal_);
+
+lateNoticeSubmitBtn.addEventListener('click', async () => {
+  if (!currentUserContext) return;
+  if (!lateNoticeDate.value) {
+    lateNoticeError.textContent = 'Please pick a date.';
+    lateNoticeError.classList.remove('hidden');
+    return;
+  }
+  lateNoticeError.classList.add('hidden');
+  lateNoticeSubmitBtn.disabled = true;
+  const originalLabel = lateNoticeSubmitBtn.innerHTML;
+  lateNoticeSubmitBtn.innerHTML = '<span class="loader loader-sm on-brand" style="vertical-align: middle; margin-right: 6px;"></span>Sending...';
+  try {
+    const reasonHtml = (lateNoticeEditor.innerHTML || '').trim();
+    const attachments = [];
+    for (const file of lateNoticeAttachmentPicker.files) {
+      const result = await uploadAttachment_(file);
+      attachments.push({ name: file.name, url: result.url, fileId: result.fileId });
+    }
+    await apiRequest_('POST', '/late-arrival-notices', {
+      name: currentUserContext.displayName,
+      date: lateNoticeDate.value,
+      expectedArrivalTime: lateNoticeTime.value || undefined,
+      reasonHtml: reasonHtml === '<br>' ? '' : reasonHtml,
+      attachments
+    });
+    closeLateNoticeModal_();
+    showToast_('Notice sent to your manager.', 'success');
+  } catch (err) {
+    lateNoticeError.textContent = err.message || 'Could not send this notice.';
+    lateNoticeError.classList.remove('hidden');
+  } finally {
+    lateNoticeSubmitBtn.disabled = false;
+    lateNoticeSubmitBtn.innerHTML = originalLabel;
+  }
+});
+
+// ---------- Emergency leave + "add docs" follow-up ----------
+function openEmergencyLeaveModal_() {
+  emergencyLeaveError.classList.add('hidden');
+  emergencyLeaveModal.classList.remove('hidden');
+}
+function closeEmergencyLeaveModal_() { emergencyLeaveModal.classList.add('hidden'); }
+emergencyLeaveBtn.addEventListener('click', openEmergencyLeaveModal_);
+closeEmergencyLeaveBtn.addEventListener('click', closeEmergencyLeaveModal_);
+emergencyLeaveBackdrop.addEventListener('click', closeEmergencyLeaveModal_);
+
+emergencyLeaveConfirmBtn.addEventListener('click', async () => {
+  if (!currentUserContext) return;
+  emergencyLeaveError.classList.add('hidden');
+  emergencyLeaveConfirmBtn.disabled = true;
+  const originalLabel = emergencyLeaveConfirmBtn.innerHTML;
+  emergencyLeaveConfirmBtn.innerHTML = '<span class="loader loader-sm on-brand" style="vertical-align: middle; margin-right: 6px;"></span>Submitting...';
+  try {
+    const created = await apiRequest_('POST', '/leave-requests', {
+      name: currentUserContext.displayName,
+      type: 'emergency'
+    });
+    closeEmergencyLeaveModal_();
+    showToast_('Emergency leave submitted - add your reason and a document when you can.', 'success');
+    await refreshApplyLeaveButton();
+    await loadMyLeavesData_();
+    openSubmitDocsModal_(created.requestId);
+  } catch (err) {
+    emergencyLeaveError.textContent = err.message || 'Could not submit this.';
+    emergencyLeaveError.classList.remove('hidden');
+  } finally {
+    emergencyLeaveConfirmBtn.disabled = false;
+    emergencyLeaveConfirmBtn.innerHTML = originalLabel;
+  }
+});
+
+function openSubmitDocsModal_(requestId) {
+  submitDocsSubmitBtn.dataset.requestId = requestId;
+  submitDocsEditor.innerHTML = '';
+  submitDocsAttachmentPicker.reset();
+  submitDocsError.classList.add('hidden');
+  submitDocsModal.classList.remove('hidden');
+}
+function closeSubmitDocsModal_() { submitDocsModal.classList.add('hidden'); }
+closeSubmitDocsBtn.addEventListener('click', closeSubmitDocsModal_);
+submitDocsBackdrop.addEventListener('click', closeSubmitDocsModal_);
+
+submitDocsSubmitBtn.addEventListener('click', async () => {
+  const requestId = submitDocsSubmitBtn.dataset.requestId;
+  if (!requestId) return;
+  submitDocsError.classList.add('hidden');
+  submitDocsSubmitBtn.disabled = true;
+  const originalLabel = submitDocsSubmitBtn.innerHTML;
+  submitDocsSubmitBtn.innerHTML = '<span class="loader loader-sm on-brand" style="vertical-align: middle; margin-right: 6px;"></span>Submitting...';
+  try {
+    const reasonHtml = (submitDocsEditor.innerHTML || '').trim();
+    const attachments = [];
+    for (const file of submitDocsAttachmentPicker.files) {
+      const formData = new FormData();
+      formData.append('file', file);
+      const result = await apiRequest_('POST', '/attachments?restrict=docs', formData);
+      attachments.push({ name: file.name, url: result.url, fileId: result.fileId });
+    }
+    await apiRequest_('PATCH', '/leave-requests/' + requestId + '/submit-docs', {
+      reasonHtml: reasonHtml === '<br>' ? '' : reasonHtml,
+      attachments
+    });
+    closeSubmitDocsModal_();
+    showToast_('Submitted - your manager can now decide.', 'success');
+    loadMyLeavesData_();
+  } catch (err) {
+    submitDocsError.textContent = err.message || 'Could not submit this.';
+    submitDocsError.classList.remove('hidden');
+  } finally {
+    submitDocsSubmitBtn.disabled = false;
+    submitDocsSubmitBtn.innerHTML = originalLabel;
+  }
+});
+
+// ---------- Reschedule modal ----------
+function openRescheduleModal_(requestId, startDate, endDate) {
+  rescheduleSubmitBtn.dataset.requestId = requestId;
+  rescheduleStartDate.value = startDate ? fmtISO(new Date(startDate)) : '';
+  rescheduleEndDate.value = endDate ? fmtISO(new Date(endDate)) : rescheduleStartDate.value;
+  rescheduleError.classList.add('hidden');
+  rescheduleModal.classList.remove('hidden');
+}
+function closeRescheduleModal_() { rescheduleModal.classList.add('hidden'); }
+closeRescheduleBtn.addEventListener('click', closeRescheduleModal_);
+rescheduleBackdrop.addEventListener('click', closeRescheduleModal_);
+
+rescheduleSubmitBtn.addEventListener('click', async () => {
+  const requestId = rescheduleSubmitBtn.dataset.requestId;
+  if (!requestId) return;
+  if (!rescheduleStartDate.value) {
+    rescheduleError.textContent = 'Please pick a start date.';
+    rescheduleError.classList.remove('hidden');
+    return;
+  }
+  rescheduleError.classList.add('hidden');
+  rescheduleSubmitBtn.disabled = true;
+  const originalLabel = rescheduleSubmitBtn.innerHTML;
+  rescheduleSubmitBtn.innerHTML = '<span class="loader loader-sm on-brand" style="vertical-align: middle; margin-right: 6px;"></span>Saving...';
+  try {
+    await apiRequest_('PATCH', '/leave-requests/' + requestId + '/reschedule', {
+      startDate: rescheduleStartDate.value,
+      endDate: rescheduleEndDate.value || rescheduleStartDate.value
+    });
+    closeRescheduleModal_();
+    showToast_('Rescheduled - sent back to your manager.', 'success');
+    loadMyLeavesData_();
+  } catch (err) {
+    rescheduleError.textContent = err.message || 'Could not reschedule this request.';
+    rescheduleError.classList.remove('hidden');
+  } finally {
+    rescheduleSubmitBtn.disabled = false;
+    rescheduleSubmitBtn.innerHTML = originalLabel;
+  }
 });
 
 // ---------- Password visibility toggles ----------

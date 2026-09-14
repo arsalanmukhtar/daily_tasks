@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/providers.dart';
 import '../../../widgets/filter_pill.dart';
 import '../manager_providers.dart';
+import 'widgets/late_notice_card.dart';
 import 'widgets/report_cards.dart';
 
 /// Three stacked sections - Needs your decision (explained) / Open reports
@@ -27,6 +28,11 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
     final roster = ref.watch(rosterProvider).valueOrNull ?? const [];
     final query = ref.watch(globalSearchQueryProvider);
     final uninformedRepo = ref.watch(uninformedLeaveRepositoryProvider);
+    final lateNoticesRepo = ref.watch(lateArrivalNoticesRepositoryProvider);
+    final lateNotices = (ref.watch(allLateArrivalNoticesProvider).valueOrNull ?? const [])
+        .where((n) => _developerFilter == null || n.email == _developerFilter)
+        .toList()
+      ..sort((a, b) => (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
 
     return reportsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -104,6 +110,17 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
                       if (mounted) setState(() => _showNewReport = false);
                     },
               ),
+            if (lateNotices.isNotEmpty) ...[
+              _sectionHeader(
+                context,
+                'Late notices',
+                lateNotices.where((n) => n.status == 'submitted').length,
+                subtitle: lateNotices.any((n) => n.status == 'submitted') ? null : 'All acknowledged',
+              ),
+              for (final n in lateNotices)
+                LateNoticeCard(notice: n, onAcknowledge: () => lateNoticesRepo.acknowledge(n.id)),
+              const SizedBox(height: 12),
+            ],
             if (explained.isNotEmpty) ...[
               _sectionHeader(context, 'Needs your decision', explained.length),
               for (final r in explained)
@@ -132,7 +149,8 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
               ),
               for (final r in resolved) ResolvedReportCard(report: r),
             ],
-            if (explained.isEmpty &&
+            if (lateNotices.isEmpty &&
+                explained.isEmpty &&
                 open.isEmpty &&
                 resolved.isEmpty &&
                 !_showNewReport)
