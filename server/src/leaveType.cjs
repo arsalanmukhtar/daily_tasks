@@ -8,7 +8,8 @@ const LABELS = {
   medical: 'Medical',
   casualShort: 'Short Leave',
   casualFull: 'Full Leave',
-  uninformedAbsence: 'Uninformed Leave'
+  uninformedAbsence: 'Uninformed Leave',
+  emergency: 'Emergency Leave'
 };
 const ALIASES = { short: 'casualShort', full: 'casualFull' };
 

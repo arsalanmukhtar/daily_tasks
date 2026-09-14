@@ -1238,7 +1238,8 @@ const LEAVE_TYPES = {
   casualOutPass: 'Out Pass',
   // Written only by push-daemon (Admin SDK) once an uninformed-leave report
   // is resolved - never created directly by this app.
-  uninformedAbsence: 'Uninformed Leave'
+  uninformedAbsence: 'Uninformed Leave',
+  emergency: 'Emergency Leave'
 };
 const LEAVE_TYPE_ALIASES = { short: 'casualShort', full: 'casualFull' };
 function normalizeLeaveType_(type) {
