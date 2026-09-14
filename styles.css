@@ -4,8 +4,8 @@
    designed against. Existing untouched sections of this file keep their
    hardcoded hex literals - only new components below use these vars. */
 :root {
-  --brand-600: #6F6A5D; --brand-700: #5C574C; --brand-800: #49453C;
-  --brand-50: #F9F8F6;  --brand-100: #EEECE8; --brand-200: #AAA69D;
+  --brand-600: #E15F41; --brand-700: #C94526; --brand-800: #9F3A23;
+  --brand-50: #FCF4F3;  --brand-100: #F9E6E2; --brand-200: #F3C8BF;
 
   --ink-900: #0F172A; --ink-800: #1E293B; --ink-700: #334155;
   --ink-600: #475569; --ink-500: #64748B; --ink-400: #94A3B8;
@@ -24,7 +24,7 @@
 
   /* duration / file-meta secondaries (new) */
   --d-short: #0369A1; --d-short-bg: #E7F1F8;
-  --d-full: #352D5D;  --d-full-bg: #E8E6F5;
+  --d-full: #274A68;  --d-full-bg: #E3EEF7;
   --d-outpass: #0F766E; --d-outpass-bg: #E3F4F2;
   --meta: #54657A;    --meta-bg: #EDF1F5; --meta-bd: #D9E1E9;
 
@@ -32,8 +32,8 @@
      this gives the calendar and timer selection a place to use a distinct
      color for secondary emphasis (today marker, quick-duration presets,
      the custom-dates strip) instead of orange for literally everything. */
-  --indigo-600: #574B90; --indigo-700: #463C77; --indigo-800: #352D5D;
-  --indigo-50: #F5F4FB;  --indigo-100: #E8E6F5; --indigo-200: #CFC9E8;
+  --indigo-600: #40739E; --indigo-700: #335F84; --indigo-800: #274A68;
+  --indigo-50: #F3F8FC;  --indigo-100: #E3EEF7; --indigo-200: #C5DAED;
 
   --r-sm: 8px; --r-md: 10px; --r-lg: 14px; --r-xl: 18px;
   --sh-1: 0 1px 2px rgba(15, 23, 42, .05);
@@ -109,11 +109,11 @@ textarea {
   padding: 0;
 }
 .tb-btn:hover { background: #e2e8f0; color: #1e293b; }
-.tb-btn:focus { outline: none; box-shadow: 0 0 0 1px #9C978C; }
+.tb-btn:focus { outline: none; box-shadow: 0 0 0 1px #ECA393; }
 .tb-btn.active {
-  background: #EEECE8;
-  color: #49453C;
-  border-color: #9C978C;
+  background: #F9E6E2;
+  color: #9F3A23;
+  border-color: #ECA393;
 }
 
 /* Color buttons: stack a letter/icon on top of a thin bar showing the
@@ -182,7 +182,7 @@ textarea {
 }
 .tb-color-palette .default-swatch:hover {
   transform: scale(1.12);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), 0 0 0 2px #9C978C;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), 0 0 0 2px #ECA393;
 }
 /* For the highlight palette: same square but with the universal "no fill"
    diagonal slash on white. Toggled via JS by adding `.transparent-style`. */
@@ -216,7 +216,7 @@ textarea {
 }
 .tb-color-palette .swatch:hover {
   transform: scale(1.12);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), 0 0 0 2px #9C978C;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), 0 0 0 2px #ECA393;
 }
 
 /* Column headers - duo-tone: slate-100 surface, slate-800 day name, slate-500 date */
@@ -258,11 +258,11 @@ textarea {
 }
 /* Today's column header - orange accent + top bar so the current day pops. */
 .tb-th.is-today {
-  background: #F9F8F6;
-  box-shadow: inset 0 3px 0 #6F6A5D;
+  background: #FCF4F3;
+  box-shadow: inset 0 3px 0 #E15F41;
 }
-.tb-th.is-today .tb-day  { color: #5C574C; }
-.tb-th.is-today .tb-date { color: #6F6A5D; }
+.tb-th.is-today .tb-day  { color: #C94526; }
+.tb-th.is-today .tb-date { color: #E15F41; }
 
 /* Rows: duo-tone striping (white + slate-50). Hovering the row reveals the × button. */
 .task-row { background: #ffffff; }
@@ -298,8 +298,8 @@ textarea {
   pointer-events: none;
 }
 .cell-editor:focus {
-  background: #F9F8F6;
-  box-shadow: inset 0 0 0 1px #9C978C;
+  background: #FCF4F3;
+  box-shadow: inset 0 0 0 1px #ECA393;
 }
 
 /* Future-day lock - weekday columns that haven't happened yet (e.g. this
@@ -626,16 +626,16 @@ textarea {
   border-radius: 0.55rem;
 }
 .weekday-row.is-today {
-  background: #F9F8F6;
-  box-shadow: inset 0 0 0 1px #AAA69D;
+  background: #FCF4F3;
+  box-shadow: inset 0 0 0 1px #F3C8BF;
 }
 .weekday-today-tag {
   font-size: 9px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #5C574C;
-  background: #AAA69D;
+  color: #C94526;
+  background: #F3C8BF;
   padding: 2px 6px;
   border-radius: 999px;
 }
@@ -678,7 +678,7 @@ textarea {
 }
 .leaves-rail-btn svg { width: 18px; height: 18px; }
 .leaves-rail-btn:hover { background: #fff; color: var(--ink-600); }
-.leaves-rail-btn.is-active { background: var(--brand-200); color: #3d3a33; box-shadow: 0 2px 6px rgba(170, 166, 157, .35); }
+.leaves-rail-btn.is-active { background: var(--brand-200); color: #762E1E; box-shadow: 0 2px 6px rgba(243, 200, 191, .35); }
 
 /* Plain notification dot (not a count) - flags that the rail's "Explain the
    Absence" tab has something open needing the developer's attention. */
@@ -697,10 +697,10 @@ textarea {
 }
 .select-pro-trigger:focus {
   outline: none;
-  border-color: #6F6A5D;
+  border-color: #E15F41;
 }
 .select-pro.open .select-pro-trigger {
-  border-color: #6F6A5D;
+  border-color: #E15F41;
 }
 .select-pro.open #designationChevron {
   transform: rotate(180deg);
@@ -744,17 +744,17 @@ textarea {
   user-select: none;
 }
 .select-pro-menu li:hover {
-  background: #F9F8F6;
-  color: #49453C;
+  background: #FCF4F3;
+  color: #9F3A23;
 }
 .select-pro-menu li.selected {
-  background: #EEECE8;
-  color: #49453C;
+  background: #F9E6E2;
+  color: #9F3A23;
   font-weight: 600;
 }
 .select-pro-menu li.selected::after {
   content: "✓";
-  color: #6F6A5D;
+  color: #E15F41;
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -784,9 +784,9 @@ textarea {
 .ew-trigger:focus-visible,
 .ew-trigger.is-open {
   outline: none;
-  border-color: #8E887B;                       /* orange-400 - modal accent */
+  border-color: #E6826B;                       /* orange-400 - modal accent */
 }
-.ew-trigger-icon { width: 16px; height: 16px; flex-shrink: 0; color: #6F6A5D; }
+.ew-trigger-icon { width: 16px; height: 16px; flex-shrink: 0; color: #E15F41; }
 .ew-trigger-label {
   flex: 1 1 auto;
   min-width: 0;
@@ -835,7 +835,7 @@ textarea {
   white-space: nowrap;
 }
 .ew-option + .ew-option { margin-top: 1px; }
-.ew-option:hover { background: #F9F8F6; color: #49453C; }
+.ew-option:hover { background: #FCF4F3; color: #9F3A23; }
 .ew-option:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 2px rgba(251, 146, 60, 0.55);
@@ -844,12 +844,12 @@ textarea {
   width: 15px;
   height: 15px;
   flex-shrink: 0;
-  color: #6F6A5D;
+  color: #E15F41;
   opacity: 0;
 }
 .ew-option.is-selected {
-  background: #EEECE8;                          /* orange-100 */
-  color: #49453C;                               /* orange-800 */
+  background: #F9E6E2;                          /* orange-100 */
+  color: #9F3A23;                               /* orange-800 */
   font-weight: 700;
 }
 .ew-option.is-selected .ew-option-check { opacity: 1; }
@@ -1029,7 +1029,7 @@ textarea {
   transition: background 120ms, color 120ms, border-color 120ms, box-shadow 120ms;
 }
 .an-range-btn:hover { border-color: #cbd5e1; background: #f8fafc; }
-.an-range-btn:focus-visible { outline: none; box-shadow: 0 0 0 1px #9C978C; }
+.an-range-btn:focus-visible { outline: none; box-shadow: 0 0 0 1px #ECA393; }
 .an-range-btn.is-active {
   background: #334155;
   border-color: #334155;
@@ -1061,8 +1061,8 @@ textarea {
 /* Existing .an-range-btn transition (background/color/border-color 120ms)
    already covers this state change - no extra rule needed. */
 .an-range-btn.is-btn-success {
-  background: #6F6A5D;
-  border-color: #6F6A5D;
+  background: #16a34a;
+  border-color: #16a34a;
   color: #ffffff;
 }
 
@@ -1113,9 +1113,9 @@ textarea {
 }
 .an-tab-btn:hover { background: #f8fafc; color: #334155; }
 .an-tab-btn.is-active {
-  background: #F9F8F6;
-  color: #49453C;
-  box-shadow: inset 0 -2px 0 #6F6A5D;
+  background: #FCF4F3;
+  color: #9F3A23;
+  box-shadow: inset 0 -2px 0 #E15F41;
 }
 
 .an-custom-list-head {
@@ -1161,7 +1161,7 @@ textarea {
 .an-custom-search:focus {
   outline: none;
   background: #ffffff;
-  border-color: #8E887B;
+  border-color: #E6826B;
 }
 
 /* Ranked developer option: a small colour dot (rank-coloured, same palette
@@ -1265,7 +1265,7 @@ textarea {
   font-size: 10.5px;
   font-weight: 600;
 }
-.an-kpi-sub.is-up   { color: #5C574C; }
+.an-kpi-sub.is-up   { color: #15803d; }
 .an-kpi-sub.is-down { color: #b91c1c; }
 .an-kpi-sub.is-flat { color: #94a3b8; }
 
@@ -1283,8 +1283,8 @@ textarea {
   line-height: 1.45;
 }
 .an-highlight strong { font-weight: 700; color: #1e293b; }
-.an-highlight[data-tone="peak"]  { border-left-color: #6F6A5D; background: #F9F8F6; }
-.an-highlight[data-tone="good"]  { border-left-color: #5C574C; background: #F9F8F6; }
+.an-highlight[data-tone="peak"]  { border-left-color: #E15F41; background: #FCF4F3; }
+.an-highlight[data-tone="good"]  { border-left-color: #15803d; background: #f0fdf4; }
 .an-highlight[data-tone="warn"]  { border-left-color: #dc2626; background: #fef2f2; }
 .an-highlight-body { display: flex; flex-direction: column; gap: 0.45rem; min-width: 0; }
 .an-highlight-title { font-weight: 700; color: #1e293b; }
@@ -1460,12 +1460,12 @@ textarea {
   text-align: center;
 }
 .lv-btn.is-idle {
-  background: #6F6A5D;
-  border-color: #6F6A5D;
+  background: #16a34a;
+  border-color: #16a34a;
   color: #ffffff;
   font-weight: 700;
 }
-.lv-btn.is-idle:hover { background: #5C574C; border-color: #5C574C; }
+.lv-btn.is-idle:hover { background: #15803d; border-color: #15803d; }
 .lv-btn.is-requested {
   background: #fef3c7;
   border-color: #fde68a;
@@ -1473,9 +1473,9 @@ textarea {
   cursor: default;
 }
 .lv-btn.is-approved {
-  background: #EEECE8;
-  border-color: #9C978C;
-  color: #49453C;
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #166534;
   cursor: default;
 }
 .lv-btn.is-rejected {
@@ -1497,7 +1497,7 @@ textarea {
   transition: background-color 150ms, border-color 150ms, color 150ms;
 }
 .lv-type-btn:hover:not(:disabled) { background: #f8fafc; border-color: #94a3b8; }
-.lv-type-btn.is-selected { background: #F9F8F6; border-color: #8E887B; color: #5C574C; }
+.lv-type-btn.is-selected { background: #FCF4F3; border-color: #E6826B; color: #C94526; }
 .lv-type-btn.is-disabled,
 .lv-type-btn:disabled {
   opacity: 0.5;
@@ -1527,10 +1527,10 @@ textarea {
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  border: 1px solid #9C978C;
+  border: 1px solid #ECA393;
   border-radius: 0.65rem;
-  background: #F9F8F6;
-  color: #5C574C;
+  background: #FCF4F3;
+  color: #C94526;
   font-size: 0.8125rem;
   font-weight: 600;
 }
@@ -1540,10 +1540,10 @@ textarea {
   height: 1.25rem;
   line-height: 1;
   border-radius: 999px;
-  color: #5C574C;
+  color: #C94526;
   font-size: 1rem;
 }
-.lv-attachment-chip button:hover { background: #AAA69D; }
+.lv-attachment-chip button:hover { background: #F3C8BF; }
 
 .lv-type-sub-btn { padding: 0.45rem 0.75rem; font-size: 0.75rem; }
 
@@ -1627,7 +1627,7 @@ textarea {
   transition: opacity 300ms ease, transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .toast.is-visible { opacity: 1; transform: translateY(0); }
-.toast.is-success { background: #49453C; }
+.toast.is-success { background: #166534; }
 .toast.is-error   { background: #b42318; }
 .toast.is-warning { background: #b54708; }
 .toast-icon { width: 1rem; height: 1rem; flex-shrink: 0; margin-top: 0.06rem; }

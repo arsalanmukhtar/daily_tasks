@@ -736,7 +736,7 @@ const FORE_COLORS = [
   '#78350f', // Brown
   '#991b1b', // Burgundy
   '#b45309', // Dark amber
-  '#49453C', // Forest
+  '#166534', // Forest
   '#115e59', // Teal
   '#1e3a8a', // Navy
   '#5b21b6', // Royal purple
@@ -745,13 +745,13 @@ const FORE_COLORS = [
 const HILITE_COLORS = [
   '#fef9c3', // Pale yellow
   '#fef3c7', // Cream
-  '#EEECE8', // Peach
+  '#ffedd5', // Peach
   '#fecdd3', // Soft pink
   '#fce7f3', // Light pink
   '#f3e8ff', // Lavender
-  '#E8E6F5', // Periwinkle
+  '#e0e7ff', // Periwinkle
   '#dbeafe', // Sky
-  '#E8E6F5', // Cyan
+  '#cffafe', // Cyan
   '#d1fae5', // Mint
   '#ecfccb', // Sage
   '#f5f5f4'  // Stone
@@ -6063,9 +6063,9 @@ document.addEventListener('keydown', function (e) {
 // ========================================================================
 
 const AN_DEV_COLORS = [
-  '#6F6A5D', '#574B90', '#7c3aed', '#5C574C', '#be123c',
-  '#0284c7', '#a16207', '#463C77', '#0d9488', '#5C574C',
-  '#65a30d', '#9333ea', '#0369a1', '#49453C', '#b45309'
+  '#ea580c', '#0891b2', '#7c3aed', '#15803d', '#be123c',
+  '#0284c7', '#a16207', '#4338ca', '#0d9488', '#c2410c',
+  '#65a30d', '#9333ea', '#0369a1', '#166534', '#b45309'
 ];
 
 let analyticsCache = null;      // { roster, submissions } from the analytics endpoint
@@ -6242,8 +6242,8 @@ function shortWeekLabel_(w) {
 function heatColor_(v, maxVal) {
   if (v <= 0) return '#fee2e2'; // submitted, but zero items logged - pale red flag
   const t = Math.min(1, v / maxVal);
-  const r1 = 255, g1 = 237, b1 = 213; // orange-100
-  const r2 = 194, g2 = 65,  b2 = 12;  // orange-700
+  const r1 = 249, g1 = 230, b1 = 226; // orange-100
+  const r2 = 201, g2 = 69,  b2 = 38;  // orange-700
   const r = Math.round(r1 + (r2 - r1) * t);
   const g = Math.round(g1 + (g2 - g1) * t);
   const b = Math.round(b1 + (b2 - b1) * t);
@@ -6251,9 +6251,9 @@ function heatColor_(v, maxVal) {
 }
 
 function colorForRank_(i, total) {
-  if (i === 0) return '#6F6A5D';                 // top - accent orange
+  if (i === 0) return '#E15F41';                 // top - accent orange
   if (total > 1 && i === total - 1) return '#94a3b8'; // last - muted slate, not alarm red
-  return '#9C978C';                               // mid pack - soft orange
+  return '#ECA393';                               // mid pack - soft orange
 }
 
 // Returns { startMs, endMs } for the given filter - either bound may be null
@@ -6565,8 +6565,8 @@ function renderTeamTrendChart_(model, Chart) {
       datasets: [{
         label: 'Tasks logged',
         data: model.weeks.map(function (w) { return model.teamWeekly[w.key] || 0; }),
-        borderColor: '#6F6A5D', backgroundColor: 'rgba(111, 106, 93, 0.12)',
-        fill: true, tension: 0.35, pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: '#6F6A5D'
+        borderColor: '#E15F41', backgroundColor: 'rgba(225, 95, 65, 0.12)',
+        fill: true, tension: 0.35, pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: '#E15F41'
       }]
     },
     options: {
@@ -6658,7 +6658,7 @@ function renderDowChart_(model, Chart) {
     type: 'bar',
     data: {
       labels: order.map(function (d) { return TASK_DAY_LONG[d]; }),
-      datasets: [{ data: order.map(function (d) { return model.dowTotals[d] || 0; }), backgroundColor: '#8E887B', borderRadius: 8, maxBarThickness: 46 }]
+      datasets: [{ data: order.map(function (d) { return model.dowTotals[d] || 0; }), backgroundColor: '#E6826B', borderRadius: 8, maxBarThickness: 46 }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
