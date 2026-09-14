@@ -199,6 +199,31 @@ const rescheduleCalFooterLabel   = document.getElementById('rescheduleCalFooterL
 const rescheduleCalClearBtn      = document.getElementById('rescheduleCalClearBtn');
 const rescheduleError      = document.getElementById('rescheduleError');
 const rescheduleSubmitBtn  = document.getElementById('rescheduleSubmitBtn');
+const rescheduleShortTimeField    = document.getElementById('rescheduleShortTimeField');
+const rescheduleShortTimeTrigger  = document.getElementById('rescheduleShortTimeTrigger');
+const rescheduleShortTimeLabel    = document.getElementById('rescheduleShortTimeLabel');
+const rescheduleShortTimePopover  = document.getElementById('rescheduleShortTimePopover');
+const rescheduleShortTimeHourCol  = document.getElementById('rescheduleShortTimeHourCol');
+const rescheduleShortTimeMinuteCol = document.getElementById('rescheduleShortTimeMinuteCol');
+const rescheduleShortTimeAmpmCol  = document.getElementById('rescheduleShortTimeAmpmCol');
+const rescheduleOutPassTimeFields = document.getElementById('rescheduleOutPassTimeFields');
+const rescheduleCheckOutTrigger   = document.getElementById('rescheduleCheckOutTrigger');
+const rescheduleCheckOutLabel     = document.getElementById('rescheduleCheckOutLabel');
+const rescheduleCheckOutPopover   = document.getElementById('rescheduleCheckOutPopover');
+const rescheduleCheckOutHourCol   = document.getElementById('rescheduleCheckOutHourCol');
+const rescheduleCheckOutMinuteCol = document.getElementById('rescheduleCheckOutMinuteCol');
+const rescheduleCheckOutAmpmCol   = document.getElementById('rescheduleCheckOutAmpmCol');
+const rescheduleCheckInTrigger    = document.getElementById('rescheduleCheckInTrigger');
+const rescheduleCheckInLabel      = document.getElementById('rescheduleCheckInLabel');
+const rescheduleCheckInPopover    = document.getElementById('rescheduleCheckInPopover');
+const rescheduleCheckInHourCol    = document.getElementById('rescheduleCheckInHourCol');
+const rescheduleCheckInMinuteCol  = document.getElementById('rescheduleCheckInMinuteCol');
+const rescheduleCheckInAmpmCol    = document.getElementById('rescheduleCheckInAmpmCol');
+// ---------- Custom-dates reschedule warning (Apply tab) ----------
+const customDatesWarningModal        = document.getElementById('customDatesWarningModal');
+const customDatesWarningBackdrop     = document.getElementById('customDatesWarningBackdrop');
+const customDatesWarningCancelBtn    = document.getElementById('customDatesWarningCancelBtn');
+const customDatesWarningContinueBtn  = document.getElementById('customDatesWarningContinueBtn');
 
 // ---------- Replacement (cover person) ----------
 const leaveReplacementTrigger  = document.getElementById('leaveReplacementTrigger');
@@ -2435,7 +2460,8 @@ function applyLeaveRecordPatch_(updated) {
   if (!latestLeaveStatusData || !updated || !updated.requestId) return;
   const fields = [
     'status', 'startDate', 'endDate', 'customDates', 'rescheduled', 'allowReschedule',
-    'resolvedAt', 'resolvedBy', 'decisionNote', 'dismissed', 'withdrawnAt', 'docsDueAt'
+    'resolvedAt', 'resolvedBy', 'decisionNote', 'dismissed', 'withdrawnAt', 'docsDueAt',
+    'halfDayPeriod', 'shortLeaveTime', 'checkOutTime', 'checkInTime'
   ];
   const patchOne = function (rec) {
     fields.forEach(function (f) { if (f in updated) rec[f] = updated[f]; });
@@ -3226,9 +3252,16 @@ function renderMyLeaveCard_(rec) {
     // A manager can grant exactly one reschedule alongside a rejection (see
     // server/src/routes/leaveRequests.js's /:id/decide + /:id/reschedule) -
     // once used, `rescheduled` flips true and this button stops showing.
+    // Custom (non-contiguous multi-date) requests can never be rescheduled
+    // (a contiguous [start,end] pair can't represent an arbitrary picked
+    // set of days, and the reschedule popover has no Custom UI) - shown as
+    // a muted explanatory note instead of an actionable button, so it isn't
+    // confusing why a manager-granted reschedule has nothing to click.
+    const isCustomDates = Array.isArray(rec.customDates) && rec.customDates.length > 1;
     const rescheduleBtn = (rec.status === 'rejected' && rec.allowReschedule && !rec.rescheduled)
-      ? '<button type="button" class="mini brand lv-reschedule-btn" data-request-id="' + escapeHtml(rec.requestId) +
-        '" data-start-date="' + escapeHtml(rec.startDate || '') + '" data-end-date="' + escapeHtml(rec.endDate || '') + '">Reschedule</button>'
+      ? (isCustomDates
+        ? '<span class="mini text-xs text-slate-400 italic">Custom-dates requests can\'t be rescheduled</span>'
+        : '<button type="button" class="mini brand lv-reschedule-btn" data-request-id="' + escapeHtml(rec.requestId) + '">Reschedule</button>')
       : '';
     actions = rescheduleBtn + (rec.dismissed
       ? ''
@@ -3393,7 +3426,12 @@ myLeavesList.addEventListener('click', (e) => {
   }
   const rescheduleBtn = e.target.closest('.lv-reschedule-btn');
   if (rescheduleBtn) {
-    openRescheduleModal_(rescheduleBtn.dataset.requestId, rescheduleBtn.dataset.startDate, rescheduleBtn.dataset.endDate);
+    // Looked up from the already-fetched list (rather than re-serializing
+    // type/customDates/time fields into data-* attributes) so the modal has
+    // everything it needs to pick the right mode - see openRescheduleModal_.
+    const allRecords = (latestLeaveStatusData && latestLeaveStatusData.allRecords) || [];
+    const rec = allRecords.find(function (r) { return r.requestId === rescheduleBtn.dataset.requestId; });
+    if (rec) openRescheduleModal_(rec);
     return;
   }
   const addDocsBtn = e.target.closest('.lv-add-docs-btn');
@@ -3510,6 +3548,26 @@ leaveSendBtn.addEventListener('click', async () => {
     showErrorToast_('Check-in time must be after check-out time.');
     return;
   }
+  // Custom (non-contiguous multi-date) requests can never be rescheduled
+  // later if rejected (see server/src/routes/leaveRequests.js's
+  // /:id/reschedule and renderMyLeaveCard_'s rescheduleBtn condition) -
+  // this is the one moment to warn, before the request even exists, rather
+  // than a missing Reschedule button surprising them after a rejection.
+  if (leaveDateMode === 'multiple' && leaveSelectedDates.length > 1) {
+    customDatesWarningModal.classList.remove('hidden');
+    return;
+  }
+  await submitLeaveRequest_();
+});
+
+customDatesWarningCancelBtn.addEventListener('click', () => customDatesWarningModal.classList.add('hidden'));
+customDatesWarningBackdrop.addEventListener('click', () => customDatesWarningModal.classList.add('hidden'));
+customDatesWarningContinueBtn.addEventListener('click', async () => {
+  customDatesWarningModal.classList.add('hidden');
+  await submitLeaveRequest_();
+});
+
+async function submitLeaveRequest_() {
   const startDate = leaveSelectedDates[0];
   const endDate = leaveSelectedDates[leaveSelectedDates.length - 1];
   const weekLabel = weekLabelFromDate_(startDate);
@@ -3579,7 +3637,7 @@ leaveSendBtn.addEventListener('click', async () => {
     leaveCancelBtn.disabled = false;
     leaveSendBtn.textContent = originalLabel;
   }
-});
+}
 
 // True when `date` (a UTC calendar date) is the user's current local day.
 function isTodayDate(date) {
@@ -4715,20 +4773,29 @@ submitDocsSubmitBtn.addEventListener('click', async () => {
   }
 });
 
-// ---------- Reschedule modal: custom range-select date popover ----------
+// ---------- Reschedule modal: custom date popover (single or range) ----------
 // Same reasoning as the late-notice date/time popovers above - a native
 // <input type="date"> pair can't be themed to match the app, so this reuses
-// the .cal2-* calendar look with a lightweight range-click behavior (first
-// click sets the start, a second click completes [min, max]), mirroring
-// the Apply-for-Leave calendar's own Range mode (see lcalPickDate_).
+// the .cal2-* calendar look. The modal adapts to whichever mode the
+// *original* request used rather than offering a mode toggle: Short
+// Leave/Out Pass (always single-day) and a request that was originally a
+// single date both get a one-click picker; a request that was originally a
+// contiguous range gets the two-click range picker (mirrors the
+// Apply-for-Leave calendar's own Range mode - see lcalPickDate_). Custom
+// (non-contiguous multi-date) requests never reach this modal at all - see
+// renderMyLeaveCard_'s rescheduleBtn condition and the server-side check in
+// PATCH /:id/reschedule.
 let rescheduleSelectedDates = []; // [] | [start] | [start, end], plain JS Date objects
 let rescheduleCalViewYear, rescheduleCalViewMonth;
+let rescheduleMode = 'single'; // 'single' | 'range' - set by openRescheduleModal_ from the original request
+let rescheduleType = 'casualFull'; // the original request's leave type
 // openRescheduleModal_ pre-fills rescheduleSelectedDates with the request's
 // *current* dates so the trigger label/grid show something meaningful
 // before the user touches anything - but that means length can already be 1
 // (or 2) the moment the popover opens. Without this flag, the very first
-// tap in a fresh popover session would be misread as "completing" a range
-// against those old, unrelated dates instead of starting a new pick.
+// tap in a fresh popover session (in 'range' mode) would be misread as
+// "completing" a range against those old, unrelated dates instead of
+// starting a new pick.
 let rescheduleFreshPick = true;
 
 function rcDateKey_(d) { return d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate(); }
@@ -4744,7 +4811,7 @@ function rescheduleRenderCalGrid_() {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const todayKey = rcDateKey_(today);
   const start = rescheduleSelectedDates.length ? rescheduleSelectedDates[0] : null;
-  const end = rescheduleSelectedDates.length > 1 ? rescheduleSelectedDates[1] : null;
+  const end = rescheduleMode === 'range' && rescheduleSelectedDates.length > 1 ? rescheduleSelectedDates[1] : null;
   const hasRange = start && end && rcDateKey_(start) !== rcDateKey_(end);
 
   let html = '';
@@ -4778,14 +4845,27 @@ function rescheduleRenderCalGrid_() {
 
   if (!rescheduleSelectedDates.length) {
     rescheduleCalFooterLabel.innerHTML = '<em>No dates selected</em>';
-  } else if (rescheduleSelectedDates.length === 1) {
+  } else if (rescheduleMode === 'range' && rescheduleSelectedDates.length === 1) {
     rescheduleCalFooterLabel.innerHTML = rcShortFmt_(start) + ' <em>&ndash; pick an end date</em>';
-  } else {
+  } else if (rescheduleMode === 'range') {
     rescheduleCalFooterLabel.textContent = rcShortFmt_(start) + ' – ' + rcShortFmt_(end) + ' ' + end.getFullYear();
+  } else {
+    rescheduleCalFooterLabel.textContent = rcShortFmt_(start) + ' ' + start.getFullYear();
   }
 }
 
 function rcPickDate_(date) {
+  if (rescheduleMode === 'single') {
+    rescheduleFreshPick = false;
+    rescheduleSelectedDates = [date];
+    rescheduleRenderCalGrid_();
+    rescheduleUpdateTriggerLabel_();
+    // A single-day pick always closes itself - same "closes on pick"
+    // behavior as the late-notice date popover (see pickLnDate_), since
+    // there's no second click to wait for.
+    closeRescheduleDatesPopover_();
+    return;
+  }
   const completingRange = !rescheduleFreshPick && rescheduleSelectedDates.length === 1;
   rescheduleFreshPick = false;
   if (!completingRange) {
@@ -4854,18 +4934,143 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// ---------- Reschedule modal: generic time-column popover ----------
+// Same 3-column hour/minute/AM-PM pattern as the late-arrival-notice time
+// popover above, generalized into a factory since the reschedule modal
+// needs up to two independent instances at once (Out Pass's check-out and
+// check-in). Each instance owns its own DOM nodes and its own {hour12,
+// minute, period} state - no shared globals, unlike the late-notice one-off.
+function createRescheduleTimePicker_(cols, trigger, label, popover) {
+  let value = null; // {hour12, minute, period} | null
+
+  function render() {
+    cols.hour.innerHTML = LN_HOURS.map((h) =>
+      `<button type="button" data-hour="${h}" class="${value && h === value.hour12 ? 'is-selected' : ''}">${String(h).padStart(2, '0')}</button>`
+    ).join('');
+    cols.minute.innerHTML = LN_MINUTES.map((m) =>
+      `<button type="button" data-minute="${m}" class="${value && m === value.minute ? 'is-selected' : ''}">${String(m).padStart(2, '0')}</button>`
+    ).join('');
+    cols.ampm.innerHTML = ['AM', 'PM'].map((p) =>
+      `<button type="button" data-ampm="${p}" class="${value && p === value.period ? 'is-selected' : ''}">${p}</button>`
+    ).join('');
+  }
+  function updateLabel() {
+    if (!value) { label.textContent = 'Select time'; label.classList.add('text-slate-400'); return; }
+    label.textContent = value.hour12 + ':' + String(value.minute).padStart(2, '0') + ' ' + value.period;
+    label.classList.remove('text-slate-400');
+  }
+  function pick(patch) {
+    value = Object.assign({ hour12: 9, minute: 0, period: 'AM' }, value, patch);
+    render();
+    updateLabel();
+  }
+  cols.hour.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-hour]');
+    if (!btn) return;
+    e.stopPropagation();
+    pick({ hour12: Number(btn.dataset.hour) });
+  });
+  cols.minute.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-minute]');
+    if (!btn) return;
+    e.stopPropagation();
+    pick({ minute: Number(btn.dataset.minute) });
+  });
+  cols.ampm.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-ampm]');
+    if (!btn) return;
+    e.stopPropagation();
+    pick({ period: btn.dataset.ampm });
+  });
+  function open() {
+    render();
+    popover.classList.remove('hidden');
+    requestAnimationFrame(() => {
+      popover.querySelectorAll('.is-selected').forEach((el) => el.scrollIntoView({ block: 'center' }));
+    });
+  }
+  function close() { popover.classList.add('hidden'); }
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    popover.classList.contains('hidden') ? open() : close();
+  });
+  document.addEventListener('click', (e) => {
+    if (!popover.classList.contains('hidden') && !popover.contains(e.target) && e.target !== trigger) close();
+  });
+
+  return {
+    close: close,
+    getValue: function () { return value; },
+    // Accepts "8:30 AM" / "12:45 PM" (see leaveTimeLabel_'s format) or null.
+    setValue: function (str) {
+      const m = typeof str === 'string' && /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(str.trim());
+      value = m ? { hour12: Number(m[1]), minute: Number(m[2]), period: m[3].toUpperCase() } : null;
+      render();
+      updateLabel();
+    },
+    // "HH:MM AM/PM" string the API expects, or '' if never touched.
+    formatValue: function () {
+      return value ? value.hour12 + ':' + String(value.minute).padStart(2, '0') + ' ' + value.period : '';
+    },
+    to24Minutes: function () {
+      if (!value) return null;
+      const h = (value.hour12 % 12) + (value.period === 'PM' ? 12 : 0);
+      return h * 60 + value.minute;
+    }
+  };
+}
+
+const rescheduleShortTimeCtl_ = createRescheduleTimePicker_(
+  { hour: rescheduleShortTimeHourCol, minute: rescheduleShortTimeMinuteCol, ampm: rescheduleShortTimeAmpmCol },
+  rescheduleShortTimeTrigger, rescheduleShortTimeLabel, rescheduleShortTimePopover
+);
+const rescheduleCheckOutCtl_ = createRescheduleTimePicker_(
+  { hour: rescheduleCheckOutHourCol, minute: rescheduleCheckOutMinuteCol, ampm: rescheduleCheckOutAmpmCol },
+  rescheduleCheckOutTrigger, rescheduleCheckOutLabel, rescheduleCheckOutPopover
+);
+const rescheduleCheckInCtl_ = createRescheduleTimePicker_(
+  { hour: rescheduleCheckInHourCol, minute: rescheduleCheckInMinuteCol, ampm: rescheduleCheckInAmpmCol },
+  rescheduleCheckInTrigger, rescheduleCheckInLabel, rescheduleCheckInPopover
+);
+
 // ---------- Reschedule modal ----------
-function openRescheduleModal_(requestId, startDate, endDate) {
-  rescheduleSubmitBtn.dataset.requestId = requestId;
-  const s = startDate ? new Date(startDate) : null;
-  const e = endDate ? new Date(endDate) : s;
-  rescheduleSelectedDates = s ? (e && rcDateKey_(e) !== rcDateKey_(s) ? [s, e] : [s]) : [];
+// Adapts to whichever mode the original request needs (see the doc comment
+// on rescheduleMode above): Short Leave/Out Pass get a single-day picker
+// plus their time field(s); anything else gets a single-day or range picker
+// matching whatever the original request was, and no time fields at all.
+function openRescheduleModal_(rec) {
+  rescheduleSubmitBtn.dataset.requestId = rec.requestId;
+  rescheduleType = rec.type;
+  const isPartialDay = rescheduleType === 'casualShort' || rescheduleType === 'casualOutPass';
+  const s = rec.startDate ? new Date(rec.startDate) : null;
+  const e = rec.endDate ? new Date(rec.endDate) : s;
+  rescheduleMode = (isPartialDay || !e || rcDateKey_(e) === rcDateKey_(s)) ? 'single' : 'range';
+  rescheduleSelectedDates = s ? (rescheduleMode === 'range' ? [s, e] : [s]) : [];
   rescheduleUpdateTriggerLabel_();
   closeRescheduleDatesPopover_();
+
+  rescheduleShortTimeField.classList.toggle('hidden', rescheduleType !== 'casualShort');
+  rescheduleOutPassTimeFields.classList.toggle('hidden', rescheduleType !== 'casualOutPass');
+  rescheduleShortTimeCtl_.close();
+  rescheduleCheckOutCtl_.close();
+  rescheduleCheckInCtl_.close();
+  if (rescheduleType === 'casualShort') {
+    rescheduleShortTimeCtl_.setValue(rec.shortLeaveTime);
+  } else if (rescheduleType === 'casualOutPass') {
+    rescheduleCheckOutCtl_.setValue(rec.checkOutTime);
+    rescheduleCheckInCtl_.setValue(rec.checkInTime);
+  }
+
   rescheduleError.classList.add('hidden');
   rescheduleModal.classList.remove('hidden');
 }
-function closeRescheduleModal_() { rescheduleModal.classList.add('hidden'); closeRescheduleDatesPopover_(); }
+function closeRescheduleModal_() {
+  rescheduleModal.classList.add('hidden');
+  closeRescheduleDatesPopover_();
+  rescheduleShortTimeCtl_.close();
+  rescheduleCheckOutCtl_.close();
+  rescheduleCheckInCtl_.close();
+}
 closeRescheduleBtn.addEventListener('click', closeRescheduleModal_);
 rescheduleBackdrop.addEventListener('click', closeRescheduleModal_);
 
@@ -4873,9 +5078,26 @@ rescheduleSubmitBtn.addEventListener('click', async () => {
   const requestId = rescheduleSubmitBtn.dataset.requestId;
   if (!requestId) return;
   if (!rescheduleSelectedDates.length) {
-    rescheduleError.textContent = 'Please pick a start date.';
+    rescheduleError.textContent = 'Please pick a date.';
     rescheduleError.classList.remove('hidden');
     return;
+  }
+  if (rescheduleType === 'casualShort' && !rescheduleShortTimeCtl_.getValue()) {
+    rescheduleError.textContent = 'Please pick a time.';
+    rescheduleError.classList.remove('hidden');
+    return;
+  }
+  if (rescheduleType === 'casualOutPass') {
+    if (!rescheduleCheckOutCtl_.getValue() || !rescheduleCheckInCtl_.getValue()) {
+      rescheduleError.textContent = 'Please pick both a check-out and a check-in time.';
+      rescheduleError.classList.remove('hidden');
+      return;
+    }
+    if (rescheduleCheckOutCtl_.to24Minutes() >= rescheduleCheckInCtl_.to24Minutes()) {
+      rescheduleError.textContent = 'Check-in time must be after check-out time.';
+      rescheduleError.classList.remove('hidden');
+      return;
+    }
   }
   rescheduleError.classList.add('hidden');
   rescheduleSubmitBtn.disabled = true;
@@ -4883,11 +5105,17 @@ rescheduleSubmitBtn.addEventListener('click', async () => {
   rescheduleSubmitBtn.innerHTML = '<span class="loader loader-sm on-brand" style="vertical-align: middle; margin-right: 6px;"></span>Saving...';
   try {
     const start = rescheduleSelectedDates[0];
-    const end = rescheduleSelectedDates.length > 1 ? rescheduleSelectedDates[1] : start;
-    const updated = await apiRequest_('PATCH', '/leave-requests/' + requestId + '/reschedule', {
-      startDate: rcIsoDate_(start),
-      endDate: rcIsoDate_(end)
-    });
+    const end = rescheduleMode === 'range' && rescheduleSelectedDates.length > 1 ? rescheduleSelectedDates[1] : start;
+    const payload = { startDate: rcIsoDate_(start), endDate: rcIsoDate_(end) };
+    if (rescheduleType === 'casualShort') {
+      const t = rescheduleShortTimeCtl_.getValue();
+      payload.halfDayPeriod = t.period;
+      payload.shortLeaveTime = rescheduleShortTimeCtl_.formatValue();
+    } else if (rescheduleType === 'casualOutPass') {
+      payload.checkOutTime = rescheduleCheckOutCtl_.formatValue();
+      payload.checkInTime = rescheduleCheckInCtl_.formatValue();
+    }
+    const updated = await apiRequest_('PATCH', '/leave-requests/' + requestId + '/reschedule', payload);
     closeRescheduleModal_();
     showToast_('Rescheduled - sent back to your manager.', 'success');
     applyLeaveRecordPatch_(updated);

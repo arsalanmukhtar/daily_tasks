@@ -261,19 +261,64 @@ leaveRequestsRouter.patch('/:id/attachments', requireAuth, async (req, res) => {
 // row instead of filing a brand new request. One-shot: `rescheduled` flips
 // true so the same grant can't be used twice: to reschedule again, the
 // manager has to reject it again and grant a fresh one.
+//
+// Custom (non-contiguous multi-date) leaves can never be rescheduled - a
+// contiguous [startDate, endDate] pair can't represent an arbitrary picked
+// set of days, and reschedule has no UI for re-picking one either (see
+// app.js's reschedule popover, which only offers a single day or a
+// range) - checked against both the row's *original* custom_dates and
+// whatever the client just sent, so neither side can smuggle a Custom
+// pick through this route. Short Leave/Out Pass (PARTIAL_DAY_TYPES) are
+// re-checked here for the same reason POST / checks them: the client
+// already restricts its own UI to a single day for these types, but that's
+// only ever a suggestion to a direct API caller.
 leaveRequestsRouter.patch('/:id/reschedule', requireAuth, async (req, res) => {
   const b = req.body || {};
   if (!b.startDate) return res.status(400).json({ error: 'startDate is required.' });
   const customDates = Array.isArray(b.customDates) ? b.customDates : [];
+  if (customDates.length > 1) {
+    return res.status(400).json({ error: "Custom (multi-date) leaves can't be rescheduled - please withdraw and submit a new request." });
+  }
+  const endDate = b.endDate || b.startDate;
+
+  const { rows: existingRows } = await pool.query(
+    `SELECT type, custom_dates FROM leave_requests
+     WHERE id = $1 AND email = $2 AND status = 'rejected' AND allow_reschedule = TRUE AND rescheduled = FALSE`,
+    [req.params.id, req.user.email]
+  );
+  if (existingRows.length === 0) {
+    return res.status(409).json({ error: 'This request is not eligible to be rescheduled.' });
+  }
+  const existing = existingRows[0];
+  if (Array.isArray(existing.custom_dates) && existing.custom_dates.length > 1) {
+    return res.status(409).json({ error: "This is a Custom-dates leave and can't be rescheduled - please withdraw and submit a new request." });
+  }
+  const isPartialDay = PARTIAL_DAY_TYPES.has(existing.type);
+  if (isPartialDay && endDate !== b.startDate) {
+    return res.status(400).json({ error: 'Short Leave and Out Pass can only be rescheduled to a single day.' });
+  }
+
+  // Time fields only ever apply to the two partial-day types - COALESCE
+  // keeps whatever was already stored when the client doesn't send one
+  // (e.g. a Full/Range/Single reschedule never sends these at all).
+  const halfDayPeriod = typeof b.halfDayPeriod === 'string' ? b.halfDayPeriod : null;
+  const shortLeaveTime = typeof b.shortLeaveTime === 'string' ? b.shortLeaveTime : null;
+  const checkOutTime = typeof b.checkOutTime === 'string' ? b.checkOutTime : null;
+  const checkInTime = typeof b.checkInTime === 'string' ? b.checkInTime : null;
 
   const { rows } = await pool.query(
     `UPDATE leave_requests
        SET start_date = $1, end_date = $2, custom_dates = $3, status = 'requested',
            resolved_at = NULL, resolved_by = '', decision_note = '',
-           allow_reschedule = FALSE, rescheduled = TRUE
+           allow_reschedule = FALSE, rescheduled = TRUE,
+           half_day_period = COALESCE($6, half_day_period),
+           short_leave_time = COALESCE($7, short_leave_time),
+           check_out_time = COALESCE($8, check_out_time),
+           check_in_time = COALESCE($9, check_in_time)
      WHERE id = $4 AND email = $5 AND status = 'rejected' AND allow_reschedule = TRUE AND rescheduled = FALSE
      RETURNING *`,
-    [b.startDate, b.endDate || b.startDate, JSON.stringify(customDates), req.params.id, req.user.email]
+    [b.startDate, endDate, JSON.stringify(customDates), req.params.id, req.user.email,
+      halfDayPeriod, shortLeaveTime, checkOutTime, checkInTime]
   );
   if (rows.length === 0) {
     return res.status(409).json({ error: 'This request is not eligible to be rescheduled.' });

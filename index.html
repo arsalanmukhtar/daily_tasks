@@ -483,11 +483,78 @@
             </div>
           </div>
         </div>
+
+        <!-- Short Leave only - a single time-of-day, same 3-column wheel
+             pattern as the late-arrival-notice popover. -->
+        <div id="rescheduleShortTimeField" class="hidden relative mb-3">
+          <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Time</label>
+          <button type="button" id="rescheduleShortTimeTrigger" class="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-left bg-white focus:outline-none focus:border-orange-500">
+            <span id="rescheduleShortTimeLabel" class="text-slate-400">Select time</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4 text-slate-400 shrink-0"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+          </button>
+          <div id="rescheduleShortTimePopover" class="hidden field-popover time-popover">
+            <div class="time-pop-col" id="rescheduleShortTimeHourCol"></div>
+            <div class="time-pop-col" id="rescheduleShortTimeMinuteCol"></div>
+            <div class="time-pop-col" id="rescheduleShortTimeAmpmCol"></div>
+          </div>
+        </div>
+
+        <!-- Out Pass only - check-out and check-in, same wheel pattern
+             twice, side by side. -->
+        <div id="rescheduleOutPassTimeFields" class="hidden grid grid-cols-2 gap-3 mb-3">
+          <div class="relative">
+            <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Check-out</label>
+            <button type="button" id="rescheduleCheckOutTrigger" class="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-left bg-white focus:outline-none focus:border-orange-500">
+              <span id="rescheduleCheckOutLabel" class="text-slate-400">Select time</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4 text-slate-400 shrink-0"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+            </button>
+            <div id="rescheduleCheckOutPopover" class="hidden field-popover time-popover">
+              <div class="time-pop-col" id="rescheduleCheckOutHourCol"></div>
+              <div class="time-pop-col" id="rescheduleCheckOutMinuteCol"></div>
+              <div class="time-pop-col" id="rescheduleCheckOutAmpmCol"></div>
+            </div>
+          </div>
+          <div class="relative">
+            <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Check-in</label>
+            <button type="button" id="rescheduleCheckInTrigger" class="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-left bg-white focus:outline-none focus:border-orange-500">
+              <span id="rescheduleCheckInLabel" class="text-slate-400">Select time</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4 text-slate-400 shrink-0"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+            </button>
+            <div id="rescheduleCheckInPopover" class="hidden field-popover time-popover">
+              <div class="time-pop-col" id="rescheduleCheckInHourCol"></div>
+              <div class="time-pop-col" id="rescheduleCheckInMinuteCol"></div>
+              <div class="time-pop-col" id="rescheduleCheckInAmpmCol"></div>
+            </div>
+          </div>
+        </div>
+
         <p id="rescheduleError" class="hidden error-callout mb-3"></p>
         <button id="rescheduleSubmitBtn" type="button" data-request-id=""
           class="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-orange-600 text-white text-sm font-semibold shadow-sm hover:bg-orange-700 active:bg-orange-800 transition">
           <span>Save new dates</span>
         </button>
+      </div>
+    </div>
+
+    <!-- ============ CUSTOM-DATES RESCHEDULE WARNING MODAL ============ -->
+    <!-- Shown when the requester clicks Send in the Apply-for-Leave tab
+         while Custom (non-contiguous multi-date) mode is active - a Custom
+         pick can never be rescheduled later (see server/src/routes/
+         leaveRequests.js's /:id/reschedule), so this is the one chance to
+         warn before the request even exists, rather than surprising them
+         with a missing Reschedule button after a rejection. -->
+    <div id="customDatesWarningModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4">
+      <div id="customDatesWarningBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
+      <div class="relative bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 w-full max-w-sm p-6">
+        <h3 class="text-lg font-semibold text-slate-800 mb-1">Heads up - Custom dates can't be rescheduled</h3>
+        <p class="text-slate-500 text-sm mb-5">
+          If this request is rejected, you won't be able to use Reschedule to fix it - Custom (multiple separate
+          days) picks can only be sent as a brand new request. Switch to Date Range instead, or send it as is.
+        </p>
+        <div class="flex items-center justify-end gap-2">
+          <button id="customDatesWarningCancelBtn" type="button" class="px-4 py-2 rounded-lg border border-slate-300 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">Let me change it</button>
+          <button id="customDatesWarningContinueBtn" type="button" class="px-4 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold shadow-sm hover:bg-orange-700 active:bg-orange-800 transition">Send anyway</button>
+        </div>
       </div>
     </div>
 
