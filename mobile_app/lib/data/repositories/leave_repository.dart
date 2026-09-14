@@ -120,4 +120,11 @@ class LeaveRepository {
       if (allowReschedule) 'allowReschedule': true,
     });
   }
+
+  /// Manager-only: emails the requester a nudge while an emergency leave is
+  /// still sitting in `pending_documentation` - see leaveRequests.js's
+  /// PATCH /:id/remind-docs. Pure email side effect, no state change.
+  Future<void> remindDocs(String requestId) {
+    return _api.patch('/leave-requests/$requestId/remind-docs');
+  }
 }

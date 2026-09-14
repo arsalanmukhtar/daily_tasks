@@ -8,6 +8,7 @@ import {
   buildDecisionEmail,
   buildReplacementRequestEmail,
   buildRescheduleNoticeEmail,
+  buildDocsReminderEmail,
   addWorkingDays
 } from '../emailTemplate.cjs';
 import { sweepExpiredReplacements } from './leaveReplacements.js';
@@ -26,12 +27,29 @@ const PARTIAL_DAY_TYPES = new Set(['casualShort', 'casualOutPass']);
 // codebase to auto-expire it (flagged deliberately, see PROJECT.md).
 const EMERGENCY_DOCS_WORKING_DAYS = 3;
 
+// node-pg parses a DATE column into a JS Date at LOCAL midnight (correct,
+// since that's the calendar day it represents on this server) - but
+// JSON.stringify then calls .toJSON()/.toISOString() on it, which is always
+// UTC, shifting local midnight back onto the *previous* day's evening on
+// this UTC+5 server (e.g. 14 Sept local becomes "2026-09-13T19:00:00.000Z").
+// Any reader that pulls calendar components off that string without first
+// converting back to local time (Flutter's DateTime.tryParse keeps a 'Z'
+// string in UTC) sees the wrong day - this is what silently misfiled a
+// same-day emergency-leave request into "archived" on the manager's Requests
+// tab. Formatting the date ourselves with local getters sidesteps the UTC
+// round-trip entirely, matching the to_char() fix already used for
+// attendance/late_arrival_notices.
+function dateOnly(d) {
+  if (!d) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function toClientShape(row) {
   return {
     requestId: row.id,
     requestedAt: row.requested_at,
-    startDate: row.start_date,
-    endDate: row.end_date,
+    startDate: dateOnly(row.start_date),
+    endDate: dateOnly(row.end_date),
     customDates: row.custom_dates,
     email: row.email,
     name: row.name,
@@ -296,6 +314,32 @@ leaveRequestsRouter.patch('/:id/submit-docs', requireAuth, async (req, res) => {
   broadcast({ resource: 'leaveRequests', id: updated.id }, 'owners');
   broadcast({ resource: 'leaveRequests', id: updated.id }, updated.email);
   res.json(toClientShape(updated));
+});
+
+// Manager-only: nudge a developer who's still sitting on an emergency
+// leave's docs. Purely an email side effect (no state change, no rate
+// limit) - there's no scheduled job in this codebase to do this
+// automatically (see EMERGENCY_DOCS_WORKING_DAYS's doc comment), so a
+// manager noticing an overdue "AWAITING DOCS" chip is the only trigger.
+leaveRequestsRouter.patch('/:id/remind-docs', requireAuth, requireOwner, async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT * FROM leave_requests WHERE id = $1 AND status = 'pending_documentation'`,
+    [req.params.id]
+  );
+  const request = rows[0];
+  if (!request) return res.status(409).json({ error: 'This request is no longer awaiting documentation.' });
+
+  try {
+    const { subject, html } = buildDocsReminderEmail({
+      requesterName: request.name,
+      docsDueAt: request.docs_due_at
+    });
+    await sendMail({ to: request.email, subject, html });
+  } catch (err) {
+    console.error('Failed to send docs-reminder email:', err);
+    return res.status(502).json({ error: 'Could not send the reminder email - please try again.' });
+  }
+  res.json({ ok: true });
 });
 
 // Manager-only: approve or reject a still-pending request. Sends the

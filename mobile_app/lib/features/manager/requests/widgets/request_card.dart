@@ -115,7 +115,11 @@ class RequestCard extends StatelessWidget {
                   textStyle: TextStyle(color: AppColors.ink700, fontSize: 13),
                 ),
               ],
-              if (request.status != 'requested') ...[
+              // Only an actually-decided/withdrawn request was "resolved by"
+              // anyone - 'pending_documentation' isn't requested yet either,
+              // but there's no resolver to name, so it's excluded here too
+              // (its own AWAITING DOCS status chip above already covers it).
+              if (const {'approved', 'rejected', 'withdrawn'}.contains(request.status)) ...[
                 const SizedBox(height: 8),
                 Text(
                   '${request.status[0].toUpperCase()}${request.status.substring(1)} by '

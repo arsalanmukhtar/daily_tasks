@@ -305,13 +305,41 @@
         <p class="text-slate-500 text-sm mb-4">Let your manager know ahead of time - they'll see this right away.</p>
 
         <div class="grid grid-cols-2 gap-3 mb-3">
-          <div>
+          <div class="relative">
             <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Date</label>
-            <input type="date" id="lateNoticeDate" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-orange-500" />
+            <button type="button" id="lateNoticeDateTrigger" class="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-left bg-white focus:outline-none focus:border-orange-500">
+              <span id="lateNoticeDateLabel" class="text-slate-400">Select date</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4 text-slate-400 shrink-0"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg>
+            </button>
+            <div id="lateNoticeDatePopover" class="hidden field-popover cal2-popover">
+              <div class="cal2-head">
+                <button type="button" class="cal2-nav" id="lnCalPrevBtn" aria-label="Previous month">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                </button>
+                <div class="cal2-pick"><span id="lnCalMonthYearLabel" class="text-sm font-semibold text-slate-700"></span></div>
+                <button type="button" class="cal2-nav" id="lnCalNextBtn" aria-label="Next month">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+              </div>
+              <div class="cal2-weekdays"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+              <div class="cal2-grid" id="lnCalGrid"></div>
+              <div class="cal2-footer">
+                <span class="cal2-footer-label">&nbsp;</span>
+                <button type="button" class="cal2-clear" id="lnCalTodayBtn">Today</button>
+              </div>
+            </div>
           </div>
-          <div>
+          <div class="relative">
             <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Expected arrival <span class="text-slate-400 normal-case font-medium">&middot; optional</span></label>
-            <input type="time" id="lateNoticeTime" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-orange-500" />
+            <button type="button" id="lateNoticeTimeTrigger" class="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-left bg-white focus:outline-none focus:border-orange-500">
+              <span id="lateNoticeTimeLabel" class="text-slate-400">--:-- --</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4 text-slate-400 shrink-0"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+            </button>
+            <div id="lateNoticeTimePopover" class="hidden field-popover time-popover">
+              <div class="time-pop-col" id="lnTimeHourCol"></div>
+              <div class="time-pop-col" id="lnTimeMinuteCol"></div>
+              <div class="time-pop-col" id="lnTimeAmpmCol"></div>
+            </div>
           </div>
         </div>
 

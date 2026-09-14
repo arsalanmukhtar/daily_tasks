@@ -144,8 +144,20 @@ const lateNoticeBtn        = document.getElementById('lateNoticeBtn');
 const lateNoticeModal      = document.getElementById('lateNoticeModal');
 const lateNoticeBackdrop   = document.getElementById('lateNoticeBackdrop');
 const closeLateNoticeBtn   = document.getElementById('closeLateNoticeBtn');
-const lateNoticeDate       = document.getElementById('lateNoticeDate');
-const lateNoticeTime       = document.getElementById('lateNoticeTime');
+const lateNoticeDateTrigger  = document.getElementById('lateNoticeDateTrigger');
+const lateNoticeDateLabel    = document.getElementById('lateNoticeDateLabel');
+const lateNoticeDatePopover  = document.getElementById('lateNoticeDatePopover');
+const lnCalPrevBtn           = document.getElementById('lnCalPrevBtn');
+const lnCalNextBtn           = document.getElementById('lnCalNextBtn');
+const lnCalMonthYearLabel    = document.getElementById('lnCalMonthYearLabel');
+const lnCalGrid              = document.getElementById('lnCalGrid');
+const lnCalTodayBtn          = document.getElementById('lnCalTodayBtn');
+const lateNoticeTimeTrigger  = document.getElementById('lateNoticeTimeTrigger');
+const lateNoticeTimeLabel    = document.getElementById('lateNoticeTimeLabel');
+const lateNoticeTimePopover  = document.getElementById('lateNoticeTimePopover');
+const lnTimeHourCol          = document.getElementById('lnTimeHourCol');
+const lnTimeMinuteCol        = document.getElementById('lnTimeMinuteCol');
+const lnTimeAmpmCol          = document.getElementById('lnTimeAmpmCol');
 const lateNoticeToolbar    = document.getElementById('lateNoticeToolbar');
 const lateNoticeEditor     = document.getElementById('lateNoticeEditor');
 const lateNoticeAttachmentInput = document.getElementById('lateNoticeAttachmentInput');
@@ -4252,23 +4264,198 @@ const submitDocsAttachmentPicker = wireSimpleAttachmentPicker_(
   'use PDF, DOC, DOCX, PNG, or JPG.'
 );
 
+// ---------- Late-arrival notice: custom date/time popovers ----------
+// Native <input type="date"/"time"> render their calendar/wheel as a
+// browser-drawn popup that our CSS can't reach (accent-color only affects a
+// handful of UA controls, not this one - confirmed live) - these reuse the
+// app's own .cal2-* calendar look (see #leaveCalendar) instead, so the
+// popover actually matches the rest of the app.
+let lnSelectedDate = null;   // Date | null, day-only (no time component)
+let lnCalViewYear, lnCalViewMonth;
+let lnSelectedHour = null, lnSelectedMinute = null, lnSelectedAmPm = null;
+
+function lnDateKey_(d) { return d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate(); }
+function lnFmtDateLabel_(d) { return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
+function lnIsoDate_(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function lnRenderCalGrid_() {
+  lnCalMonthYearLabel.textContent = new Date(lnCalViewYear, lnCalViewMonth, 1)
+    .toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const lead = new Date(lnCalViewYear, lnCalViewMonth, 1).getDay();
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const todayKey = lnDateKey_(today);
+  const selKey = lnSelectedDate ? lnDateKey_(lnSelectedDate) : null;
+
+  let html = '';
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(lnCalViewYear, lnCalViewMonth, 1 - lead + i);
+    const dKey = lnDateKey_(d);
+    const classes = ['cal2-day'];
+    if (d.getMonth() !== lnCalViewMonth) classes.push('is-adjacent');
+    if (d.getDay() === 0 || d.getDay() === 6) classes.push('is-weekend');
+    if (dKey === todayKey) classes.push('is-today');
+    if (dKey === selKey) classes.push('is-edge');
+    html += '<div class="cal2-cell"><button type="button" class="' + classes.join(' ') + '" data-time="' + d.getTime() + '">' + d.getDate() + '</button></div>';
+  }
+  lnCalGrid.innerHTML = html;
+}
+
+function pickLnDate_(d) {
+  lnSelectedDate = d;
+  lateNoticeDateLabel.textContent = lnFmtDateLabel_(d);
+  lateNoticeDateLabel.classList.remove('text-slate-400');
+  lnRenderCalGrid_();
+  closeLnDatePopover_();
+}
+lnCalGrid.addEventListener('click', (e) => {
+  const btn = e.target.closest('.cal2-day');
+  if (btn) pickLnDate_(new Date(Number(btn.dataset.time)));
+});
+lnCalTodayBtn.addEventListener('click', () => {
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  lnCalViewYear = t.getFullYear(); lnCalViewMonth = t.getMonth();
+  pickLnDate_(t);
+});
+lnCalPrevBtn.addEventListener('click', () => {
+  lnCalViewMonth--; if (lnCalViewMonth < 0) { lnCalViewMonth = 11; lnCalViewYear--; }
+  lnRenderCalGrid_();
+});
+lnCalNextBtn.addEventListener('click', () => {
+  lnCalViewMonth++; if (lnCalViewMonth > 11) { lnCalViewMonth = 0; lnCalViewYear++; }
+  lnRenderCalGrid_();
+});
+
+function openLnDatePopover_() {
+  closeLnTimePopover_();
+  const base = lnSelectedDate || new Date();
+  lnCalViewYear = base.getFullYear();
+  lnCalViewMonth = base.getMonth();
+  lnRenderCalGrid_();
+  lateNoticeDatePopover.classList.remove('hidden');
+}
+function closeLnDatePopover_() { lateNoticeDatePopover.classList.add('hidden'); }
+lateNoticeDateTrigger.addEventListener('click', (e) => {
+  e.stopPropagation();
+  lateNoticeDatePopover.classList.contains('hidden') ? openLnDatePopover_() : closeLnDatePopover_();
+});
+
+// ---- time popover: three scrollable columns (hour/minute/AM-PM), same
+// selection-highlight language as the calendar's .cal2-day.is-edge ----
+const LN_HOURS = Array.from({ length: 12 }, (_, i) => i + 1);
+const LN_MINUTES = Array.from({ length: 60 }, (_, i) => i);
+
+function lnRenderTimeCols_() {
+  lnTimeHourCol.innerHTML = LN_HOURS.map((h) =>
+    `<button type="button" data-hour="${h}" class="${h === lnSelectedHour ? 'is-selected' : ''}">${String(h).padStart(2, '0')}</button>`
+  ).join('');
+  lnTimeMinuteCol.innerHTML = LN_MINUTES.map((m) =>
+    `<button type="button" data-minute="${m}" class="${m === lnSelectedMinute ? 'is-selected' : ''}">${String(m).padStart(2, '0')}</button>`
+  ).join('');
+  lnTimeAmpmCol.innerHTML = ['AM', 'PM'].map((p) =>
+    `<button type="button" data-ampm="${p}" class="${p === lnSelectedAmPm ? 'is-selected' : ''}">${p}</button>`
+  ).join('');
+}
+function lnUpdateTimeLabel_() {
+  lateNoticeTimeLabel.textContent =
+    String(lnSelectedHour).padStart(2, '0') + ':' + String(lnSelectedMinute).padStart(2, '0') + ' ' + lnSelectedAmPm;
+  lateNoticeTimeLabel.classList.remove('text-slate-400');
+}
+// Converts the picked 12h value to the HH:MM (24h) string the API expects -
+// '' if the user hasn't touched the picker at all (time stays optional).
+function lnTimeValue24_() {
+  if (lnSelectedHour == null || lnSelectedMinute == null || lnSelectedAmPm == null) return '';
+  let h = lnSelectedHour % 12;
+  if (lnSelectedAmPm === 'PM') h += 12;
+  return String(h).padStart(2, '0') + ':' + String(lnSelectedMinute).padStart(2, '0');
+}
+lnTimeHourCol.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-hour]');
+  if (!btn) return;
+  // Rewriting this column's innerHTML below detaches e.target from the
+  // document mid-bubble, which breaks the document-level outside-click
+  // handler's `popover.contains(e.target)` check (a detached node "contains"
+  // nothing) - stop the bubble here so that check never sees it.
+  e.stopPropagation();
+  lnSelectedHour = Number(btn.dataset.hour);
+  if (lnSelectedMinute == null) lnSelectedMinute = 0;
+  if (lnSelectedAmPm == null) lnSelectedAmPm = 'AM';
+  lnRenderTimeCols_();
+  lnUpdateTimeLabel_();
+});
+lnTimeMinuteCol.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-minute]');
+  if (!btn) return;
+  e.stopPropagation();
+  lnSelectedMinute = Number(btn.dataset.minute);
+  if (lnSelectedHour == null) lnSelectedHour = 9;
+  if (lnSelectedAmPm == null) lnSelectedAmPm = 'AM';
+  lnRenderTimeCols_();
+  lnUpdateTimeLabel_();
+});
+lnTimeAmpmCol.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-ampm]');
+  if (!btn) return;
+  e.stopPropagation();
+  lnSelectedAmPm = btn.dataset.ampm;
+  if (lnSelectedHour == null) lnSelectedHour = 9;
+  if (lnSelectedMinute == null) lnSelectedMinute = 0;
+  lnRenderTimeCols_();
+  lnUpdateTimeLabel_();
+});
+
+function openLnTimePopover_() {
+  closeLnDatePopover_();
+  lnRenderTimeCols_();
+  lateNoticeTimePopover.classList.remove('hidden');
+  requestAnimationFrame(() => {
+    lateNoticeTimePopover.querySelectorAll('.is-selected').forEach((el) => el.scrollIntoView({ block: 'center' }));
+  });
+}
+function closeLnTimePopover_() { lateNoticeTimePopover.classList.add('hidden'); }
+lateNoticeTimeTrigger.addEventListener('click', (e) => {
+  e.stopPropagation();
+  lateNoticeTimePopover.classList.contains('hidden') ? openLnTimePopover_() : closeLnTimePopover_();
+});
+
+document.addEventListener('click', (e) => {
+  if (!lateNoticeDatePopover.classList.contains('hidden') && !lateNoticeDatePopover.contains(e.target) && e.target !== lateNoticeDateTrigger) {
+    closeLnDatePopover_();
+  }
+  if (!lateNoticeTimePopover.classList.contains('hidden') && !lateNoticeTimePopover.contains(e.target) && e.target !== lateNoticeTimeTrigger) {
+    closeLnTimePopover_();
+  }
+});
+
 // ---------- Late-arrival notice modal ----------
 function openLateNoticeModal_() {
-  lateNoticeDate.value = fmtISO(new Date());
-  lateNoticeTime.value = '';
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  lnSelectedDate = t;
+  lateNoticeDateLabel.textContent = lnFmtDateLabel_(t);
+  lateNoticeDateLabel.classList.remove('text-slate-400');
+  lnSelectedHour = lnSelectedMinute = lnSelectedAmPm = null;
+  lateNoticeTimeLabel.textContent = '--:-- --';
+  lateNoticeTimeLabel.classList.add('text-slate-400');
+  closeLnDatePopover_();
+  closeLnTimePopover_();
   lateNoticeEditor.innerHTML = '';
   lateNoticeAttachmentPicker.reset();
   lateNoticeError.classList.add('hidden');
   lateNoticeModal.classList.remove('hidden');
 }
-function closeLateNoticeModal_() { lateNoticeModal.classList.add('hidden'); }
+function closeLateNoticeModal_() {
+  lateNoticeModal.classList.add('hidden');
+  closeLnDatePopover_();
+  closeLnTimePopover_();
+}
 lateNoticeBtn.addEventListener('click', openLateNoticeModal_);
 closeLateNoticeBtn.addEventListener('click', closeLateNoticeModal_);
 lateNoticeBackdrop.addEventListener('click', closeLateNoticeModal_);
 
 lateNoticeSubmitBtn.addEventListener('click', async () => {
   if (!currentUserContext) return;
-  if (!lateNoticeDate.value) {
+  if (!lnSelectedDate) {
     lateNoticeError.textContent = 'Please pick a date.';
     lateNoticeError.classList.remove('hidden');
     return;
@@ -4286,8 +4473,8 @@ lateNoticeSubmitBtn.addEventListener('click', async () => {
     }
     await apiRequest_('POST', '/late-arrival-notices', {
       name: currentUserContext.displayName,
-      date: lateNoticeDate.value,
-      expectedArrivalTime: lateNoticeTime.value || undefined,
+      date: lnIsoDate_(lnSelectedDate),
+      expectedArrivalTime: lnTimeValue24_() || undefined,
       reasonHtml: reasonHtml === '<br>' ? '' : reasonHtml,
       attachments
     });

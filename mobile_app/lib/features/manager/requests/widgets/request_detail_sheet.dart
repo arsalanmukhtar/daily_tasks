@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/leave_request.dart';
+import '../../../../data/providers.dart';
 import '../../../../utils/rich_text.dart';
 import '../../../../widgets/attachment_chip.dart';
 import '../../../../widgets/avatar.dart';
@@ -34,6 +35,7 @@ class _RequestDetailSheetState extends ConsumerState<RequestDetailSheet> {
   final _noteController = TextEditingController();
   bool? _decidingApprove; // null = not deciding, true/false = which action's note is showing
   bool _isSubmitting = false;
+  bool _isSendingReminder = false;
   // Only ever meaningful (and only ever shown) alongside a rejection - see
   // LeaveRequest.allowReschedule's doc comment.
   bool _allowReschedule = false;
@@ -59,6 +61,22 @@ class _RequestDetailSheetState extends ConsumerState<RequestDetailSheet> {
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _sendReminder() async {
+    setState(() => _isSendingReminder = true);
+    try {
+      await ref.read(leaveRepositoryProvider).remindDocs(widget.request.requestId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reminder sent.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not send reminder: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isSendingReminder = false);
     }
   }
 
@@ -103,6 +121,8 @@ class _RequestDetailSheetState extends ConsumerState<RequestDetailSheet> {
                     _dateFact(context, r),
                     if (r.weekLabel.isNotEmpty) _fact('Week', r.weekLabel),
                     if (r.requestedAt != null) _fact('Applied', _timeFmt.format(r.requestedAt!)),
+                    if (r.status == 'pending_documentation' && r.docsDueAt != null)
+                      _fact('Docs due', _fullDateFmt.format(r.docsDueAt!)),
                     ReplacementSection(leaveRequestId: r.requestId),
                     if (r.attachments.isNotEmpty) ...[
                       const SizedBox(height: 4),
@@ -130,6 +150,10 @@ class _RequestDetailSheetState extends ConsumerState<RequestDetailSheet> {
               if (r.status == 'requested') ...[
                 const SizedBox(height: 16),
                 _buildFooter(context),
+              ],
+              if (r.status == 'pending_documentation') ...[
+                const SizedBox(height: 16),
+                _buildDocsReminderBanner(context),
               ],
             ],
           ),
@@ -196,6 +220,40 @@ class _RequestDetailSheetState extends ConsumerState<RequestDetailSheet> {
             Icon(Icons.calendar_month_outlined, size: 18, color: AppColors.brandPrimary),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Shown only while `pending_documentation` - there's nothing to decide
+  /// yet, just a heads-up that this developer still owes a reason/document,
+  /// and a one-tap way to email them a nudge (see LeaveRepository.remindDocs).
+  Widget _buildDocsReminderBanner(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.statusRequestedBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.statusRequested.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.hourglass_top_rounded, size: 18, color: AppColors.statusRequested),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              "Still waiting on their reason/document - they can't be decided until that's in.",
+              style: TextStyle(fontSize: 12.5),
+            ),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            onPressed: _isSendingReminder ? null : _sendReminder,
+            child: _isSendingReminder
+                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Send reminder'),
+          ),
+        ],
       ),
     );
   }

@@ -1829,6 +1829,52 @@ textarea {
   .cal2-rail { display: none; }
 }
 
+/* Custom date/time popovers (late-arrival notice, etc.) - native
+   <input type="date"/"time"> draw their dropdown as a browser/OS popup that
+   plain CSS can't restyle (only a handful of UA controls respect
+   accent-color, confirmed live - the calendar/wheel itself ignores it), so
+   these small anchored panels replace them, reusing the same .cal2-* look
+   as the leave-apply calendar for visual consistency instead of inventing a
+   second style. */
+.field-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 60;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-2);
+}
+.cal2-popover { width: 266px; }
+
+.time-popover { display: flex; width: 176px; }
+.time-pop-col {
+  flex: 1;
+  max-height: 208px;
+  overflow-y: auto;
+  padding: 6px 4px;
+  scrollbar-width: thin;
+}
+.time-pop-col + .time-pop-col { border-left: 1px solid var(--line-soft); }
+.time-pop-col button {
+  display: block;
+  width: 100%;
+  text-align: center;
+  border: 0;
+  background: transparent;
+  border-radius: 6px;
+  padding: 6px 0;
+  margin-bottom: 1px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-700);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.time-pop-col button:hover { background: var(--surface-2); }
+.time-pop-col button.is-selected { background: var(--brand-600); color: #fff; }
+
 /* Bottom area under the calendar - the timer selection (a timeline drawn to
    scale, styled after timebar-3.html's "T3 Timeline" reference but with our
    own brand palette plus indigo as a second accent instead of one color

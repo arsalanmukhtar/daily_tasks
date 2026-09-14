@@ -1015,6 +1015,65 @@ function buildRescheduleNoticeEmail(data) {
   return { subject, html };
 }
 
+// Sent to the requester when a manager taps "Send reminder" on an emergency
+// leave still sitting in pending_documentation - same plain single-CTA
+// treatment as buildRescheduleNoticeEmail, just addressed the other way.
+function buildDocsReminderEmail(data) {
+  const requesterName = data.requesterName || 'there';
+  const firstName = String(requesterName).trim().split(/\s+/)[0] || requesterName;
+  const dueText = data.docsDueAt ? formatWeekdayDayMonthYear(data.docsDueAt) : null;
+
+  const html = `
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(
+    `Reminder: add your reason and document to finish your emergency leave request${dueText ? ` (due ${dueText})` : ''}.`
+  )}</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF0F4;">
+<tr><td align="center" style="padding:32px 12px;">
+  <table role="presentation" class="wrap" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;">
+    <tr><td style="padding:0 4px 12px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td style="font:700 13px/1.2 ${FONT};color:#0F172A;letter-spacing:-.01em;">
+          <span style="display:inline-block;width:9px;height:9px;background:#E8590C;border-radius:2px;margin-right:8px;"></span>Daily Tasks
+        </td>
+        <td align="right" style="font:400 12px/1.2 ${FONT};color:#7A8698;">Emergency leave · reminder</td>
+      </tr></table>
+    </td></tr>
+    <tr><td style="background:#FFFFFF;border:1px solid #E3E8EF;border-radius:14px;overflow:hidden;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td height="4" style="height:4px;line-height:4px;font-size:0;background:#D97706;">&nbsp;</td>
+      </tr></table>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:26px 32px 26px;">
+          <p style="margin:0;font:700 20px/1.3 ${FONT};color:#0F172A;letter-spacing:-.02em;">
+            Your manager is still waiting on your emergency leave
+          </p>
+          <p style="margin:9px 0 0;font:400 14px/1.6 ${FONT};color:#5A6879;">
+            Hello ${escapeHtml(
+              firstName
+            )} — you still need to add a reason and a document before this can be decided${
+    dueText ? `, ideally by <strong>${escapeHtml(dueText)}</strong>` : ''
+  }.
+          </p>
+          <table role="presentation" cellpadding="0" cellspacing="0" class="btn" style="margin-top:18px;"><tr>
+            <td style="background:#E8590C;border-radius:9px;">
+              <a href="${escapeAttr(APP_URL)}" style="display:inline-block;padding:12px 22px;font:600 14px/1 ${FONT};color:#FFFFFF;text-decoration:none;">Finish in Daily Tasks</a>
+            </td>
+          </tr></table>
+        </td>
+      </tr></table>
+    </td></tr>
+    <tr><td class="gut" style="padding:16px 8px 0;">
+      <p style="margin:0;font:400 11.5px/1.7 ${FONT};color:#8593A5;">Sent by Daily Tasks. Internal use only.</p>
+    </td></tr>
+  </table>
+</td></tr>
+</table>`.trim();
+
+  const subject = 'Reminder: finish your emergency leave request';
+  return { subject, html };
+}
+
 // A rich-text field with no real content isn't always an empty string - a
 // contenteditable box that was focused and left untouched can save as
 // "<br>", "<p></p>" or "<p><br></p>". Left unguarded, `data.x || fallback`
@@ -1067,6 +1126,7 @@ module.exports = {
   buildReplacementResolvedEmail,
   buildLateNoticeEmail,
   buildRescheduleNoticeEmail,
+  buildDocsReminderEmail,
   htmlToPlainText,
   addWorkingDays
 };
