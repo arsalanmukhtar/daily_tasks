@@ -4,8 +4,8 @@
    designed against. Existing untouched sections of this file keep their
    hardcoded hex literals - only new components below use these vars. */
 :root {
-  --brand-600: #E8590C; --brand-700: #C2410C; --brand-800: #9A3412;
-  --brand-50: #FFF5EE;  --brand-100: #FFE6D5; --brand-200: #FBC9A4;
+  --brand-600: #16A34A; --brand-700: #15803D; --brand-800: #166534;
+  --brand-50: #F0FDF4;  --brand-100: #DCFCE7; --brand-200: #7BED9E;
 
   --ink-900: #0F172A; --ink-800: #1E293B; --ink-700: #334155;
   --ink-600: #475569; --ink-500: #64748B; --ink-400: #94A3B8;
@@ -24,7 +24,7 @@
 
   /* duration / file-meta secondaries (new) */
   --d-short: #0369A1; --d-short-bg: #E7F1F8;
-  --d-full: #3730A3;  --d-full-bg: #ECEBFA;
+  --d-full: #155E75;  --d-full-bg: #CFFAFE;
   --d-outpass: #0F766E; --d-outpass-bg: #E3F4F2;
   --meta: #54657A;    --meta-bg: #EDF1F5; --meta-bd: #D9E1E9;
 
@@ -32,8 +32,8 @@
      this gives the calendar and timer selection a place to use a distinct
      color for secondary emphasis (today marker, quick-duration presets,
      the custom-dates strip) instead of orange for literally everything. */
-  --indigo-600: #4F46E5; --indigo-700: #4338CA; --indigo-800: #3730A3;
-  --indigo-50: #EEF2FF;  --indigo-100: #E0E7FF; --indigo-200: #C7D2FE;
+  --indigo-600: #0891B2; --indigo-700: #0E7490; --indigo-800: #155E75;
+  --indigo-50: #ECFEFF;  --indigo-100: #CFFAFE; --indigo-200: #17C0EB;
 
   --r-sm: 8px; --r-md: 10px; --r-lg: 14px; --r-xl: 18px;
   --sh-1: 0 1px 2px rgba(15, 23, 42, .05);
@@ -109,11 +109,11 @@ textarea {
   padding: 0;
 }
 .tb-btn:hover { background: #e2e8f0; color: #1e293b; }
-.tb-btn:focus { outline: none; box-shadow: 0 0 0 1px #fdba74; }
+.tb-btn:focus { outline: none; box-shadow: 0 0 0 1px #86EFAC; }
 .tb-btn.active {
-  background: #ffedd5;
-  color: #9a3412;
-  border-color: #fdba74;
+  background: #DCFCE7;
+  color: #166534;
+  border-color: #86EFAC;
 }
 
 /* Color buttons: stack a letter/icon on top of a thin bar showing the
@@ -182,7 +182,7 @@ textarea {
 }
 .tb-color-palette .default-swatch:hover {
   transform: scale(1.12);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), 0 0 0 2px #fdba74;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), 0 0 0 2px #86EFAC;
 }
 /* For the highlight palette: same square but with the universal "no fill"
    diagonal slash on white. Toggled via JS by adding `.transparent-style`. */
@@ -216,7 +216,7 @@ textarea {
 }
 .tb-color-palette .swatch:hover {
   transform: scale(1.12);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), 0 0 0 2px #fdba74;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), 0 0 0 2px #86EFAC;
 }
 
 /* Column headers - duo-tone: slate-100 surface, slate-800 day name, slate-500 date */
@@ -258,11 +258,11 @@ textarea {
 }
 /* Today's column header - orange accent + top bar so the current day pops. */
 .tb-th.is-today {
-  background: #fff7ed;
-  box-shadow: inset 0 3px 0 #ea580c;
+  background: #F0FDF4;
+  box-shadow: inset 0 3px 0 #16A34A;
 }
-.tb-th.is-today .tb-day  { color: #c2410c; }
-.tb-th.is-today .tb-date { color: #ea580c; }
+.tb-th.is-today .tb-day  { color: #15803D; }
+.tb-th.is-today .tb-date { color: #16A34A; }
 
 /* Rows: duo-tone striping (white + slate-50). Hovering the row reveals the × button. */
 .task-row { background: #ffffff; }
@@ -298,8 +298,8 @@ textarea {
   pointer-events: none;
 }
 .cell-editor:focus {
-  background: #fff7ed;
-  box-shadow: inset 0 0 0 1px #fdba74;
+  background: #F0FDF4;
+  box-shadow: inset 0 0 0 1px #86EFAC;
 }
 
 /* Future-day lock - weekday columns that haven't happened yet (e.g. this
@@ -626,16 +626,16 @@ textarea {
   border-radius: 0.55rem;
 }
 .weekday-row.is-today {
-  background: #fff7ed;
-  box-shadow: inset 0 0 0 1px #fed7aa;
+  background: #F0FDF4;
+  box-shadow: inset 0 0 0 1px #7BED9E;
 }
 .weekday-today-tag {
   font-size: 9px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #c2410c;
-  background: #fed7aa;
+  color: #15803D;
+  background: #7BED9E;
   padding: 2px 6px;
   border-radius: 999px;
 }
@@ -678,7 +678,7 @@ textarea {
 }
 .leaves-rail-btn svg { width: 18px; height: 18px; }
 .leaves-rail-btn:hover { background: #fff; color: var(--ink-600); }
-.leaves-rail-btn.is-active { background: #7bed9e; color: #4b5c52; box-shadow: 0 2px 6px rgba(123, 237, 158, .35); }
+.leaves-rail-btn.is-active { background: var(--brand-200); color: #4b5c52; box-shadow: 0 2px 6px rgba(123, 237, 158, .35); }
 
 /* Plain notification dot (not a count) - flags that the rail's "Explain the
    Absence" tab has something open needing the developer's attention. */
@@ -697,10 +697,10 @@ textarea {
 }
 .select-pro-trigger:focus {
   outline: none;
-  border-color: #ea580c;
+  border-color: #16A34A;
 }
 .select-pro.open .select-pro-trigger {
-  border-color: #ea580c;
+  border-color: #16A34A;
 }
 .select-pro.open #designationChevron {
   transform: rotate(180deg);
@@ -744,17 +744,17 @@ textarea {
   user-select: none;
 }
 .select-pro-menu li:hover {
-  background: #fff7ed;
-  color: #9a3412;
+  background: #F0FDF4;
+  color: #166534;
 }
 .select-pro-menu li.selected {
-  background: #ffedd5;
-  color: #9a3412;
+  background: #DCFCE7;
+  color: #166534;
   font-weight: 600;
 }
 .select-pro-menu li.selected::after {
   content: "✓";
-  color: #ea580c;
+  color: #16A34A;
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -784,9 +784,9 @@ textarea {
 .ew-trigger:focus-visible,
 .ew-trigger.is-open {
   outline: none;
-  border-color: #fb923c;                       /* orange-400 - modal accent */
+  border-color: #4ADE80;                       /* orange-400 - modal accent */
 }
-.ew-trigger-icon { width: 16px; height: 16px; flex-shrink: 0; color: #ea580c; }
+.ew-trigger-icon { width: 16px; height: 16px; flex-shrink: 0; color: #16A34A; }
 .ew-trigger-label {
   flex: 1 1 auto;
   min-width: 0;
@@ -835,7 +835,7 @@ textarea {
   white-space: nowrap;
 }
 .ew-option + .ew-option { margin-top: 1px; }
-.ew-option:hover { background: #fff7ed; color: #9a3412; }
+.ew-option:hover { background: #F0FDF4; color: #166534; }
 .ew-option:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 2px rgba(251, 146, 60, 0.55);
@@ -844,12 +844,12 @@ textarea {
   width: 15px;
   height: 15px;
   flex-shrink: 0;
-  color: #ea580c;
+  color: #16A34A;
   opacity: 0;
 }
 .ew-option.is-selected {
-  background: #ffedd5;                          /* orange-100 */
-  color: #9a3412;                               /* orange-800 */
+  background: #DCFCE7;                          /* orange-100 */
+  color: #166534;                               /* orange-800 */
   font-weight: 700;
 }
 .ew-option.is-selected .ew-option-check { opacity: 1; }
@@ -1029,7 +1029,7 @@ textarea {
   transition: background 120ms, color 120ms, border-color 120ms, box-shadow 120ms;
 }
 .an-range-btn:hover { border-color: #cbd5e1; background: #f8fafc; }
-.an-range-btn:focus-visible { outline: none; box-shadow: 0 0 0 1px #fdba74; }
+.an-range-btn:focus-visible { outline: none; box-shadow: 0 0 0 1px #86EFAC; }
 .an-range-btn.is-active {
   background: #334155;
   border-color: #334155;
@@ -1113,9 +1113,9 @@ textarea {
 }
 .an-tab-btn:hover { background: #f8fafc; color: #334155; }
 .an-tab-btn.is-active {
-  background: #fff7ed;
-  color: #9a3412;
-  box-shadow: inset 0 -2px 0 #ea580c;
+  background: #F0FDF4;
+  color: #166534;
+  box-shadow: inset 0 -2px 0 #16A34A;
 }
 
 .an-custom-list-head {
@@ -1161,7 +1161,7 @@ textarea {
 .an-custom-search:focus {
   outline: none;
   background: #ffffff;
-  border-color: #fb923c;
+  border-color: #4ADE80;
 }
 
 /* Ranked developer option: a small colour dot (rank-coloured, same palette
@@ -1283,7 +1283,7 @@ textarea {
   line-height: 1.45;
 }
 .an-highlight strong { font-weight: 700; color: #1e293b; }
-.an-highlight[data-tone="peak"]  { border-left-color: #ea580c; background: #fff7ed; }
+.an-highlight[data-tone="peak"]  { border-left-color: #16A34A; background: #F0FDF4; }
 .an-highlight[data-tone="good"]  { border-left-color: #15803d; background: #f0fdf4; }
 .an-highlight[data-tone="warn"]  { border-left-color: #dc2626; background: #fef2f2; }
 .an-highlight-body { display: flex; flex-direction: column; gap: 0.45rem; min-width: 0; }
@@ -1497,7 +1497,7 @@ textarea {
   transition: background-color 150ms, border-color 150ms, color 150ms;
 }
 .lv-type-btn:hover:not(:disabled) { background: #f8fafc; border-color: #94a3b8; }
-.lv-type-btn.is-selected { background: #fff7ed; border-color: #fb923c; color: #c2410c; }
+.lv-type-btn.is-selected { background: #F0FDF4; border-color: #4ADE80; color: #15803D; }
 .lv-type-btn.is-disabled,
 .lv-type-btn:disabled {
   opacity: 0.5;
@@ -1527,10 +1527,10 @@ textarea {
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  border: 1px solid #fdba74;
+  border: 1px solid #86EFAC;
   border-radius: 0.65rem;
-  background: #fff7ed;
-  color: #c2410c;
+  background: #F0FDF4;
+  color: #15803D;
   font-size: 0.8125rem;
   font-weight: 600;
 }
@@ -1540,10 +1540,10 @@ textarea {
   height: 1.25rem;
   line-height: 1;
   border-radius: 999px;
-  color: #c2410c;
+  color: #15803D;
   font-size: 1rem;
 }
-.lv-attachment-chip button:hover { background: #fed7aa; }
+.lv-attachment-chip button:hover { background: #7BED9E; }
 
 .lv-type-sub-btn { padding: 0.45rem 0.75rem; font-size: 0.75rem; }
 

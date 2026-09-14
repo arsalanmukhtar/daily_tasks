@@ -745,11 +745,11 @@ const FORE_COLORS = [
 const HILITE_COLORS = [
   '#fef9c3', // Pale yellow
   '#fef3c7', // Cream
-  '#ffedd5', // Peach
+  '#DCFCE7', // Peach
   '#fecdd3', // Soft pink
   '#fce7f3', // Light pink
   '#f3e8ff', // Lavender
-  '#e0e7ff', // Periwinkle
+  '#CFFAFE', // Periwinkle
   '#dbeafe', // Sky
   '#cffafe', // Cyan
   '#d1fae5', // Mint
@@ -6063,8 +6063,8 @@ document.addEventListener('keydown', function (e) {
 // ========================================================================
 
 const AN_DEV_COLORS = [
-  '#ea580c', '#0891b2', '#7c3aed', '#15803d', '#be123c',
-  '#0284c7', '#a16207', '#4338ca', '#0d9488', '#c2410c',
+  '#16A34A', '#0891b2', '#7c3aed', '#15803d', '#be123c',
+  '#0284c7', '#a16207', '#0E7490', '#0d9488', '#15803D',
   '#65a30d', '#9333ea', '#0369a1', '#166534', '#b45309'
 ];
 
@@ -6251,9 +6251,9 @@ function heatColor_(v, maxVal) {
 }
 
 function colorForRank_(i, total) {
-  if (i === 0) return '#ea580c';                 // top - accent orange
+  if (i === 0) return '#16A34A';                 // top - accent orange
   if (total > 1 && i === total - 1) return '#94a3b8'; // last - muted slate, not alarm red
-  return '#fdba74';                               // mid pack - soft orange
+  return '#86EFAC';                               // mid pack - soft orange
 }
 
 // Returns { startMs, endMs } for the given filter - either bound may be null
@@ -6565,8 +6565,8 @@ function renderTeamTrendChart_(model, Chart) {
       datasets: [{
         label: 'Tasks logged',
         data: model.weeks.map(function (w) { return model.teamWeekly[w.key] || 0; }),
-        borderColor: '#ea580c', backgroundColor: 'rgba(234, 88, 12, 0.12)',
-        fill: true, tension: 0.35, pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: '#ea580c'
+        borderColor: '#16A34A', backgroundColor: 'rgba(22, 163, 74, 0.12)',
+        fill: true, tension: 0.35, pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: '#16A34A'
       }]
     },
     options: {
@@ -6658,7 +6658,7 @@ function renderDowChart_(model, Chart) {
     type: 'bar',
     data: {
       labels: order.map(function (d) { return TASK_DAY_LONG[d]; }),
-      datasets: [{ data: order.map(function (d) { return model.dowTotals[d] || 0; }), backgroundColor: '#fb923c', borderRadius: 8, maxBarThickness: 46 }]
+      datasets: [{ data: order.map(function (d) { return model.dowTotals[d] || 0; }), backgroundColor: '#4ADE80', borderRadius: 8, maxBarThickness: 46 }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,

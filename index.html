@@ -10,6 +10,36 @@
   <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800&family=Inter+Tight:wght@600;700;800&family=Archivo+Narrow:wght@600;700&display=swap" rel="stylesheet" />
 
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Rebrand: every bg-orange-*/text-orange-*/border-orange-*/etc. utility
+       class in this file (and any app.js builds dynamically) resolves
+       through Tailwind's own "orange" palette key - overriding it here
+       (after the CDN script, which is what defines the `tailwind` global
+       this assigns to) recolors every one of those instances at once to
+       the app's mint-green brand color, with #7BED9E (the exact shade
+       specified) at the 200 step and the rest of the ramp derived from it.
+       "indigo" is overridden the same way to the new cyan accent, #17C0EB
+       at its own 200 step. Mirrors styles.css's own --brand-*/--indigo-*
+       custom-property scale so both systems render identically. -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            orange: {
+              50: '#F0FDF4', 100: '#DCFCE7', 200: '#7BED9E', 300: '#86EFAC',
+              400: '#4ADE80', 500: '#22C55E', 600: '#16A34A', 700: '#15803D',
+              800: '#166534', 900: '#14532D', 950: '#052E16'
+            },
+            indigo: {
+              50: '#ECFEFF', 100: '#CFFAFE', 200: '#17C0EB', 300: '#67E8F9',
+              400: '#22D3EE', 500: '#06B6D4', 600: '#0891B2', 700: '#0E7490',
+              800: '#155E75', 900: '#164E63', 950: '#083344'
+            }
+          }
+        }
+      }
+    };
+  </script>
   <link href="styles.css?v=20260909a" rel="stylesheet" />
 </head>
 <!-- `app-shell` drives the desktop single-viewport lock - see the media query
@@ -1304,7 +1334,7 @@
                 </div>
 
                 <div id="leaveDatePicked" class="picked hidden">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C2410C" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#15803D" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
                   <div id="leaveDatePickedSingle" class="min-w-0">
                     <b id="leaveDatePickedLabel"></b><span id="leaveDatePickedMeta"></span>
                   </div>
