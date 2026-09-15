@@ -44,6 +44,131 @@ function escapeHtml(s) {
   ));
 }
 
+// ---------- Rich-text sanitizing/normalizing (ported from app.js, kept in
+// sync - stored reason/explanation/resolution/rejection HTML is injected
+// raw via innerHTML, so this is both the XSS guard and the fix for legacy
+// plain-text "- item"/"1. item" lines that never went through a real
+// insertUnorderedList/insertOrderedList and so have no actual <ul>/<li> for
+// .rich-text's list CSS to hang-indent). ----------
+const RICH_TEXT_ALLOWED_TAGS_ = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'UL', 'OL', 'LI', 'P', 'DIV', 'A']);
+function sanitizeRichTextInto_(sourceNode, targetParent) {
+  sourceNode.childNodes.forEach(function (node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      targetParent.appendChild(document.createTextNode(node.textContent));
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    if (node.tagName === 'BR') { targetParent.appendChild(document.createElement('br')); return; }
+    if (node.tagName === 'SCRIPT' || node.tagName === 'STYLE') return;
+    if (RICH_TEXT_ALLOWED_TAGS_.has(node.tagName)) {
+      const clean = document.createElement(node.tagName);
+      if (node.tagName === 'A') {
+        const href = node.getAttribute('href') || '';
+        if (/^(https?:|mailto:)/i.test(href.trim())) {
+          clean.setAttribute('href', href.trim());
+          clean.setAttribute('target', '_blank');
+          clean.setAttribute('rel', 'noopener noreferrer');
+        }
+      }
+      sanitizeRichTextInto_(node, clean);
+      targetParent.appendChild(clean);
+    } else {
+      sanitizeRichTextInto_(node, targetParent);
+    }
+  });
+}
+function parseInertHtml_(html) {
+  const tpl = document.createElement('template');
+  tpl.innerHTML = String(html || '');
+  return tpl.content;
+}
+const BULLET_MARKER_RE_ = /^[•\-\*]\s+/;
+const NUMBERED_MARKER_RE_ = /^\d+[.)]\s+/;
+function splitNewlinesIntoBr_(root) {
+  Array.from(root.childNodes).forEach(function (node) {
+    if (node.nodeType !== Node.TEXT_NODE || node.textContent.indexOf('\n') === -1) return;
+    const parts = node.textContent.split('\n');
+    parts.forEach(function (part, i) {
+      if (i > 0) root.insertBefore(document.createElement('br'), node);
+      if (part) root.insertBefore(document.createTextNode(part), node);
+    });
+    root.removeChild(node);
+  });
+}
+function computeLines_(container) {
+  const lines = [];
+  let contentNodes = [];
+  let allNodes = [];
+  function flush() {
+    if (contentNodes.length || allNodes.length) lines.push({ contentNodes: contentNodes, allNodes: allNodes });
+    contentNodes = [];
+    allNodes = [];
+  }
+  Array.from(container.childNodes).forEach(function (node) {
+    const tag = node.nodeType === Node.ELEMENT_NODE ? node.tagName : null;
+    if (tag === 'DIV' || tag === 'P') {
+      flush();
+      lines.push({ contentNodes: Array.from(node.childNodes), allNodes: [node] });
+      return;
+    }
+    if (tag === 'BR') {
+      allNodes.push(node);
+      flush();
+      return;
+    }
+    contentNodes.push(node);
+    allNodes.push(node);
+  });
+  flush();
+  return lines;
+}
+function leadingMarkerMatch_(line, markerRe) {
+  const first = line.contentNodes[0];
+  if (!first || first.nodeType !== Node.TEXT_NODE) return null;
+  return first.textContent.match(markerRe);
+}
+function groupMarkerLinesIntoList_(container, markerRe, listTag) {
+  const lines = computeLines_(container);
+  let i = 0;
+  while (i < lines.length) {
+    const match = leadingMarkerMatch_(lines[i], markerRe);
+    if (!match) { i++; continue; }
+    const run = [{ line: lines[i], marker: match }];
+    let j = i + 1;
+    while (j < lines.length) {
+      const m = leadingMarkerMatch_(lines[j], markerRe);
+      if (!m) break;
+      run.push({ line: lines[j], marker: m });
+      j++;
+    }
+
+    const list = document.createElement(listTag);
+    container.insertBefore(list, run[0].line.allNodes[0]);
+
+    run.forEach(function (r) {
+      const li = document.createElement('li');
+      const first = r.line.contentNodes[0];
+      first.textContent = first.textContent.slice(r.marker[0].length);
+      r.line.contentNodes.forEach(function (n) { li.appendChild(n); });
+      list.appendChild(li);
+      r.line.allNodes.forEach(function (n) { if (n.parentNode === container) container.removeChild(n); });
+    });
+    i = j;
+  }
+}
+function normalizeStoredListMarkers_(container) {
+  splitNewlinesIntoBr_(container);
+  groupMarkerLinesIntoList_(container, BULLET_MARKER_RE_, 'ul');
+  groupMarkerLinesIntoList_(container, NUMBERED_MARKER_RE_, 'ol');
+}
+// Stored reason/explanation/resolution/rejection HTML -> a clean string safe to inject.
+function sanitizeStoredRichTextHtml_(html) {
+  const clean = document.createElement('div');
+  sanitizeRichTextInto_(parseInertHtml_(html), clean);
+  normalizeStoredListMarkers_(clean);
+  return clean.innerHTML;
+}
+
 // ---------- DOM refs ----------
 const loadingState = document.getElementById('loadingState');
 const authGate = document.getElementById('authGate');
@@ -112,7 +237,6 @@ const mgrDetailReplacementText = document.getElementById('mgrDetailReplacementTe
 const mgrDetailAwaitingDocsNotice = document.getElementById('mgrDetailAwaitingDocsNotice');
 const mgrDetailDecisionNoteWrap = document.getElementById('mgrDetailDecisionNoteWrap');
 const mgrDetailDecisionNoteText = document.getElementById('mgrDetailDecisionNoteText');
-const mgrDetailError = document.getElementById('mgrDetailError');
 const mgrDetailFooter = document.getElementById('mgrDetailFooter');
 const mgrRejectBtn = document.getElementById('mgrRejectBtn');
 const mgrApproveBtn = document.getElementById('mgrApproveBtn');
@@ -376,12 +500,27 @@ function fmtDate_(iso) {
   if (isNaN(d.getTime())) return iso;
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
+// DD-MM-YYYY HH:MM, no timezone string - for real timestamps (not date-only
+// values like fmtDate_ handles).
+function fmtDateTime_(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+// Matches the calendar glyph the native app shows next to a leave request's
+// date range (see app.js's #upcomingLeaveBtn icon for the same paths).
+const CALENDAR_ICON_SVG_ = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>';
 function dateRangeLabel_(rec) {
   if (Array.isArray(rec.customDates) && rec.customDates.length > 1) {
     return rec.customDates.length + ' selected dates';
   }
   if (rec.startDate === rec.endDate || !rec.endDate) return fmtDate_(rec.startDate);
   return fmtDate_(rec.startDate) + ' – ' + fmtDate_(rec.endDate);
+}
+function dateRangePillHtml_(rec) {
+  return `<span class="mgr-pill lv-meta">${CALENDAR_ICON_SVG_}${escapeHtml(dateRangeLabel_(rec))}</span>`;
 }
 function timeAgo_(iso) {
   if (!iso) return '';
@@ -633,7 +772,7 @@ function requestCardHtml_(rec) {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>${attachments.length}
     </span>` : '';
   const reasonPreview = rec.reasonHtml && rec.reasonHtml.trim()
-    ? `<div class="rich-text text-xs text-slate-600 mt-2">${rec.reasonHtml}</div>`
+    ? `<div class="rich-text text-xs text-slate-600 mt-2">${sanitizeStoredRichTextHtml_(rec.reasonHtml)}</div>`
     : '';
   return `
     <button type="button" class="w-full text-left bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 hover:ring-orange-300 transition p-3.5" data-request-id="${escapeHtml(rec.requestId)}">
@@ -649,10 +788,10 @@ function requestCardHtml_(rec) {
           </div>
           <div class="flex flex-wrap gap-1.5 mt-2.5">
             ${leaveTypeChipsHtml_(rec.type)}
-            <span class="mgr-pill lv-meta">${escapeHtml(dateRangeLabel_(rec))}</span>
+            ${dateRangePillHtml_(rec)}
           </div>
           <div class="flex flex-wrap items-center gap-2.5 mt-1.5">
-            <span class="mgr-pill lv-meta">${escapeHtml(timeAgo_(rec.requestedAt))}</span>
+            <span class="mgr-pill lv-applied">${escapeHtml(timeAgo_(rec.requestedAt))}</span>
             ${attachIndicator}
           </div>
           ${reasonPreview}
@@ -722,11 +861,11 @@ function openDetail_(rec, opts) {
   mgrDetailMeta.textContent = 'Sent ' + timeAgo_(rec.requestedAt) + (rec.weekLabel ? ' · ' + rec.weekLabel : '');
   mgrDetailChips.innerHTML =
     leaveTypeChipsHtml_(rec.type) +
-    `<span class="mgr-pill lv-meta">${escapeHtml(dateRangeLabel_(rec))}</span>` +
+    dateRangePillHtml_(rec) +
     (rec.shortLeaveTime ? `<span class="mgr-pill lv-meta">${escapeHtml(rec.shortLeaveTime)}</span>` : '') +
     (rec.checkOutTime ? `<span class="mgr-pill lv-meta">${escapeHtml(rec.checkOutTime)} – ${escapeHtml(rec.checkInTime || '')}</span>` : '') +
     (opts.readOnly ? statusPillHtml_(rec.status) : '');
-  mgrDetailReason.innerHTML = rec.reasonHtml && rec.reasonHtml.trim() ? rec.reasonHtml : '<i class="text-slate-400">No reason provided.</i>';
+  mgrDetailReason.innerHTML = rec.reasonHtml && rec.reasonHtml.trim() ? sanitizeStoredRichTextHtml_(rec.reasonHtml) : '<i class="text-slate-400">No reason provided.</i>';
 
   const attachments = Array.isArray(rec.attachments) ? rec.attachments : [];
   mgrDetailAttachWrap.classList.toggle('hidden', attachments.length === 0);
@@ -744,7 +883,6 @@ function openDetail_(rec, opts) {
   mgrDetailDecisionNoteWrap.classList.toggle('hidden', !showDecisionNote);
   if (showDecisionNote) mgrDetailDecisionNoteText.textContent = rec.decisionNote;
 
-  mgrDetailError.classList.add('hidden');
   mgrDecideRejectExtra.classList.add('hidden');
   mgrDecideNote.value = '';
   mgrDecideAllowReschedule.checked = false;
@@ -786,7 +924,6 @@ mgrDecideConfirmBtn.addEventListener('click', () => submitDecision_('rejected'))
 async function submitDecision_(decision) {
   if (!currentDetailRecord_) return;
   const requestId = currentDetailRecord_.requestId;
-  mgrDetailError.classList.add('hidden');
   mgrApproveBtn.disabled = true;
   mgrDecideConfirmBtn.disabled = true;
   try {
@@ -799,8 +936,7 @@ async function submitDecision_(decision) {
     closeDetail_();
     fetchRequests_();
   } catch (err) {
-    mgrDetailError.textContent = err.message;
-    mgrDetailError.classList.remove('hidden');
+    showErrorToast_(err.message);
   } finally {
     mgrApproveBtn.disabled = false;
     mgrDecideConfirmBtn.disabled = false;
@@ -877,20 +1013,18 @@ const mgrSumKpiPending = document.getElementById('mgrSumKpiPending');
 const mgrSumKpiWithdrawn = document.getElementById('mgrSumKpiWithdrawn');
 const mgrSumKpiUninformed = document.getElementById('mgrSumKpiUninformed');
 const mgrSumByType = document.getElementById('mgrSumByType');
+const mgrSumTrendCard = document.getElementById('mgrSumTrendCard');
+const mgrSumTrendTitle = document.getElementById('mgrSumTrendTitle');
+const mgrSumTrendModeToggle = document.getElementById('mgrSumTrendModeToggle');
 const mgrSumTrend = document.getElementById('mgrSumTrend');
 const mgrSumLeaderboard = document.getElementById('mgrSumLeaderboard');
 const mgrSumDeveloperFilter = document.getElementById('mgrSumDeveloperFilter');
-
-function monthKey_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
-function monthLabel_(key) {
-  const [y, m] = key.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
-}
 
 let summaryPeriodState_ = makePeriodState_('year');
 let sumDeveloperFilter_ = '';
 let summaryRequestsCache_ = [];
 let summaryUninformedCache_ = [];
+let sumTrendWeekMode_ = false; // only meaningful when summaryPeriodState_.unit === 'quarter'
 
 async function fetchSummary_() {
   mgrSummaryLoading.classList.remove('hidden');
@@ -915,13 +1049,12 @@ async function fetchSummary_() {
 }
 
 function renderSummaryFiltered_() {
-  const requests = summaryRequestsCache_
-    .filter((r) => inPeriod_(summaryPeriodState_, r.requestedAt))
-    .filter((r) => !sumDeveloperFilter_ || r.email === sumDeveloperFilter_);
+  const developerFiltered = summaryRequestsCache_.filter((r) => !sumDeveloperFilter_ || r.email === sumDeveloperFilter_);
+  const requests = developerFiltered.filter((r) => inPeriod_(summaryPeriodState_, r.requestedAt));
   const uninformed = summaryUninformedCache_
     .filter((r) => inPeriod_(summaryPeriodState_, r.reportedAt))
     .filter((r) => !sumDeveloperFilter_ || r.email === sumDeveloperFilter_);
-  renderSummary_(requests, uninformed);
+  renderSummary_(requests, uninformed, developerFiltered);
 }
 
 wirePeriodNav_(
@@ -932,8 +1065,73 @@ wirePeriodNav_(
   summaryPeriodState_, renderSummaryFiltered_
 );
 mgrSumDeveloperFilter.addEventListener('change', () => { sumDeveloperFilter_ = mgrSumDeveloperFilter.value; renderSummaryFiltered_(); });
+mgrSumTrendModeToggle.addEventListener('click', (e) => {
+  const btn = e.target.closest('.mgr-chip');
+  if (!btn) return;
+  sumTrendWeekMode_ = btn.dataset.trendMode === 'week';
+  renderSummaryFiltered_();
+});
 
-function renderSummary_(requests, uninformed) {
+const TREND_MONTH_LABELS_ = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+// A request's "trend date" is its leave start date (falling back to when it
+// was requested) - mirrors the native app's _groupDate(), so a request
+// applied in one month for leave starting in another lands in the month the
+// leave actually happens.
+function trendGroupDate_(r) { return new Date(r.startDate || r.requestedAt); }
+function renderTrendBars_(labels, counts) {
+  const maxVal = Math.max(1, ...counts);
+  mgrSumTrend.innerHTML = labels.map((label, i) => `
+    <div class="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+      <div class="text-[10px] font-semibold text-slate-500">${counts[i]}</div>
+      <div class="w-full bg-orange-500 rounded-t-md" style="height:${Math.max(4, Math.round((counts[i] / maxVal) * 88))}px"></div>
+      <div class="text-[9px] text-slate-400">${escapeHtml(label)}</div>
+    </div>
+  `).join('');
+}
+// Trend chart follows the active period pill exactly like the native app:
+// Year -> 12 months of that year; Quarter -> its 3 months, or (via the
+// Month/Week toggle) its ~13 weeks; Month/Week -> hidden (too little range
+// for a trend to mean anything).
+function renderSummaryTrend_(allRequests) {
+  const unit = summaryPeriodState_.unit;
+  const showTrend = unit === 'year' || unit === 'quarter';
+  mgrSumTrendCard.classList.toggle('hidden', !showTrend);
+  mgrSumTrendModeToggle.classList.toggle('hidden', unit !== 'quarter');
+  if (!showTrend) return;
+  if (unit !== 'quarter') sumTrendWeekMode_ = false;
+  mgrSumTrendModeToggle.querySelectorAll('.mgr-chip').forEach((b) => {
+    b.classList.toggle('is-active', b.dataset.trendMode === (sumTrendWeekMode_ ? 'week' : 'month'));
+  });
+
+  const { start } = periodBounds_(summaryPeriodState_);
+
+  if (unit === 'quarter' && sumTrendWeekMode_) {
+    mgrSumTrendTitle.textContent = 'Weekly trend';
+    const labels = [];
+    const counts = [];
+    for (let i = 0; i < 13; i++) {
+      const wStart = new Date(start); wStart.setDate(start.getDate() + i * 7);
+      const wEnd = new Date(wStart); wEnd.setDate(wStart.getDate() + 6); wEnd.setHours(23, 59, 59, 999);
+      counts.push(allRequests.filter((r) => { const d = trendGroupDate_(r); return d >= wStart && d <= wEnd; }).length);
+      labels.push('W' + (i + 1));
+    }
+    renderTrendBars_(labels, counts);
+    return;
+  }
+
+  mgrSumTrendTitle.textContent = 'Monthly trend';
+  const year = start.getFullYear();
+  const monthsInScope = unit === 'quarter'
+    ? [0, 1, 2].map((i) => start.getMonth() + i)
+    : Array.from({ length: 12 }, (_, i) => i);
+  const counts = monthsInScope.map((m) => allRequests.filter((r) => {
+    const d = trendGroupDate_(r);
+    return d.getFullYear() === year && d.getMonth() === m;
+  }).length);
+  renderTrendBars_(monthsInScope.map((m) => TREND_MONTH_LABELS_[m]), counts);
+}
+
+function renderSummary_(requests, uninformed, allForTrend) {
   const total = requests.length;
   const approved = requests.filter((r) => r.status === 'approved').length;
   const rejected = requests.filter((r) => r.status === 'rejected').length;
@@ -969,24 +1167,7 @@ function renderSummary_(requests, uninformed) {
       </div>
     `).join('') : '<div class="text-sm text-slate-400 text-center py-4">No data yet.</div>';
 
-  // Monthly trend - last 6 months
-  const now = new Date();
-  const months = [];
-  for (let i = 5; i >= 0; i--) months.push(monthKey_(new Date(now.getFullYear(), now.getMonth() - i, 1)));
-  const monthCounts = {};
-  months.forEach((m) => { monthCounts[m] = 0; });
-  requests.forEach((r) => {
-    const key = monthKey_(new Date(r.requestedAt));
-    if (key in monthCounts) monthCounts[key]++;
-  });
-  const maxMonth = Math.max(1, ...Object.values(monthCounts));
-  mgrSumTrend.innerHTML = months.map((m) => `
-    <div class="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-      <div class="text-[10px] font-semibold text-slate-500">${monthCounts[m]}</div>
-      <div class="w-full bg-orange-500 rounded-t-md" style="height:${Math.max(4, Math.round((monthCounts[m] / maxMonth) * 88))}px"></div>
-      <div class="text-[9px] text-slate-400">${monthLabel_(m)}</div>
-    </div>
-  `).join('');
+  renderSummaryTrend_(allForTrend || requests);
 
   // Leaderboard - within the currently selected period/developer filter
   const byEmail = {};
@@ -1026,7 +1207,6 @@ const mgrNewReportForm = document.getElementById('mgrNewReportForm');
 const mgrNewReportEmail = document.getElementById('mgrNewReportEmail');
 const mgrNewReportDate = document.getElementById('mgrNewReportDate');
 const mgrNewReportReason = document.getElementById('mgrNewReportReason');
-const mgrNewReportError = document.getElementById('mgrNewReportError');
 const mgrNewReportSubmitBtn = document.getElementById('mgrNewReportSubmitBtn');
 const mgrReportDecideModal = document.getElementById('mgrReportDecideModal');
 const mgrReportDecideBackdrop = document.getElementById('mgrReportDecideBackdrop');
@@ -1036,7 +1216,6 @@ const mgrReportDecideMeta = document.getElementById('mgrReportDecideMeta');
 const mgrReportDecideReason = document.getElementById('mgrReportDecideReason');
 const mgrReportDecideExplanation = document.getElementById('mgrReportDecideExplanation');
 const mgrReportDecideNote = document.getElementById('mgrReportDecideNote');
-const mgrReportDecideError = document.getElementById('mgrReportDecideError');
 const mgrReportDecideRejectBtn = document.getElementById('mgrReportDecideRejectBtn');
 const mgrReportDecideAcceptBtn = document.getElementById('mgrReportDecideAcceptBtn');
 const mgrReportDeveloperFilter = document.getElementById('mgrReportDeveloperFilter');
@@ -1076,8 +1255,12 @@ function reportCard_(r, kind) {
   const badge = kind === 'decision'
     ? pill_('Explained', 'lv-requested', true)
     : kind === 'open' ? pill_('Awaiting Explanation', 'lv-withdrawn', true) : pill_('Resolved', 'lv-approved', true);
-  const bodyHtml = kind === 'decision' ? r.explanationHtml : kind === 'open' ? r.reasonHtml : r.resolutionHtml;
+  const rawBodyHtml = kind === 'decision' ? r.explanationHtml : kind === 'open' ? r.reasonHtml : r.resolutionHtml;
+  const bodyHtml = rawBodyHtml && rawBodyHtml.trim() ? sanitizeStoredRichTextHtml_(rawBodyHtml) : rawBodyHtml;
   const isDecision = kind === 'decision';
+  const resolvedLine = kind === 'resolved' && r.resolvedAt
+    ? `<div class="text-xs text-slate-400 mt-0.5">Resolved ${escapeHtml(fmtDateTime_(r.resolvedAt))}</div>`
+    : '';
   return `
     <${isDecision ? 'button type="button"' : 'div'} ${isDecision ? `data-report-id="${escapeHtml(r.reportId)}"` : ''} class="w-full text-left bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 ${isDecision ? 'hover:ring-orange-300 transition' : ''} p-3.5 block">
       <div class="flex items-start gap-3">
@@ -1087,6 +1270,7 @@ function reportCard_(r, kind) {
             <div class="min-w-0">
               <div class="font-semibold text-slate-800 text-sm truncate">${escapeHtml(r.name)}</div>
               <div class="text-xs text-slate-500">${escapeHtml(fmtDate_(r.date))}</div>
+              ${resolvedLine}
             </div>
             <div class="shrink-0">${badge}</div>
           </div>
@@ -1111,7 +1295,7 @@ function lateNoticeCard_(n) {
             </div>
             ${ack ? pill_('Acknowledged', 'lv-approved', true) : `<button type="button" data-ack-notice-id="${escapeHtml(n.id)}" class="text-xs font-semibold text-orange-700 hover:text-orange-800 shrink-0">Acknowledge</button>`}
           </div>
-          ${n.reasonHtml && n.reasonHtml.trim() ? `<div class="rich-text text-xs text-slate-600 mt-2">${n.reasonHtml}</div>` : ''}
+          ${n.reasonHtml && n.reasonHtml.trim() ? `<div class="rich-text text-xs text-slate-600 mt-2">${sanitizeStoredRichTextHtml_(n.reasonHtml)}</div>` : ''}
         </div>
       </div>
     </div>
@@ -1164,10 +1348,9 @@ function openReportDecide_(rec) {
   currentReportRecord_ = rec;
   mgrReportDecideName.textContent = rec.name;
   mgrReportDecideMeta.textContent = fmtDate_(rec.date);
-  mgrReportDecideReason.innerHTML = rec.reasonHtml && rec.reasonHtml.trim() ? rec.reasonHtml : '<i class="text-slate-400">No reason given.</i>';
-  mgrReportDecideExplanation.innerHTML = rec.explanationHtml && rec.explanationHtml.trim() ? rec.explanationHtml : '<i class="text-slate-400">No explanation given.</i>';
+  mgrReportDecideReason.innerHTML = rec.reasonHtml && rec.reasonHtml.trim() ? sanitizeStoredRichTextHtml_(rec.reasonHtml) : '<i class="text-slate-400">No reason given.</i>';
+  mgrReportDecideExplanation.innerHTML = rec.explanationHtml && rec.explanationHtml.trim() ? sanitizeStoredRichTextHtml_(rec.explanationHtml) : '<i class="text-slate-400">No explanation given.</i>';
   mgrReportDecideNote.value = '';
-  mgrReportDecideError.classList.add('hidden');
   mgrReportDecideModal.classList.remove('hidden');
 }
 function closeReportDecide_() {
@@ -1179,7 +1362,6 @@ mgrReportDecideBackdrop.addEventListener('click', closeReportDecide_);
 
 async function submitReportDecision_(kind) {
   if (!currentReportRecord_) return;
-  mgrReportDecideError.classList.add('hidden');
   mgrReportDecideAcceptBtn.disabled = true;
   mgrReportDecideRejectBtn.disabled = true;
   const note = escapeHtml(mgrReportDecideNote.value.trim());
@@ -1194,8 +1376,7 @@ async function submitReportDecision_(kind) {
     closeReportDecide_();
     fetchReportTab_();
   } catch (err) {
-    mgrReportDecideError.textContent = err.message;
-    mgrReportDecideError.classList.remove('hidden');
+    showErrorToast_(err.message);
   } finally {
     mgrReportDecideAcceptBtn.disabled = false;
     mgrReportDecideRejectBtn.disabled = false;
@@ -1209,7 +1390,6 @@ mgrNewReportCloseBtn.addEventListener('click', closeNewReportModal_);
 mgrNewReportBackdrop.addEventListener('click', closeNewReportModal_);
 
 async function openNewReportModal_() {
-  mgrNewReportError.classList.add('hidden');
   mgrNewReportForm.reset();
   mgrNewReportDate.value = new Date().toISOString().slice(0, 10);
   try {
@@ -1225,7 +1405,6 @@ function closeNewReportModal_() { mgrNewReportModal.classList.add('hidden'); }
 
 mgrNewReportForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  mgrNewReportError.classList.add('hidden');
   const email = mgrNewReportEmail.value;
   const user = usersCache_.find((u) => u.email === email);
   mgrNewReportSubmitBtn.disabled = true;
@@ -1240,8 +1419,7 @@ mgrNewReportForm.addEventListener('submit', async (e) => {
     closeNewReportModal_();
     fetchReportTab_();
   } catch (err) {
-    mgrNewReportError.textContent = err.message;
-    mgrNewReportError.classList.remove('hidden');
+    showErrorToast_(err.message);
   } finally {
     mgrNewReportSubmitBtn.disabled = false;
   }
@@ -1323,7 +1501,6 @@ const mgrUserEditDomain = document.getElementById('mgrUserEditDomain');
 const mgrUserEditIsOwner = document.getElementById('mgrUserEditIsOwner');
 const mgrUserEditActive = document.getElementById('mgrUserEditActive');
 const mgrUserEditSelfNote = document.getElementById('mgrUserEditSelfNote');
-const mgrUserEditError = document.getElementById('mgrUserEditError');
 const mgrUserEditCancelBtn = document.getElementById('mgrUserEditCancelBtn');
 const mgrUserEditSaveBtn = document.getElementById('mgrUserEditSaveBtn');
 
@@ -1340,7 +1517,6 @@ function openUserDetail_(user) {
   mgrUserViewActive.textContent = user.active ? 'Yes' : 'No';
   mgrUserViewMode.classList.remove('hidden');
   mgrUserEditMode.classList.add('hidden');
-  mgrUserEditError.classList.add('hidden');
   mgrUserDetailModal.classList.remove('hidden');
 }
 function closeUserDetail_() {
@@ -1362,7 +1538,6 @@ mgrUserEditToggleBtn.addEventListener('click', () => {
   mgrUserEditIsOwner.disabled = isSelf;
   mgrUserEditActive.disabled = isSelf;
   mgrUserEditSelfNote.classList.toggle('hidden', !isSelf);
-  mgrUserEditError.classList.add('hidden');
   mgrUserViewMode.classList.add('hidden');
   mgrUserEditMode.classList.remove('hidden');
 });
@@ -1372,7 +1547,6 @@ mgrUserEditCancelBtn.addEventListener('click', () => {
 });
 mgrUserEditSaveBtn.addEventListener('click', async () => {
   if (!currentUserRecord_) return;
-  mgrUserEditError.classList.add('hidden');
   mgrUserEditSaveBtn.disabled = true;
   try {
     const body = {
@@ -1391,8 +1565,7 @@ mgrUserEditSaveBtn.addEventListener('click', async () => {
     closeUserDetail_();
     renderTeamDirectory_();
   } catch (err) {
-    mgrUserEditError.textContent = err.message;
-    mgrUserEditError.classList.remove('hidden');
+    showErrorToast_(err.message);
   } finally {
     mgrUserEditSaveBtn.disabled = false;
   }
@@ -1417,7 +1590,6 @@ const mgrAttOnDutyRangeWrap = document.getElementById('mgrAttOnDutyRangeWrap');
 const mgrAttOnDutyStart = document.getElementById('mgrAttOnDutyStart');
 const mgrAttOnDutyEnd = document.getElementById('mgrAttOnDutyEnd');
 const mgrAttNote = document.getElementById('mgrAttNote');
-const mgrAttMarkError = document.getElementById('mgrAttMarkError');
 const mgrAttMarkSaveBtn = document.getElementById('mgrAttMarkSaveBtn');
 
 let attSelectedDate_ = new Date().toISOString().slice(0, 10);
@@ -1540,7 +1712,6 @@ function openAttMark_(user) {
   mgrAttArrivalTime.value = st.arrivalTime || '';
   mgrAttOnDutyStart.value = attSelectedDate_;
   mgrAttOnDutyEnd.value = attSelectedDate_;
-  mgrAttMarkError.classList.add('hidden');
   document.querySelectorAll('.mgr-att-opt').forEach((b) => b.classList.remove('is-active', 'att-present', 'att-late', 'att-absent', 'att-nightduty', 'att-onduty', 'att-rejected'));
   mgrAttMarkSaveBtn.disabled = true;
   mgrAttMarkSaveBtn.textContent = 'Select a status';
@@ -1556,7 +1727,6 @@ mgrAttMarkBackdrop.addEventListener('click', closeAttMark_);
 
 mgrAttMarkSaveBtn.addEventListener('click', async () => {
   if (!attMarkUser_ || !attMarkSelectedStatus_) return;
-  mgrAttMarkError.classList.add('hidden');
   mgrAttMarkSaveBtn.disabled = true;
   try {
     if (attMarkSelectedStatus_ === 'unmark') {
@@ -1579,8 +1749,7 @@ mgrAttMarkSaveBtn.addEventListener('click', async () => {
     closeAttMark_();
     fetchAttendanceRoster_();
   } catch (err) {
-    mgrAttMarkError.textContent = err.message;
-    mgrAttMarkError.classList.remove('hidden');
+    showErrorToast_(err.message);
   } finally {
     mgrAttMarkSaveBtn.disabled = false;
   }

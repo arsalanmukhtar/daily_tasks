@@ -47,7 +47,7 @@
        forking a parallel design system - every .cal2-*/.sheet-modal/
        .mobile-tabbar/.tb-btn/rich-text/.toast component this app reuses
        stays visually identical and gets any future fix automatically. -->
-  <link href="../styles.css?v=20260915c" rel="stylesheet" />
+  <link href="../styles.css?v=20260915d" rel="stylesheet" />
 </head>
 <body class="mgr-shell min-h-screen bg-gradient-to-br from-slate-200 via-slate-100 to-orange-100/70">
 
@@ -286,8 +286,14 @@
           <div id="mgrSumByType" class="space-y-2"></div>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
-          <div class="text-xs font-semibold text-slate-600 mb-3">Monthly trend &middot; last 6 months</div>
+        <div id="mgrSumTrendCard" class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
+          <div class="flex items-center justify-between mb-3">
+            <div id="mgrSumTrendTitle" class="text-xs font-semibold text-slate-600">Monthly trend</div>
+            <div id="mgrSumTrendModeToggle" class="hidden gap-1.5">
+              <button type="button" class="mgr-chip is-active" data-trend-mode="month">Month</button>
+              <button type="button" class="mgr-chip" data-trend-mode="week">Week</button>
+            </div>
+          </div>
           <div id="mgrSumTrend" class="flex items-end gap-2 h-28"></div>
         </div>
 
@@ -482,8 +488,6 @@
         </label>
       </div>
 
-      <p id="mgrDetailError" class="hidden error-callout mt-4"></p>
-
       <div id="mgrDetailFooter" class="mt-5 flex items-center gap-2">
         <button id="mgrRejectBtn" type="button" class="flex-1 px-4 py-2.5 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm font-semibold hover:bg-red-100 hover:border-red-300 transition">Reject</button>
         <button id="mgrApproveBtn" type="button" class="flex-1 px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold shadow-sm hover:bg-emerald-700 active:bg-emerald-800 transition">Approve</button>
@@ -519,7 +523,6 @@
         <textarea id="mgrReportDecideNote" rows="3" placeholder="Add a note for the record..."
           class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-500"></textarea>
       </div>
-      <p id="mgrReportDecideError" class="hidden error-callout mt-4"></p>
       <div class="mt-5 flex items-center gap-2">
         <button id="mgrReportDecideRejectBtn" type="button" class="flex-1 px-4 py-2.5 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm font-semibold hover:bg-red-100 hover:border-red-300 transition">Send back</button>
         <button id="mgrReportDecideAcceptBtn" type="button" class="flex-1 px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold shadow-sm hover:bg-emerald-700 active:bg-emerald-800 transition">Accept</button>
@@ -549,7 +552,6 @@
           <textarea id="mgrNewReportReason" rows="4" required placeholder="Describe the uninformed absence..."
             class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-500"></textarea>
         </div>
-        <p id="mgrNewReportError" class="hidden error-callout"></p>
         <button id="mgrNewReportSubmitBtn" type="submit"
           class="w-full mt-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-orange-600 text-white text-sm font-semibold shadow-sm hover:bg-orange-700 active:bg-orange-800 transition">
           Submit report
@@ -603,7 +605,6 @@
           <input id="mgrUserEditActive" type="checkbox" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500" /> Active
         </label>
         <p id="mgrUserEditSelfNote" class="hidden text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">You can't remove your own manager access or deactivate your own account.</p>
-        <p id="mgrUserEditError" class="hidden error-callout"></p>
         <div class="flex items-center gap-2 pt-1">
           <button id="mgrUserEditCancelBtn" type="button" class="flex-1 px-4 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 transition">Cancel</button>
           <button id="mgrUserEditSaveBtn" type="button" class="flex-1 px-4 py-2.5 rounded-lg bg-orange-600 text-white text-sm font-semibold shadow-sm hover:bg-orange-700 active:bg-orange-800 transition">Save</button>
@@ -655,7 +656,6 @@
           <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Note <span class="text-slate-400 normal-case font-medium">&middot; optional</span></label>
           <textarea id="mgrAttNote" rows="2" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-500"></textarea>
         </div>
-        <p id="mgrAttMarkError" class="hidden error-callout"></p>
         <button id="mgrAttMarkSaveBtn" type="button" disabled
           class="w-full px-4 py-2.5 rounded-lg bg-orange-600 text-white text-sm font-semibold shadow-sm hover:bg-orange-700 active:bg-orange-800 transition disabled:opacity-50">
           Select a status
@@ -667,6 +667,6 @@
   <!-- ============ TOAST NOTIFICATIONS ============ -->
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
-  <script type="module" src="app.js?v=20260915c"></script>
+  <script type="module" src="app.js?v=20260915d"></script>
 </body>
 </html>

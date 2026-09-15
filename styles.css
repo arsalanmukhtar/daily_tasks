@@ -70,6 +70,15 @@ input[type="time"] {
   accent-color: var(--brand-600);
 }
 
+/* Manager attendance day-nav date input - the browser's native field chrome
+   otherwise paints a gray box behind the label, clashing with the
+   transparent pill bar it sits inside. */
+#mgrAttDateInput {
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
 html,
 body,
 button,
@@ -1097,7 +1106,7 @@ body {
   border-color: #334155;
   color: #ffffff;
 }
-.an-range-btn:disabled { cursor: not-allowed; }
+.an-range-btn:disabled { cursor: not-allowed; opacity: 0.5; }
 
 /* In-button loading/success states (Export report + drawer export button) */
 .an-btn-icon-slot {
@@ -2543,6 +2552,7 @@ body.mgr-shell:not(.is-authed) {
 .mgr-pill {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   height: 24px;
   padding: 0 10px;
   border-radius: 999px;
@@ -2551,6 +2561,7 @@ body.mgr-shell:not(.is-authed) {
   white-space: nowrap;
   line-height: 1;
 }
+.mgr-pill svg { width: 12px; height: 12px; flex-shrink: 0; }
 .mgr-pill.is-status { text-transform: uppercase; font-weight: 700; letter-spacing: 0.02em; font-size: 10.5px; }
 
 .mgr-pill.lv-approved      { background: var(--lv-approved-bg);      color: var(--lv-approved); }
@@ -2565,6 +2576,7 @@ body.mgr-shell:not(.is-authed) {
 .mgr-pill.lv-dur-full      { background: var(--lv-dur-full-bg);      color: var(--lv-dur-full); }
 .mgr-pill.lv-dur-outpass   { background: var(--lv-dur-outpass-bg);   color: var(--lv-dur-outpass); }
 .mgr-pill.lv-meta          { background: var(--lv-meta-bg);          color: var(--lv-meta); }
+.mgr-pill.lv-applied       { background: #1F2937;                    color: #E2E8F0; }
 /* Attendance statuses - same underlying palette as above, named for
    clarity at call sites (mirrors AttendanceStatus's foreground/background
    getters in team_providers.dart exactly). */

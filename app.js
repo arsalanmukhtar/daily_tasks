@@ -27,6 +27,25 @@ function clearStoredAuthToken_() {
   try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch (_e) {}
 }
 
+// Every mobile Account-sheet action proxy-clicks the header's own (still-
+// present, just CSS-hidden on phones) button rather than duplicating its
+// open logic. Set right before proxy-clicking the real header button, and
+// consumed by that sub-panel's own close function - lets
+// closeLateNoticeModal_() etc. know to reopen the Account sheet behind them
+// instead of just dropping the user back on whatever tab happened to be
+// underneath. Declared here (rather than next to openMobileAccountSheet_()
+// further down) so every consumeReopenMobileAccountSheet_() call site -
+// several of which run during initial page setup, before the rest of the
+// script has executed - sees an already-initialized `let` instead of
+// throwing a temporal-dead-zone ReferenceError.
+let reopenMobileAccountSheetOnClose_ = false;
+function consumeReopenMobileAccountSheet_() {
+  if (reopenMobileAccountSheetOnClose_) {
+    reopenMobileAccountSheetOnClose_ = false;
+    openMobileAccountSheet_();
+  }
+}
+
 // Thin fetch wrapper used by every API call in this file - attaches the
 // stored JWT, JSON in/out, and throws Error(json.error) on any non-2xx so
 // every existing `catch (err) { setStatus('error', err.message) }` call
@@ -7042,6 +7061,15 @@ function closeAnalyticsExportPanel_() {
   analyticsExportTrigger.setAttribute('aria-expanded', 'false');
 }
 
+// The Export report trigger and the date-range bar sit above #analyticsContent
+// (so they're visible while it's still loading) but both depend on
+// analyticsCache - without this they were clickable-but-dead the instant the
+// panel opened, with no feedback, until the background fetch resolved.
+function setAnalyticsTopBarDisabled_(disabled) {
+  analyticsExportTrigger.disabled = disabled;
+  analyticsRangeBar.querySelectorAll('button').forEach(function (b) { b.disabled = disabled; });
+}
+
 async function openAnalyticsPanel() {
   if (!currentUserContext || !currentUserContext.isOwner) return;
   analyticsBackdrop.classList.remove('hidden');
@@ -7053,13 +7081,17 @@ async function openAnalyticsPanel() {
   analyticsContent.classList.add('hidden');
   setAnalyticsStatus_('loading', 'Loading submissions…');
 
+  const needsFetch = !analyticsCache;
+  if (needsFetch) setAnalyticsTopBarDisabled_(true);
   try {
-    if (!analyticsCache) await fetchAnalyticsData_();
+    if (needsFetch) await fetchAnalyticsData_();
     setAnalyticsStatus_('', '');
     analyticsContent.classList.remove('hidden');
     await renderAnalytics_();
   } catch (err) {
     setAnalyticsStatus_('error', err.message || 'Failed to load analytics.');
+  } finally {
+    if (needsFetch) setAnalyticsTopBarDisabled_(false);
   }
 }
 
@@ -8054,20 +8086,6 @@ mobileAccountBackdrop.addEventListener('click', closeMobileAccountSheet_);
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape' && !mobileAccountModal.classList.contains('hidden')) closeMobileAccountSheet_();
 });
-
-// Every sheet action proxy-clicks the header's own (still-present, just
-// CSS-hidden on phones) button rather than duplicating its open logic.
-// Set right before proxy-clicking the real header button, and consumed by
-// that sub-panel's own close function - lets closeLateNoticeModal_() etc.
-// know to reopen the Account sheet behind them instead of just dropping
-// the user back on whatever tab happened to be underneath.
-let reopenMobileAccountSheetOnClose_ = false;
-function consumeReopenMobileAccountSheet_() {
-  if (reopenMobileAccountSheetOnClose_) {
-    reopenMobileAccountSheetOnClose_ = false;
-    openMobileAccountSheet_();
-  }
-}
 
 mAcctLateNoticeBtn.addEventListener('click', function () { closeMobileAccountSheet_(); reopenMobileAccountSheetOnClose_ = true; lateNoticeBtn.click(); });
 mAcctExportBtn.addEventListener('click', function () { closeMobileAccountSheet_(); reopenMobileAccountSheetOnClose_ = true; exportSummaryBtn.click(); });

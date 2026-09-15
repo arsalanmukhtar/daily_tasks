@@ -12,12 +12,20 @@ import { buildLateNoticeEmail } from '../emailTemplate.cjs';
 // (see PROJECT.md's Team-feature-v2 plan).
 export const lateArrivalNoticesRouter = Router();
 
+// Postgres DATE columns come back as JS Date objects (UTC midnight); JSON-
+// serializing one raw produces a full ISO timestamp instead of a plain
+// YYYY-MM-DD string. Matches leaveRequests.js's own dateOnly() helper.
+function dateOnly(d) {
+  if (!d) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function toClientShape(row) {
   return {
     id: row.id,
     email: row.email,
     name: row.name,
-    date: row.date,
+    date: dateOnly(row.date),
     expectedArrivalTime: row.expected_arrival_time,
     reasonHtml: row.reason_html,
     attachments: row.attachments,
