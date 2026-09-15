@@ -2450,3 +2450,25 @@ input[type="password"]:not(:placeholder-shown) {
 .mgr-tab-btn svg { width: 21px; height: 21px; }
 .mgr-tab-btn.is-active { color: var(--brand-700, #C94526); }
 .mgr-tab-btn .rail-badge { top: 4px; right: 50%; margin-right: -14px; }
+
+/* Filter/sub-tab chips - Archived's status filter, Team's Directory/
+   Attendance/Stats switcher, Stats' period selector. One shared toggle
+   look everywhere a manager screen needs a small pill choice. */
+.mgr-chip {
+  padding: 0.375rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--line-soft);
+  background: #fff;
+  color: var(--ink-500);
+  transition: background 120ms, color 120ms, border-color 120ms;
+  cursor: pointer;
+}
+.mgr-chip:hover { background: var(--line-soft); }
+.mgr-chip.is-active {
+  background: var(--brand-600);
+  border-color: var(--brand-600);
+  color: #fff;
+}
+.mgr-chip.is-active:hover { background: var(--brand-700); }

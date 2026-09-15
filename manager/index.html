@@ -181,18 +181,151 @@
       <div id="mgrRequestsList" class="space-y-2.5"></div>
     </section>
 
-    <!-- ============ PLACEHOLDER TABS ============ -->
-    <section id="mgrArchivedPanel" class="hidden pb-24">
-      <div class="bg-white rounded-2xl shadow-md ring-1 ring-slate-200/70 p-8 text-center text-sm text-slate-400">Archived - coming soon.</div>
+    <!-- ============ ARCHIVED TAB ============ -->
+    <section id="mgrArchivedPanel" class="hidden space-y-3 pb-24">
+      <div class="flex items-center justify-between gap-2 px-1">
+        <h2 class="text-sm font-semibold text-slate-700">Archived requests</h2>
+        <span id="mgrArchivedCount" class="text-xs text-slate-400"></span>
+      </div>
+      <div id="mgrArchivedFilters" class="flex flex-wrap gap-1.5 px-1">
+        <button type="button" class="mgr-chip is-active" data-archived-status="all">All</button>
+        <button type="button" class="mgr-chip" data-archived-status="approved">Approved</button>
+        <button type="button" class="mgr-chip" data-archived-status="rejected">Rejected</button>
+        <button type="button" class="mgr-chip" data-archived-status="withdrawn">Withdrawn</button>
+        <button type="button" class="mgr-chip" data-archived-status="dismissed">Dismissed</button>
+      </div>
+      <input id="mgrArchivedSearch" type="search" placeholder="Search by name..."
+        class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-500" />
+      <div id="mgrArchivedLoading" class="flex flex-col items-center justify-center py-16 gap-3">
+        <span class="loader"></span>
+        <span class="text-xs text-slate-500">Loading archive&hellip;</span>
+      </div>
+      <div id="mgrArchivedEmpty" class="hidden text-center py-16 text-sm text-slate-400">No archived requests match.</div>
+      <div id="mgrArchivedList" class="space-y-2.5"></div>
     </section>
-    <section id="mgrSummaryPanel" class="hidden pb-24">
-      <div class="bg-white rounded-2xl shadow-md ring-1 ring-slate-200/70 p-8 text-center text-sm text-slate-400">Summary - coming soon.</div>
+
+    <!-- ============ SUMMARY TAB ============ -->
+    <section id="mgrSummaryPanel" class="hidden space-y-4 pb-24">
+      <div class="flex items-center justify-between gap-2 px-1">
+        <h2 class="text-sm font-semibold text-slate-700">Summary</h2>
+        <span id="mgrSummaryUpdated" class="text-xs text-slate-400"></span>
+      </div>
+      <div id="mgrSummaryLoading" class="flex flex-col items-center justify-center py-16 gap-3">
+        <span class="loader"></span>
+        <span class="text-xs text-slate-500">Crunching numbers&hellip;</span>
+      </div>
+      <div id="mgrSummaryBody" class="hidden space-y-4">
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 lv-kpi-grid">
+          <div class="an-kpi stat-tile stat-all"><div class="an-kpi-label"><i></i>Total</div><div id="mgrSumKpiTotal" class="an-kpi-value">0</div></div>
+          <div class="an-kpi stat-tile stat-ok"><div class="an-kpi-label"><i></i>Approved</div><div id="mgrSumKpiApproved" class="an-kpi-value">0</div></div>
+          <div class="an-kpi stat-tile stat-no"><div class="an-kpi-label"><i></i>Rejected</div><div id="mgrSumKpiRejected" class="an-kpi-value">0</div></div>
+          <div class="an-kpi stat-tile stat-wait"><div class="an-kpi-label"><i></i>Pending</div><div id="mgrSumKpiPending" class="an-kpi-value">0</div></div>
+          <div class="an-kpi stat-tile stat-neutral"><div class="an-kpi-label"><i></i>Withdrawn</div><div id="mgrSumKpiWithdrawn" class="an-kpi-value">0</div></div>
+          <div class="an-kpi stat-tile stat-neutral"><div class="an-kpi-label"><i></i>Uninformed</div><div id="mgrSumKpiUninformed" class="an-kpi-value">0</div></div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
+          <div class="text-xs font-semibold text-slate-600 mb-3">By leave type</div>
+          <div id="mgrSumByType" class="space-y-2"></div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
+          <div class="text-xs font-semibold text-slate-600 mb-3">Monthly trend &middot; last 6 months</div>
+          <div id="mgrSumTrend" class="flex items-end gap-2 h-28"></div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
+          <div class="text-xs font-semibold text-slate-600 mb-3">Top requesters &middot; this month</div>
+          <div id="mgrSumLeaderboard" class="space-y-2"></div>
+        </div>
+      </div>
     </section>
-    <section id="mgrReportPanel" class="hidden pb-24">
-      <div class="bg-white rounded-2xl shadow-md ring-1 ring-slate-200/70 p-8 text-center text-sm text-slate-400">Report - coming soon.</div>
+
+    <!-- ============ REPORT TAB ============ -->
+    <section id="mgrReportPanel" class="hidden space-y-4 pb-24">
+      <div class="flex items-center justify-between gap-2 px-1">
+        <h2 class="text-sm font-semibold text-slate-700">Uninformed absence reports</h2>
+        <button id="mgrNewReportBtn" type="button" class="text-xs font-semibold text-orange-700 hover:text-orange-800">+ New report</button>
+      </div>
+      <div id="mgrReportLoading" class="flex flex-col items-center justify-center py-16 gap-3">
+        <span class="loader"></span>
+        <span class="text-xs text-slate-500">Loading reports&hellip;</span>
+      </div>
+      <div id="mgrReportBody" class="hidden space-y-4">
+        <div>
+          <div class="text-xs font-semibold text-slate-600 mb-2 px-1">Needs your decision</div>
+          <div id="mgrReportDecisionEmpty" class="hidden text-center py-8 text-sm text-slate-400 bg-white rounded-xl ring-1 ring-slate-200/70">Nothing waiting on you.</div>
+          <div id="mgrReportDecisionList" class="space-y-2.5"></div>
+        </div>
+        <div>
+          <div class="text-xs font-semibold text-slate-600 mb-2 px-1">Open reports</div>
+          <div id="mgrReportOpenEmpty" class="hidden text-center py-8 text-sm text-slate-400 bg-white rounded-xl ring-1 ring-slate-200/70">No open reports.</div>
+          <div id="mgrReportOpenList" class="space-y-2.5"></div>
+        </div>
+        <div>
+          <div class="text-xs font-semibold text-slate-600 mb-2 px-1">Resolutions</div>
+          <div id="mgrReportResolvedEmpty" class="hidden text-center py-8 text-sm text-slate-400 bg-white rounded-xl ring-1 ring-slate-200/70">Nothing resolved yet.</div>
+          <div id="mgrReportResolvedList" class="space-y-2.5"></div>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-2 px-1">
+            <div class="text-xs font-semibold text-slate-600">Late notices</div>
+          </div>
+          <div id="mgrLateNoticeEmpty" class="hidden text-center py-8 text-sm text-slate-400 bg-white rounded-xl ring-1 ring-slate-200/70">No late notices.</div>
+          <div id="mgrLateNoticeList" class="space-y-2.5"></div>
+        </div>
+      </div>
     </section>
-    <section id="mgrTeamPanel" class="hidden pb-24">
-      <div class="bg-white rounded-2xl shadow-md ring-1 ring-slate-200/70 p-8 text-center text-sm text-slate-400">Team - coming soon.</div>
+
+    <!-- ============ TEAM TAB ============ -->
+    <section id="mgrTeamPanel" class="hidden space-y-3 pb-24">
+      <div id="mgrTeamSubTabs" class="flex gap-1.5 px-1">
+        <button type="button" class="mgr-chip is-active" data-team-sub="directory">Directory</button>
+        <button type="button" class="mgr-chip" data-team-sub="attendance">Attendance</button>
+        <button type="button" class="mgr-chip" data-team-sub="stats">Stats</button>
+      </div>
+
+      <div id="mgrTeamDirectorySub">
+        <input id="mgrTeamSearch" type="search" placeholder="Search name, email, designation..."
+          class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-500 mb-3" />
+        <div id="mgrTeamDirectoryList" class="space-y-2"></div>
+      </div>
+
+      <div id="mgrTeamAttendanceSub" class="hidden space-y-3">
+        <div class="flex items-center justify-between gap-2 bg-white rounded-xl ring-1 ring-slate-200/70 px-3 py-2">
+          <button id="mgrAttPrevDayBtn" type="button" class="w-8 h-8 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Previous day">&larr;</button>
+          <input id="mgrAttDateInput" type="date" class="text-sm font-semibold text-slate-700 border-0 focus:outline-none text-center" />
+          <button id="mgrAttNextDayBtn" type="button" class="w-8 h-8 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-500" aria-label="Next day">&rarr;</button>
+        </div>
+        <div id="mgrAttLoading" class="flex flex-col items-center justify-center py-16 gap-3">
+          <span class="loader"></span>
+          <span class="text-xs text-slate-500">Loading roster&hellip;</span>
+        </div>
+        <div id="mgrAttList" class="hidden space-y-2"></div>
+      </div>
+
+      <div id="mgrTeamStatsSub" class="hidden space-y-4">
+        <div id="mgrStatsPeriodChips" class="flex flex-wrap gap-1.5 px-1">
+          <button type="button" class="mgr-chip is-active" data-stats-period="week">This week</button>
+          <button type="button" class="mgr-chip" data-stats-period="month">This month</button>
+          <button type="button" class="mgr-chip" data-stats-period="quarter">This quarter</button>
+        </div>
+        <div id="mgrStatsLoading" class="flex flex-col items-center justify-center py-16 gap-3">
+          <span class="loader"></span>
+          <span class="text-xs text-slate-500">Crunching attendance&hellip;</span>
+        </div>
+        <div id="mgrStatsBody" class="hidden space-y-4">
+          <div class="grid grid-cols-3 gap-2 lv-kpi-grid">
+            <div class="an-kpi stat-tile stat-ok"><div class="an-kpi-label"><i></i>Present</div><div id="mgrStatsKpiPresent" class="an-kpi-value">0%</div></div>
+            <div class="an-kpi stat-tile stat-wait"><div class="an-kpi-label"><i></i>Late</div><div id="mgrStatsKpiLate" class="an-kpi-value">0%</div></div>
+            <div class="an-kpi stat-tile stat-no"><div class="an-kpi-label"><i></i>Absent</div><div id="mgrStatsKpiAbsent" class="an-kpi-value">0%</div></div>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
+            <div class="text-xs font-semibold text-slate-600 mb-3">By person</div>
+            <div id="mgrStatsByPerson" class="space-y-2"></div>
+          </div>
+        </div>
+      </div>
     </section>
   </div>
 
@@ -255,6 +388,15 @@
         <p id="mgrDetailReplacementText" class="text-sm text-indigo-900"></p>
       </div>
 
+      <div id="mgrDetailAwaitingDocsNotice" class="hidden mt-4 rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+        This is an emergency leave awaiting the requester's reason/attachment. It'll show up here for a decision once they submit it.
+      </div>
+
+      <div id="mgrDetailDecisionNoteWrap" class="hidden mt-4">
+        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Decision note</div>
+        <div id="mgrDetailDecisionNoteText" class="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-3"></div>
+      </div>
+
       <!-- Reject-only extras, revealed once "Reject" is tapped. -->
       <div id="mgrDecideRejectExtra" class="hidden mt-4 space-y-2.5">
         <div>
@@ -277,6 +419,175 @@
       <div id="mgrDecideConfirmFooter" class="hidden mt-5 flex items-center gap-2">
         <button id="mgrDecideCancelBtn" type="button" class="flex-1 px-4 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 transition">Cancel</button>
         <button id="mgrDecideConfirmBtn" type="button" class="flex-1 px-4 py-2.5 rounded-lg bg-orange-600 text-white text-sm font-semibold shadow-sm hover:bg-orange-700 active:bg-orange-800 transition">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ REPORT: DECIDE MODAL (accept/reject an explanation) ============ -->
+  <div id="mgrReportDecideModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 sheet-modal">
+    <div id="mgrReportDecideBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
+    <div class="relative bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 w-full max-w-lg p-6 max-h-[88vh] overflow-y-auto">
+      <div class="flex items-start justify-between gap-3 mb-1">
+        <div class="min-w-0">
+          <h3 id="mgrReportDecideName" class="text-lg font-semibold text-slate-800 truncate">-</h3>
+          <p id="mgrReportDecideMeta" class="text-xs text-slate-500 mt-0.5"></p>
+        </div>
+        <button id="mgrReportDecideCloseBtn" type="button" aria-label="Close" class="text-slate-400 hover:text-slate-600 text-xl leading-none shrink-0">&times;</button>
+      </div>
+      <div class="mt-4">
+        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Reported reason</div>
+        <div id="mgrReportDecideReason" class="rich-text text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-3"></div>
+      </div>
+      <div class="mt-3">
+        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Their explanation</div>
+        <div id="mgrReportDecideExplanation" class="rich-text text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-3"></div>
+      </div>
+      <div class="mt-4">
+        <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Note <span class="text-slate-400 normal-case font-medium">&middot; optional</span></div>
+        <textarea id="mgrReportDecideNote" rows="3" placeholder="Add a note for the record..."
+          class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-500"></textarea>
+      </div>
+      <p id="mgrReportDecideError" class="hidden error-callout mt-4"></p>
+      <div class="mt-5 flex items-center gap-2">
+        <button id="mgrReportDecideRejectBtn" type="button" class="flex-1 px-4 py-2.5 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm font-semibold hover:bg-red-100 hover:border-red-300 transition">Send back</button>
+        <button id="mgrReportDecideAcceptBtn" type="button" class="flex-1 px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold shadow-sm hover:bg-emerald-700 active:bg-emerald-800 transition">Accept</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ REPORT: NEW REPORT MODAL ============ -->
+  <div id="mgrNewReportModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 sheet-modal">
+    <div id="mgrNewReportBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
+    <div class="relative bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 w-full max-w-lg p-6 max-h-[88vh] overflow-y-auto">
+      <div class="flex items-start justify-between gap-3 mb-3">
+        <h3 class="text-lg font-semibold text-slate-800">New report</h3>
+        <button id="mgrNewReportCloseBtn" type="button" aria-label="Close" class="text-slate-400 hover:text-slate-600 text-xl leading-none shrink-0">&times;</button>
+      </div>
+      <form id="mgrNewReportForm" class="space-y-3">
+        <div>
+          <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Developer</label>
+          <select id="mgrNewReportEmail" required class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-orange-500"></select>
+        </div>
+        <div>
+          <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Date</label>
+          <input id="mgrNewReportDate" type="date" required class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-orange-500" />
+        </div>
+        <div>
+          <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">What happened</label>
+          <textarea id="mgrNewReportReason" rows="4" required placeholder="Describe the uninformed absence..."
+            class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-500"></textarea>
+        </div>
+        <p id="mgrNewReportError" class="hidden error-callout"></p>
+        <button id="mgrNewReportSubmitBtn" type="submit"
+          class="w-full mt-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-orange-600 text-white text-sm font-semibold shadow-sm hover:bg-orange-700 active:bg-orange-800 transition">
+          Submit report
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ TEAM: USER DETAIL / EDIT SHEET ============ -->
+  <div id="mgrUserDetailModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 sheet-modal">
+    <div id="mgrUserDetailBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
+    <div class="relative bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 w-full max-w-lg p-6 max-h-[88vh] overflow-y-auto">
+      <div class="flex items-start justify-between gap-3 mb-1">
+        <div class="min-w-0">
+          <h3 id="mgrUserDetailName" class="text-lg font-semibold text-slate-800 truncate">-</h3>
+          <p id="mgrUserDetailEmail" class="text-xs text-slate-500 mt-0.5 truncate"></p>
+        </div>
+        <button id="mgrUserDetailCloseBtn" type="button" aria-label="Close" class="text-slate-400 hover:text-slate-600 text-xl leading-none shrink-0">&times;</button>
+      </div>
+
+      <div id="mgrUserViewMode" class="mt-4 space-y-2.5 text-sm">
+        <div class="flex justify-between gap-3"><span class="text-slate-400">Designation</span><span id="mgrUserViewDesignation" class="text-slate-800 font-medium text-right"></span></div>
+        <div class="flex justify-between gap-3"><span class="text-slate-400">Reports to</span><span id="mgrUserViewReportedTo" class="text-slate-800 font-medium text-right"></span></div>
+        <div class="flex justify-between gap-3"><span class="text-slate-400">Domain</span><span id="mgrUserViewDomain" class="text-slate-800 font-medium text-right"></span></div>
+        <div class="flex justify-between gap-3"><span class="text-slate-400">Manager access</span><span id="mgrUserViewIsOwner" class="text-slate-800 font-medium text-right"></span></div>
+        <div class="flex justify-between gap-3"><span class="text-slate-400">Active</span><span id="mgrUserViewActive" class="text-slate-800 font-medium text-right"></span></div>
+        <button id="mgrUserEditToggleBtn" type="button" class="w-full mt-2 px-4 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50 transition">Edit profile</button>
+      </div>
+
+      <div id="mgrUserEditMode" class="hidden mt-4 space-y-2.5">
+        <div>
+          <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Name</label>
+          <input id="mgrUserEditName" type="text" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-orange-500" />
+        </div>
+        <div>
+          <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Designation</label>
+          <input id="mgrUserEditDesignation" type="text" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-orange-500" />
+        </div>
+        <div>
+          <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Reports to</label>
+          <input id="mgrUserEditReportedTo" type="text" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-orange-500" />
+        </div>
+        <div>
+          <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Domain</label>
+          <input id="mgrUserEditDomain" type="text" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-orange-500" />
+        </div>
+        <label class="flex items-center gap-2 text-sm text-slate-600">
+          <input id="mgrUserEditIsOwner" type="checkbox" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500" /> Manager access
+        </label>
+        <label class="flex items-center gap-2 text-sm text-slate-600">
+          <input id="mgrUserEditActive" type="checkbox" class="rounded border-slate-300 text-orange-600 focus:ring-orange-500" /> Active
+        </label>
+        <p id="mgrUserEditSelfNote" class="hidden text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">You can't remove your own manager access or deactivate your own account.</p>
+        <p id="mgrUserEditError" class="hidden error-callout"></p>
+        <div class="flex items-center gap-2 pt-1">
+          <button id="mgrUserEditCancelBtn" type="button" class="flex-1 px-4 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 transition">Cancel</button>
+          <button id="mgrUserEditSaveBtn" type="button" class="flex-1 px-4 py-2.5 rounded-lg bg-orange-600 text-white text-sm font-semibold shadow-sm hover:bg-orange-700 active:bg-orange-800 transition">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TEAM: ATTENDANCE MARK SHEET ============ -->
+  <div id="mgrAttMarkModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 sheet-modal">
+    <div id="mgrAttMarkBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
+    <div class="relative bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 w-full max-w-lg p-6 max-h-[88vh] overflow-y-auto">
+      <div class="flex items-start justify-between gap-3 mb-1">
+        <div class="min-w-0">
+          <h3 id="mgrAttMarkName" class="text-lg font-semibold text-slate-800 truncate">-</h3>
+          <p id="mgrAttMarkDate" class="text-xs text-slate-500 mt-0.5"></p>
+        </div>
+        <button id="mgrAttMarkCloseBtn" type="button" aria-label="Close" class="text-slate-400 hover:text-slate-600 text-xl leading-none shrink-0">&times;</button>
+      </div>
+
+      <div id="mgrAttOnLeaveNotice" class="hidden mt-4 rounded-lg bg-slate-100 border border-slate-200 p-3 text-sm text-slate-600">
+        This person is on approved leave for this day &mdash; attendance marking is disabled.
+      </div>
+
+      <div id="mgrAttMarkForm" class="mt-4 space-y-3">
+        <div class="grid grid-cols-3 gap-2">
+          <button type="button" data-att-status="present" class="mgr-att-opt px-2 py-2.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50">Present</button>
+          <button type="button" data-att-status="late" class="mgr-att-opt px-2 py-2.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50">Late</button>
+          <button type="button" data-att-status="absent" class="mgr-att-opt px-2 py-2.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50">Absent</button>
+          <button type="button" data-att-status="night_duty" class="mgr-att-opt px-2 py-2.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50">Night Duty</button>
+          <button type="button" data-att-status="on_duty" class="mgr-att-opt px-2 py-2.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50">On Duty</button>
+          <button type="button" data-att-status="unmark" class="mgr-att-opt px-2 py-2.5 rounded-lg border border-slate-300 text-xs font-semibold text-red-600 hover:bg-red-50">Unmark</button>
+        </div>
+        <div id="mgrAttArrivalTimeWrap" class="hidden">
+          <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Arrival time</label>
+          <input id="mgrAttArrivalTime" type="time" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-orange-500" />
+        </div>
+        <div id="mgrAttOnDutyRangeWrap" class="hidden grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">From</label>
+            <input id="mgrAttOnDutyStart" type="date" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-orange-500" />
+          </div>
+          <div>
+            <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">To</label>
+            <input id="mgrAttOnDutyEnd" type="date" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-orange-500" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-1.5">Note <span class="text-slate-400 normal-case font-medium">&middot; optional</span></label>
+          <textarea id="mgrAttNote" rows="2" class="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-500"></textarea>
+        </div>
+        <p id="mgrAttMarkError" class="hidden error-callout"></p>
+        <button id="mgrAttMarkSaveBtn" type="button" disabled
+          class="w-full px-4 py-2.5 rounded-lg bg-orange-600 text-white text-sm font-semibold shadow-sm hover:bg-orange-700 active:bg-orange-800 transition disabled:opacity-50">
+          Select a status
+        </button>
       </div>
     </div>
   </div>
