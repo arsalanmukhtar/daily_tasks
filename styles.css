@@ -276,6 +276,14 @@ textarea {
 }
 .task-cell:nth-last-child(2) { border-right: 0; }
 
+/* Non-editable wrapper + day/date label around .cell-editor - see
+   createTaskRow() in app.js for why these are siblings, not children, of
+   the contenteditable cell. Inert (display:contents, label hidden) outside
+   phone-mode; see the "Mobile SPA mode" section further down for the
+   stacked-card treatment that turns this into a visible label. */
+.cell-editor-wrap { display: contents; }
+.cell-day-label { display: none; }
+
 /* Cell editor - contenteditable div with placeholder, focus accent, soft
    scrolling. Font, padding and min-height scale fluidly with viewport width
    so the editor reads well from phones up to large desktops. */
@@ -685,6 +693,51 @@ textarea {
 .rail-badge {
   position: absolute; top: 4px; right: 4px; width: 8px; height: 8px;
   border-radius: 999px; background: #2563EB; border: 1.5px solid #fff; box-sizing: border-box;
+}
+
+/* ---------- Mobile bottom tab bar ----------
+   Hidden by default (desktop/tablet); shown only under the phone-mode media
+   query in the "Mobile SPA mode" section further down, once signed in
+   (body.is-authed). Four persistent docks: Tasks (the default view, nothing
+   else open), Submissions, Leaves and Account - see app.js's "Mobile bottom
+   navigation" section for the click wiring. */
+.mobile-tabbar {
+  display: none;
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 55;
+  height: calc(var(--mtabbar-h, 60px) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: #fff;
+  border-top: 1px solid var(--line-soft);
+  box-shadow: 0 -6px 18px rgba(15, 23, 42, 0.08);
+  align-items: stretch;
+}
+.mtab-btn {
+  position: relative;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-400);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: color 120ms;
+}
+.mtab-btn svg {
+  width: 21px; height: 21px;
+}
+.mtab-btn.is-active {
+  color: var(--brand-700, #C94526);
+}
+.mtab-btn .rail-badge {
+  top: 4px; right: 50%; margin-right: -14px;
 }
 
 /* ---------- Custom designation dropdown ---------- */
@@ -1418,16 +1471,161 @@ textarea {
   }
 }
 
-/* Phones: the 5-day task grid can't shrink to ~60px columns and stay usable,
-   so give the table a comfortable min-width and let its wrapper scroll
-   horizontally. Header cells get tighter padding to claw back space. */
-@media (max-width: 639.98px) {
+/* =========================================================
+   Mobile SPA mode (< 768px)
+   =========================================================
+   Below this width the app behaves like a small native app rather than a
+   shrunk desktop page: a persistent bottom tab bar (#mobileTabbar) replaces
+   the header's own action buttons as the primary way to reach Submissions/
+   Leaves/Account, the weekly task table collapses from a horizontally-
+   scrolling grid into stacked day cards, and every small action modal
+   (.sheet-modal) docks to the bottom of the screen instead of floating
+   centered, matching the platform's own sheet convention. */
+:root {
+  --mtabbar-h: 60px;
+}
+
+@media (max-width: 767.98px) {
+
+  /* ---- Bottom tab bar + page/drawer insets ---- */
+  body.is-authed {
+    padding-bottom: calc(var(--mtabbar-h) + env(safe-area-inset-bottom, 0px));
+  }
+  body.is-authed .mobile-tabbar {
+    display: flex;
+  }
+  /* Drawers/backdrops stop above the tab bar (instead of covering it) so a
+     dock stays reachable - tapping another tab switches straight to it
+     without needing to close the current one first. */
+  body.is-authed .drawer-panel,
+  body.is-authed .drawer-backdrop {
+    bottom: calc(var(--mtabbar-h) + env(safe-area-inset-bottom, 0px));
+    height: auto !important;
+  }
+
+  /* Owner-only header tools + the late-notice/settings icons all move into
+     the Account tab's sheet on mobile (see #mobileAccountModal) - keeps the
+     header down to just the logo and identity. */
+  body.is-authed #exportSummaryBtn,
+  body.is-authed #analyticsBtn,
+  body.is-authed #lateNoticeBtn,
+  body.is-authed #settingsBtn {
+    display: none !important;
+  }
+
+  /* ---- Small action modals dock to the bottom edge, sheet-style ---- */
+  .sheet-modal {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  .sheet-modal > div:last-child {
+    width: 100%;
+    max-width: 100% !important;
+    max-height: 88vh;
+    overflow-y: auto;
+    border-radius: 20px 20px 0 0 !important;
+    margin: 0 !important;
+    animation: sheetSlideUp 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* ---- Leaves drawer: rail becomes a horizontal sub-dock strip on top ---- */
+  .leaves-body {
+    flex-direction: column;
+  }
+  .leaves-rail {
+    order: -1;
+    width: 100%;
+    flex-direction: row;
+    justify-content: center;
+    gap: 10px;
+    padding: 8px 6px;
+    border-left: 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .leaves-rail-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* ---- Weekly task table: horizontal grid -> stacked day cards ----
+     Each task-row becomes a rounded card; each of its 5 day cells stacks
+     full-width inside it with its own day/date label (taskDayMeta_ in
+     app.js stamps data-day/data-date onto every cell so this works even
+     for rows added later via "Add row"). */
   #taskTable {
-    min-width: 36rem;
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0 10px;
   }
-  .tb-th {
-    padding: 0.5rem 0.55rem;
+  #taskTable thead {
+    display: none;
   }
+  #taskTable, #taskTable tbody {
+    display: block;
+  }
+  .task-row {
+    display: block;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    background: #fff;
+  }
+  .task-row + .task-row {
+    border-top: 1px solid #e2e8f0;
+  }
+  .task-cell {
+    display: block;
+    border-right: 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .task-cell:last-of-type {
+    border-bottom: 0;
+  }
+  .task-cell.is-today {
+    background: #FCF4F3;
+    box-shadow: inset 3px 0 0 #E15F41;
+  }
+  /* .cell-editor-wrap/.cell-day-label are plain siblings around the
+     contenteditable .cell-editor (see createTaskRow() in app.js) - a
+     pseudo-element on .cell-editor itself would collide with its existing
+     :empty::before placeholder rule (only one ::before can win), and a
+     real child element would get swept into cell.innerHTML, which is
+     exactly what gets persisted. display:contents on desktop keeps this
+     wrapper completely out of the layout there; only phones turn it into
+     a real block to show the label above the field. */
+  .cell-editor-wrap {
+    display: block;
+  }
+  .cell-day-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    padding: 7px 10px 0;
+  }
+  .task-cell.is-today .cell-day-label {
+    color: #C94526;
+  }
+  .row-action-cell {
+    display: block;
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: auto;
+  }
+  .remove-row-btn {
+    opacity: 0.65;
+    background: #fff;
+  }
+}
+
+@keyframes sheetSlideUp {
+  from { transform: translateY(28px); opacity: 0.4; }
+  to   { transform: translateY(0);    opacity: 1; }
 }
 
 /* Fine-tune the spacing rhythm on large desktops so the dashboard breathes. */

@@ -416,6 +416,26 @@ const leaveDatesStripClearBtn = document.getElementById('leaveDatesStripClearBtn
 const leaveSummaryChips      = document.getElementById('leaveSummaryChips');
 const leaveAttachmentCountNote = document.getElementById('leaveAttachmentCountNote');
 const toastContainer     = document.getElementById('toastContainer');
+
+// ---------- Mobile bottom navigation ----------
+const mobileTabbar        = document.getElementById('mobileTabbar');
+const mtabTasksBtn        = document.getElementById('mtabTasksBtn');
+const mtabSubmissionsBtn  = document.getElementById('mtabSubmissionsBtn');
+const mtabLeavesBtn       = document.getElementById('mtabLeavesBtn');
+const mtabLeavesBadge     = document.getElementById('mtabLeavesBadge');
+const mtabAccountBtn      = document.getElementById('mtabAccountBtn');
+const mobileAccountModal    = document.getElementById('mobileAccountModal');
+const mobileAccountBackdrop = document.getElementById('mobileAccountBackdrop');
+const closeMobileAccountBtn = document.getElementById('closeMobileAccountBtn');
+const mAcctPhoto          = document.getElementById('mAcctPhoto');
+const mAcctName           = document.getElementById('mAcctName');
+const mAcctEmail          = document.getElementById('mAcctEmail');
+const mAcctLateNoticeBtn      = document.getElementById('mAcctLateNoticeBtn');
+const mAcctExportBtn          = document.getElementById('mAcctExportBtn');
+const mAcctAnalyticsBtn       = document.getElementById('mAcctAnalyticsBtn');
+const mAcctChangePasswordBtn  = document.getElementById('mAcctChangePasswordBtn');
+const mAcctSignOutBtn         = document.getElementById('mAcctSignOutBtn');
+
 const analyticsLeaveKpis = document.getElementById('analyticsLeaveKpis');
 const exportSummaryBtn   = document.getElementById('exportSummaryBtn');
 const exportBackdrop     = document.getElementById('exportBackdrop');
@@ -480,6 +500,15 @@ let activeToolbarEl = null;
 // happened yet. Kept in sync by applyFutureDayLocks().
 let futureDays = new Set();
 
+// Per-day date label + "is today" flag for the currently selected week -
+// kept in sync by updateColumnHeaderDates() and mirrored onto each row's
+// own .cell-day-label (a plain sibling div, NOT a child of the
+// contenteditable .cell-editor - it must never end up inside
+// cell.innerHTML, which is exactly what gets persisted) so phones, which
+// collapse the table header into stacked cards (see styles.css), can still
+// show each cell's day/date instead of relying on a hidden <thead>.
+let taskDayMeta_ = {};
+
 // The signed-in user's submissions, cached so the form can auto-load a week's
 // saved content when the week changes (no network round-trip per change).
 let submissionsCache = null;
@@ -490,6 +519,14 @@ function createTaskRow(rowData) {
   TASK_DAYS.forEach((day) => {
     const td = document.createElement('td');
     td.className = 'task-cell';
+    // Wrapper + label are plain siblings of .cell-editor, never children of
+    // it - .cell-editor's innerHTML is exactly what serializeTaskTable()
+    // persists, so anything shown "inside" the cell for mobile's stacked-
+    // card look must live outside the contenteditable region.
+    const wrap = document.createElement('div');
+    wrap.className = 'cell-editor-wrap';
+    const label = document.createElement('div');
+    label.className = 'cell-day-label';
     const cell = document.createElement('div');
     cell.className = 'cell-editor';
     cell.dataset.day = day;
@@ -499,9 +536,14 @@ function createTaskRow(rowData) {
     cell.contentEditable = locked ? 'false' : 'true';
     cell.classList.toggle('cell-locked', locked);
     cell.dataset.placeholder = locked ? 'Upcoming' : (day + ' tasks…');
+    const meta = taskDayMeta_[day];
+    label.textContent = meta ? (day + ' · ' + meta.label) : day;
+    td.classList.toggle('is-today', !!(meta && meta.isToday));
     if (rowData && rowData[day]) cell.innerHTML = rowData[day];
     cell.addEventListener('focus', () => { activeCell = cell; activeToolbarEl = taskToolbar; });
-    td.appendChild(cell);
+    wrap.appendChild(label);
+    wrap.appendChild(cell);
+    td.appendChild(wrap);
     tr.appendChild(td);
   });
   const actionTd = document.createElement('td');
@@ -2421,6 +2463,7 @@ async function openApplyLeaveTab_() {
 
 async function openMyLeavesDrawer() {
   if (!currentUserContext) return;
+  setMobileDock_('leaves');
   myLeavesDrawer.classList.add('open');
   myLeavesBackdrop.classList.add('open');
   switchLeavesTab_('overview');
@@ -2446,6 +2489,7 @@ function closeMyLeavesDrawer() {
   myLeavesDrawer.classList.remove('open');
   myLeavesBackdrop.classList.remove('open');
   closeMyLeavesDateFilterPanel_();
+  setMobileDock_('tasks');
 }
 
 // Patches one already-known record in place with fields the server just
@@ -3932,19 +3976,33 @@ window.addEventListener('resize', () => { if (calOpen) closeCalendar(); });
 
 function updateColumnHeaderDates(info) {
   const dayIndex = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4 };
+  taskDayMeta_ = {};
   taskTable.querySelectorAll('thead th[data-day]').forEach((th) => {
     const dateEl = th.querySelector('.tb-date');
     if (!dateEl) return;
+    const day = th.dataset.day;
+    let label = '-';
+    let isToday = false;
     if (info) {
-      const d = info.days[dayIndex[th.dataset.day]].date;
-      dateEl.textContent = d.toLocaleDateString('en-GB', {
+      const d = info.days[dayIndex[day]].date;
+      label = d.toLocaleDateString('en-GB', {
         day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC'
       });
-      th.classList.toggle('is-today', isTodayDate(d));
-    } else {
-      dateEl.textContent = '-';
-      th.classList.remove('is-today');
+      isToday = isTodayDate(d);
     }
+    dateEl.textContent = label;
+    th.classList.toggle('is-today', isToday);
+    taskDayMeta_[day] = { label, isToday };
+    // Mirror onto every already-rendered row's .cell-day-label too - phones
+    // collapse the table header into stacked cards (see styles.css), so
+    // each cell shows its own day/date label instead of relying on the
+    // (hidden-on-mobile) column header.
+    taskTbody.querySelectorAll('.cell-editor[data-day="' + day + '"]').forEach((cell) => {
+      const td = cell.closest('.task-cell');
+      const lbl = cell.previousElementSibling;
+      if (lbl && lbl.classList.contains('cell-day-label')) lbl.textContent = day + ' · ' + label;
+      if (td) td.classList.toggle('is-today', isToday);
+    });
   });
 }
 
@@ -3979,6 +4037,8 @@ function showLoading()  {
   submissionsDrawer.classList.remove('open'); submissionsBackdrop.classList.remove('open');
   myLeavesDrawer.classList.remove('open'); myLeavesBackdrop.classList.remove('open');
   applyLeaveBtn.classList.add('hidden');
+  document.body.classList.remove('is-authed');
+  closeMobileAccountSheet_();
 }
 // One of: 'signIn' | 'forgot' | 'checkEmail' | 'reset'.
 const AUTH_GATE_STATES_ = {
@@ -4005,6 +4065,8 @@ function showAuthGate(errMsg, state) {
   submissionsDrawer.classList.remove('open'); submissionsBackdrop.classList.remove('open');
   myLeavesDrawer.classList.remove('open'); myLeavesBackdrop.classList.remove('open');
   applyLeaveBtn.classList.add('hidden');
+  document.body.classList.remove('is-authed');
+  closeMobileAccountSheet_();
   // Defaults to the sign-in sub-state - a stale "check your email" or
   // "reset password" state must never persist across a sign-out.
   setAuthGateState_(state || 'signIn');
@@ -4037,12 +4099,26 @@ function showForm(user, displayName, designation, reportedTo) {
   exportSummaryBtn.classList.toggle('flex', isOwner);
   analyticsBtn.classList.toggle('hidden', !isOwner);
   analyticsBtn.classList.toggle('flex', isOwner);
+  // Same reveal rule, mirrored onto the mobile Account sheet's copies of
+  // these two owner-only actions (see the "Mobile bottom navigation"
+  // section near the end of this file).
+  mAcctExportBtn.classList.toggle('hidden', !isOwner);
+  mAcctExportBtn.classList.toggle('flex', isOwner);
+  mAcctAnalyticsBtn.classList.toggle('hidden', !isOwner);
+  mAcctAnalyticsBtn.classList.toggle('flex', isOwner);
 
   const FALLBACK_AVATAR = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22white%22%3E%3Cpath d=%22M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z%22/%3E%3C/svg%3E';
   userPhoto.onerror = () => { userPhoto.onerror = null; userPhoto.src = FALLBACK_AVATAR; };
   userPhoto.src     = user.photoURL || FALLBACK_AVATAR;
   userName.textContent  = displayName;
   userEmail.textContent = user.email;
+  mAcctPhoto.onerror = () => { mAcctPhoto.onerror = null; mAcctPhoto.src = FALLBACK_AVATAR; };
+  mAcctPhoto.src     = user.photoURL || FALLBACK_AVATAR;
+  mAcctName.textContent  = displayName;
+  mAcctEmail.textContent = user.email;
+
+  document.body.classList.add('is-authed');
+  setMobileDock_('tasks');
 
   submittingAsName.textContent   = displayName;
   submittingAsEmail.textContent  = user.email;
@@ -5448,6 +5524,7 @@ function weekLabelToIsoInput(weekLabel) {
 
 function openSubmissionsDrawer() {
   if (!currentUserContext) return;
+  setMobileDock_('submissions');
   submissionsDrawer.classList.add('open');
   submissionsBackdrop.classList.add('open');
   submissionsList.innerHTML =
@@ -5461,6 +5538,7 @@ function openSubmissionsDrawer() {
 function closeSubmissionsDrawer() {
   submissionsDrawer.classList.remove('open');
   submissionsBackdrop.classList.remove('open');
+  setMobileDock_('tasks');
 }
 
 // Fetches the signed-in user's submissions and refreshes the cache. Throws on
@@ -7863,3 +7941,74 @@ document.addEventListener('keydown', function (e) {
   if (devDetailPanel.classList.contains('open')) { closeDevDetail_(); return; }
   if (!analyticsPanel.classList.contains('hidden')) closeAnalyticsPanel();
 });
+
+// ---------- Mobile bottom navigation ----------
+// Phone-only (see styles.css's "Mobile SPA mode" section) persistent tab
+// bar with 4 docks: Tasks (the default - nothing else open), Submissions,
+// Leaves and Account. Every tab drives the exact same open/close functions
+// the pre-existing header/nav-card buttons already call, so there is
+// exactly one code path per action regardless of how it was reached; this
+// section only adds active-tab bookkeeping and the new Account sheet.
+function setMobileDock_(name) {
+  [mtabTasksBtn, mtabSubmissionsBtn, mtabLeavesBtn, mtabAccountBtn].forEach(function (btn) {
+    if (btn) btn.classList.toggle('is-active', btn.dataset.mtab === name);
+  });
+}
+
+function openMobileAccountSheet_() {
+  setMobileDock_('account');
+  mobileAccountModal.classList.remove('hidden');
+}
+function closeMobileAccountSheet_() {
+  mobileAccountModal.classList.add('hidden');
+  setMobileDock_('tasks');
+}
+
+mtabTasksBtn.addEventListener('click', function () {
+  closeSubmissionsDrawer();
+  closeMyLeavesDrawer();
+  closeMobileAccountSheet_();
+});
+mtabSubmissionsBtn.addEventListener('click', function () {
+  closeMyLeavesDrawer();
+  closeMobileAccountSheet_();
+  openSubmissionsDrawer();
+});
+mtabLeavesBtn.addEventListener('click', function () {
+  closeSubmissionsDrawer();
+  closeMobileAccountSheet_();
+  openMyLeavesDrawer();
+});
+mtabAccountBtn.addEventListener('click', function () {
+  closeSubmissionsDrawer();
+  closeMyLeavesDrawer();
+  openMobileAccountSheet_();
+});
+
+closeMobileAccountBtn.addEventListener('click', closeMobileAccountSheet_);
+mobileAccountBackdrop.addEventListener('click', closeMobileAccountSheet_);
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && !mobileAccountModal.classList.contains('hidden')) closeMobileAccountSheet_();
+});
+
+// Every sheet action proxy-clicks the header's own (still-present, just
+// CSS-hidden on phones) button rather than duplicating its open logic.
+mAcctLateNoticeBtn.addEventListener('click', function () { closeMobileAccountSheet_(); lateNoticeBtn.click(); });
+mAcctExportBtn.addEventListener('click', function () { closeMobileAccountSheet_(); exportSummaryBtn.click(); });
+mAcctAnalyticsBtn.addEventListener('click', function () { closeMobileAccountSheet_(); analyticsBtn.click(); });
+mAcctChangePasswordBtn.addEventListener('click', function () { closeMobileAccountSheet_(); changePasswordMenuBtn.click(); });
+mAcctSignOutBtn.addEventListener('click', function () { closeMobileAccountSheet_(); signOutBtn.click(); });
+
+// Mirrors the Leaves drawer's own rail badges (reschedule-pending on
+// History, an open report on Explain the Absence) onto the bottom tab's
+// single dot, via a MutationObserver rather than editing every call site
+// that toggles them.
+if (mtabLeavesBadge && historyRailBadge && uninformedRailBadge) {
+  var syncMtabLeavesBadge_ = function () {
+    var show = !historyRailBadge.classList.contains('hidden') || !uninformedRailBadge.classList.contains('hidden');
+    mtabLeavesBadge.classList.toggle('hidden', !show);
+  };
+  new MutationObserver(syncMtabLeavesBadge_).observe(historyRailBadge, { attributes: true, attributeFilter: ['class'] });
+  new MutationObserver(syncMtabLeavesBadge_).observe(uninformedRailBadge, { attributes: true, attributeFilter: ['class'] });
+  syncMtabLeavesBadge_();
+}

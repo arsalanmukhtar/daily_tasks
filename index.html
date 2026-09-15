@@ -2,7 +2,7 @@
 <html lang="en-GB">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Daily Tasks - Weekly Time Sheet</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -263,7 +263,7 @@
          forgot-password flow (this always requires the current password,
          so a session left open on a shared machine can't be used to lock
          the real owner out). -->
-    <div id="changePasswordModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4">
+    <div id="changePasswordModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 sheet-modal">
       <div id="changePasswordBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
       <div class="relative bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 w-full max-w-sm p-6">
         <div class="flex items-center justify-between mb-1">
@@ -329,7 +329,7 @@
          notice, purely informational on the manager's side (see
          server/src/routes/lateArrivalNotices.js). Same plain client-side
          modal shell as #changePasswordModal above. -->
-    <div id="lateNoticeModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4">
+    <div id="lateNoticeModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 sheet-modal">
       <div id="lateNoticeBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
       <div class="relative bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-1">
@@ -415,7 +415,7 @@
          (status='pending_documentation', dated today); the reason/document
          are added afterwards via #submitDocsModal, from the request's own
          card once it appears in My Leaves. -->
-    <div id="emergencyLeaveModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4">
+    <div id="emergencyLeaveModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 sheet-modal">
       <div id="emergencyLeaveBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
       <div class="relative bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 w-full max-w-sm p-6">
         <div class="flex items-center justify-between mb-1">
@@ -439,7 +439,7 @@
          PDF/DOC/DOCX/PNG/JPG accepted here (see server/src/routes/
          attachments.js's ?restrict=docs fileFilter), unlike every other
          attachment picker in this app. -->
-    <div id="submitDocsModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4">
+    <div id="submitDocsModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 sheet-modal">
       <div id="submitDocsBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
       <div class="relative bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-1">
@@ -485,7 +485,7 @@
          .cal2-* calendar look, e.g. #leaveCalendar/#lateNoticeDatePopover)
          rather than native date inputs, so this matches the app's theme
          instead of the browser's own calendar. -->
-    <div id="rescheduleModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4">
+    <div id="rescheduleModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 sheet-modal">
       <div id="rescheduleBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
       <div class="relative bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 w-full max-w-sm p-6">
         <div class="flex items-center justify-between mb-1">
@@ -577,7 +577,7 @@
          leaveRequests.js's /:id/reschedule), so this is the one chance to
          warn before the request even exists, rather than surprising them
          with a missing Reschedule button after a rejection. -->
-    <div id="customDatesWarningModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4">
+    <div id="customDatesWarningModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 sheet-modal">
       <div id="customDatesWarningBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
       <div class="relative bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 w-full max-w-sm p-6">
         <h3 class="text-lg font-semibold text-slate-800 mb-1">Heads up - Custom dates can't be rescheduled</h3>
@@ -975,7 +975,7 @@
       </button>
     </header>
 
-    <div class="flex-1 flex overflow-hidden">
+    <div class="flex-1 flex overflow-hidden leaves-body">
       <nav id="leavesTabRail" class="leaves-rail" aria-label="Leaves panel sections">
         <button type="button" class="leaves-rail-btn is-active" data-tab="overview" title="My Leaves" aria-label="My Leaves">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg>
@@ -1450,7 +1450,7 @@
 
   <!-- ============ EXPORT WEEKLY SUMMARY MODAL (owner only) ============ -->
   <div id="exportBackdrop" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60]"></div>
-  <div id="exportModal" class="hidden fixed inset-0 z-[70] items-center justify-center p-4">
+  <div id="exportModal" class="hidden fixed inset-0 z-[70] items-center justify-center p-4 sheet-modal">
     <div class="bg-white rounded-2xl shadow-2xl ring-1 ring-slate-200 w-full max-w-md overflow-hidden">
       <header class="px-5 py-4 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-orange-50/60 flex items-start justify-between gap-3">
         <div class="min-w-0">
@@ -1666,6 +1666,93 @@
       <input type="text" id="analyticsExportSearch" class="an-custom-search" placeholder="Search by name or role…" autocomplete="off" />
     </div>
     <div id="analyticsExportList" class="an-custom-list"></div>
+  </div>
+
+  <!-- ============ MOBILE BOTTOM TAB BAR ============
+       Phone-only (see styles.css's max-width:767.98px block) persistent
+       navigation dock. Each button drives the exact same open/close
+       functions the existing header/nav-card buttons already call
+       (openSubmissionsDrawer, openMyLeavesDrawer, etc. - see app.js's
+       "Mobile bottom navigation" section near the end) so there's exactly
+       one code path per action regardless of how it was reached. Stays
+       fixed above the drawers/sheets, which get a bottom inset on mobile
+       so they never cover it - tabs stay reachable while a dock is open. -->
+  <nav id="mobileTabbar" class="mobile-tabbar" aria-label="Main navigation">
+    <button type="button" id="mtabTasksBtn" class="mtab-btn is-active" data-mtab="tasks">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M8 14h3m-3 4h6"/></svg>
+      <span>Tasks</span>
+    </button>
+    <button type="button" id="mtabSubmissionsBtn" class="mtab-btn" data-mtab="submissions">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9h6m-6 4h4"/></svg>
+      <span>Submissions</span>
+    </button>
+    <button type="button" id="mtabLeavesBtn" class="mtab-btn" data-mtab="leaves">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M16 2.5v4M8 2.5v4M3 10h18M12 14v5M9.5 16.5h5"/></svg>
+      <span id="mtabLeavesBadge" class="rail-badge hidden" aria-hidden="true"></span>
+      <span>Leaves</span>
+    </button>
+    <button type="button" id="mtabAccountBtn" class="mtab-btn" data-mtab="account">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"/></svg>
+      <span>Account</span>
+    </button>
+  </nav>
+
+  <!-- ============ MOBILE ACCOUNT SHEET ============
+       Phone-only, opened from the bottom tab bar's Account tab. Consolidates
+       the header's late-notice/settings-gear actions (hidden from the
+       header itself below the same breakpoint - see styles.css) plus the
+       owner-only export/analytics tools into one bottom sheet. Every button
+       here proxy-clicks the header's own (still-present, just hidden)
+       button rather than duplicating its logic - see app.js. -->
+  <div id="mobileAccountModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 sheet-modal">
+    <div id="mobileAccountBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
+    <div class="relative bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 w-full max-w-sm p-5">
+      <div class="flex items-center gap-3 mb-4">
+        <img id="mAcctPhoto" alt="" referrerpolicy="no-referrer" class="w-11 h-11 rounded-full ring-2 ring-orange-100 shrink-0 bg-slate-100 object-cover" />
+        <div class="min-w-0 flex-1">
+          <div id="mAcctName" class="font-semibold text-slate-800 text-sm truncate"></div>
+          <div id="mAcctEmail" class="text-xs text-slate-500 truncate"></div>
+        </div>
+        <button type="button" id="closeMobileAccountBtn" aria-label="Close" class="text-slate-400 hover:text-slate-600 text-xl leading-none shrink-0">&times;</button>
+      </div>
+
+      <div class="space-y-1.5">
+        <button type="button" id="mAcctLateNoticeBtn" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 text-left transition">
+          <span class="w-8 h-8 rounded-md bg-orange-50 text-orange-700 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          </span>
+          <span class="text-sm font-medium text-slate-700">I'll be late</span>
+        </button>
+
+        <button type="button" id="mAcctExportBtn" class="hidden w-full items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 text-left transition">
+          <span class="w-8 h-8 rounded-md bg-orange-50 text-orange-700 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+          </span>
+          <span class="text-sm font-medium text-slate-700">Export weekly summary</span>
+        </button>
+
+        <button type="button" id="mAcctAnalyticsBtn" class="hidden w-full items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 text-left transition">
+          <span class="w-8 h-8 rounded-md bg-orange-50 text-orange-700 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+          </span>
+          <span class="text-sm font-medium text-slate-700">Analytics</span>
+        </button>
+
+        <button type="button" id="mAcctChangePasswordBtn" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 text-left transition">
+          <span class="w-8 h-8 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </span>
+          <span class="text-sm font-medium text-slate-700">Change password</span>
+        </button>
+
+        <button type="button" id="mAcctSignOutBtn" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-red-50 text-left transition">
+          <span class="w-8 h-8 rounded-md bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+          </span>
+          <span class="text-sm font-medium text-red-600">Sign out</span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- ?v= is a cache-buster: bump it whenever app.js changes so browsers
