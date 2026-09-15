@@ -2397,3 +2397,47 @@ input[type="password"]:not(:placeholder-shown) {
   font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
   letter-spacing: 0.12em;
 }
+
+/* =========================================================
+   Manager app (manager/index.html, manager/app.js)
+   =========================================================
+   A separate document sharing this same stylesheet, not a different design
+   system - visually identical to .mobile-tabbar/.mtab-btn above, just
+   always visible (this app is built mobile-first from the start, as the
+   browser-based stand-in for a native iOS build that isn't possible
+   without a paid Apple Developer account) rather than gated to a phone-
+   width media query the way the developer app's bottom bar is. */
+.mgr-tabbar {
+  display: none;
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 55;
+  height: calc(60px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: #fff;
+  border-top: 1px solid var(--line-soft);
+  box-shadow: 0 -6px 18px rgba(15, 23, 42, 0.08);
+  max-width: 48rem;
+  margin: 0 auto;
+}
+.mgr-tabbar:not(.hidden) { display: flex; }
+.mgr-tab-btn {
+  position: relative;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-400);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: color 120ms;
+}
+.mgr-tab-btn svg { width: 21px; height: 21px; }
+.mgr-tab-btn.is-active { color: var(--brand-700, #C94526); }
+.mgr-tab-btn .rail-badge { top: 4px; right: 50%; margin-right: -14px; }
