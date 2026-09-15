@@ -958,6 +958,94 @@ function buildLateNoticeEmail(data) {
   return { subject, html };
 }
 
+// Sent to every active manager the moment a normal-user submits a new leave
+// request (any type, including a bare emergency-leave stub) - previously
+// leaveRequests.js's POST route never emailed anyone about a fresh request
+// at all (only a chosen replacement got one), so managers had no way to
+// know one existed short of having the app open. Reuses the type chips +
+// quoted-reason blocks from buildUninformedReportEmail and the single-CTA
+// shape from buildRescheduleNoticeEmail below.
+function buildNewLeaveRequestEmail(data) {
+  const requesterName = data.requesterName || 'A team member';
+  const managerName = data.managerName || 'there';
+  const firstName = String(managerName).trim().split(/\s+/)[0] || managerName;
+  const dateDetail = leaveDateDetailHtml(data);
+  const chips = leaveTypeChipsHtml(data.type);
+
+  const html = `
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(
+    `${requesterName} applied for leave (${dateDetail.dateLine}) - review it in Daily Tasks.`
+  )}</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF0F4;">
+<tr><td align="center" style="padding:32px 12px;">
+  <table role="presentation" class="wrap" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;">
+    <tr><td style="padding:0 4px 12px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td style="font:700 13px/1.2 ${FONT};color:#0F172A;letter-spacing:-.01em;">
+          <span style="display:inline-block;width:9px;height:9px;background:#E8590C;border-radius:2px;margin-right:8px;"></span>Daily Tasks
+        </td>
+        <td align="right" style="font:400 12px/1.2 ${FONT};color:#7A8698;">New leave request</td>
+      </tr></table>
+    </td></tr>
+    <tr><td style="background:#FFFFFF;border:1px solid #E3E8EF;border-radius:14px;overflow:hidden;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td height="4" style="height:4px;line-height:4px;font-size:0;background:#E8590C;">&nbsp;</td>
+      </tr></table>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:26px 32px 0;">
+          <div>${chips}</div>
+          <p style="margin:14px 0 0;font:700 20px/1.3 ${FONT};color:#0F172A;letter-spacing:-.02em;">
+            ${escapeHtml(requesterName)} applied for leave
+          </p>
+          <p style="margin:9px 0 0;font:400 14px/1.6 ${FONT};color:#5A6879;">
+            Hello ${escapeHtml(firstName)} — a new request is waiting on your decision.
+          </p>
+        </td>
+      </tr></table>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:18px 32px 0;">
+          <div style="font:700 10px/1 ${FONT};color:#93A0B0;letter-spacing:.07em;">${dateDetail.label}</div>
+          <p style="margin:6px 0 0;font:600 15px/1.4 ${FONT};color:#0F172A;">${dateDetail.dateLine || '<i>Not yet set</i>'}</p>
+          ${dateDetail.subLine ? `<p style="margin:2px 0 0;font:400 12.5px/1.4 ${FONT};color:#8593A5;">${dateDetail.subLine}</p>` : ''}
+        </td>
+      </tr></table>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:18px 32px 0;">
+          <div style="font:700 10px/1 ${FONT};color:#93A0B0;letter-spacing:.07em;">REASON</div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
+            <tr><td style="border-left:3px solid #E3E8EF;padding:2px 0 2px 14px;
+                           font:400 14px/1.6 ${FONT};color:#334155;">
+              ${htmlOrFallback(data.reasonHtml, '<i>No reason provided yet.</i>')}
+            </td></tr>
+          </table>
+        </td>
+      </tr></table>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td class="gut" style="padding:22px 32px 26px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" class="btn"><tr>
+            <td style="background:#E8590C;border-radius:9px;">
+              <a href="${escapeAttr(APP_URL)}" style="display:inline-block;padding:12px 22px;font:600 14px/1 ${FONT};color:#FFFFFF;text-decoration:none;">Review in Daily Tasks</a>
+            </td>
+          </tr></table>
+        </td>
+      </tr></table>
+    </td></tr>
+    <tr><td class="gut" style="padding:16px 8px 0;">
+      <p style="margin:0;font:400 11.5px/1.7 ${FONT};color:#8593A5;">Sent by Daily Tasks. Internal use only.</p>
+    </td></tr>
+  </table>
+</td></tr>
+</table>`.trim();
+
+  const subject = `${requesterName} applied for leave — please review`;
+  return { subject, html };
+}
+
 // Tiny, deliberately plain notice email - sent to whoever decided a request
 // when the requester uses a granted reschedule to pick new dates on it. Not
 // worth the full decision-card treatment (there's no decision to review yet,
@@ -1125,6 +1213,7 @@ module.exports = {
   buildReplacementRequestEmail,
   buildReplacementResolvedEmail,
   buildLateNoticeEmail,
+  buildNewLeaveRequestEmail,
   buildRescheduleNoticeEmail,
   buildDocsReminderEmail,
   htmlToPlainText,

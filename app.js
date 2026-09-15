@@ -1167,6 +1167,18 @@ function isoWeeksInYear_(year) {
   return dateToIsoWeek_(new Date(Date.UTC(year, 11, 28))).week;
 }
 function fmtISO(d) { return d.toISOString().slice(0, 10); }
+// Local-calendar-day counterpart to fmtISO, for Date objects built as LOCAL
+// midnight (e.g. the leave-apply calendar's lcalPickDate_ picks, built via
+// `new Date(year, month, day)`) rather than a UTC-anchored one (like the
+// week/task-table dates fmtISO is used for elsewhere, which already are
+// UTC midnight). fmtISO's .toISOString() converts to UTC first, which
+// silently rolls the date back a day in any timezone ahead of UTC (e.g.
+// Pakistan, UTC+5) - this instead reads the same getFullYear/getMonth/
+// getDate the calendar grid itself already keys off (see lcalKey_), so it
+// always matches what's visibly selected.
+function fmtISOLocal_(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
 function fmtLong(d) { return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }); }
 
 // "18 May 2026" - a single date with month and year spelled out.
@@ -1366,6 +1378,13 @@ let leaveOutPassCheckInTime = { hour12: 1, minute: 0, period: 'PM' };
 let leaveAttachmentFiles = [];
 let leaveSelectedDates = []; // [start] or [start, end], plain JS Date objects
 let leaveDateMode = 'single'; // 'single' | 'range' | 'multiple' - which calendar mode is active
+// Every day ('YYYY-MM-DD') already covered by one of the caller's own
+// active leave requests - fetched fresh each time the Apply tab opens (see
+// openApplyLeaveTab_) so the calendar can grey those out before a second,
+// overlapping request can even be picked. The server re-checks the same
+// thing at submit time (see leaveRequests.js's POST /) - this is purely a
+// UX guard, not the actual enforcement.
+let leaveOccupiedDates_ = new Set();
 let lcalViewYear = new Date().getFullYear();
 let lcalViewMonth = new Date().getMonth(); // 0-11
 let myLeavesSelectedYear = null;
@@ -1452,11 +1471,11 @@ async function refreshLeaveReplacementOccupancy_() {
 function leaveReplacementDateQuery_() {
   if (!leaveSelectedDates.length) return '';
   if (leaveDateMode === 'multiple' && leaveSelectedDates.length > 1) {
-    return '?dates=' + encodeURIComponent(JSON.stringify(leaveSelectedDates.map(fmtISO)));
+    return '?dates=' + encodeURIComponent(JSON.stringify(leaveSelectedDates.map(fmtISOLocal_)));
   }
   const start = leaveSelectedDates[0];
   const end = leaveSelectedDates[leaveSelectedDates.length - 1];
-  return '?start=' + fmtISO(start) + '&end=' + fmtISO(end);
+  return '?start=' + fmtISOLocal_(start) + '&end=' + fmtISOLocal_(end);
 }
 
 function renderLeaveReplacementTriggerLabel_() {
@@ -2187,6 +2206,8 @@ function lcalRenderGrid_() {
     const d = new Date(lcalViewYear, lcalViewMonth, 1 - lead + i);
     const dKey = lcalKey_(d);
     const isPast = dKey < todayKey;
+    // fmtISOLocal_ (not fmtISO/.toISOString()) - see its own doc comment.
+    const isOccupied = !isPast && leaveOccupiedDates_.has(fmtISOLocal_(d));
     let isStart = false, isEnd = false, isMid = false;
     if (isRangeMode && start) {
       isStart = lcalKey_(start) === dKey;
@@ -2209,11 +2230,13 @@ function lcalRenderGrid_() {
     if (d.getMonth() !== lcalViewMonth) classes.push('is-adjacent');
     if (d.getDay() === 0 || d.getDay() === 6) classes.push('is-weekend');
     if (dKey === todayKey) classes.push('is-today');
+    if (isOccupied) classes.push('is-occupied');
     if (isStart || isEnd) classes.push('is-edge');
     else if (isMid) classes.push('is-mid');
 
+    const title = isOccupied ? ' title="Already covered by another of your leave requests"' : '';
     html += '<div class="cal2-cell">' + links +
-      '<button type="button" class="' + classes.join(' ') + '" data-time="' + d.getTime() + '"' + (isPast ? ' disabled' : '') + '>' +
+      '<button type="button" class="' + classes.join(' ') + '" data-time="' + d.getTime() + '"' + (isPast || isOccupied ? ' disabled' : '') + title + '>' +
       d.getDate() + '</button></div>';
   }
   lcalGrid.innerHTML = html;
@@ -2422,6 +2445,21 @@ function switchLeavesTab_(tab) {
   if (tab === 'apply') {
     paintLeaveApplyForm_();
     populateLeaveReplacementSelect_();
+    // Refreshed every time this tab opens (not cached) - another of this
+    // person's own requests could have been approved/withdrawn since the
+    // last visit. Re-renders the grid once it lands so already-picked
+    // dates don't get stuck showing stale availability.
+    fetchLeaveOccupiedDates_().then(function () { lcalRenderGrid_(); });
+  }
+}
+
+// See leaveOccupiedDates_'s doc comment above its declaration.
+async function fetchLeaveOccupiedDates_() {
+  try {
+    const data = await apiRequest_('GET', '/leave-requests/occupied-dates');
+    leaveOccupiedDates_ = new Set(Array.isArray(data.occupiedDates) ? data.occupiedDates : []);
+  } catch (_e) {
+    leaveOccupiedDates_ = new Set();
   }
 }
 
@@ -3628,15 +3666,15 @@ async function submitLeaveRequest_() {
       name: currentUserContext.displayName,
       weekLabel: weekLabel,
       type: selectedLeaveType,
-      startDate: fmtISO(startDate),
-      endDate: fmtISO(endDate),
+      startDate: fmtISOLocal_(startDate),
+      endDate: fmtISOLocal_(endDate),
       reasonHtml: reasonHtml === '<br>' ? '' : reasonHtml
     };
     // Custom (non-contiguous) picks: startDate/endDate above still cover the
     // full span for backward-compat with archive/overlap logic elsewhere,
     // but the exact picked days are preserved here so nothing is lost.
     if (leaveDateMode === 'multiple' && leaveSelectedDates.length > 1) {
-      leaveDocPayload.customDates = leaveSelectedDates.map(fmtISO);
+      leaveDocPayload.customDates = leaveSelectedDates.map(fmtISOLocal_);
     }
     // Only Short Leave carries a half-day period / start time, and only Out
     // Pass carries a check-out/check-in pair - omit both entirely for Full

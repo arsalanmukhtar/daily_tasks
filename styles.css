@@ -2013,6 +2013,16 @@ textarea {
 .cal2-day.is-mid { background: var(--brand-50); border-color: var(--brand-50); color: var(--brand-800); }
 .cal2-day.is-edge { background: var(--brand-600); border-color: var(--brand-600); color: #fff; font-weight: 700; }
 .cal2-day.is-edge:hover { background: var(--brand-700); border-color: var(--brand-700); }
+/* Already covered by another of this person's own active leave requests -
+   distinct from a plain past/disabled day so it reads as "taken", not just
+   "unavailable". See app.js's leaveOccupiedDates_. */
+.cal2-day.is-occupied {
+  background: #FEF2F2;
+  color: #B91C1C;
+  text-decoration: line-through;
+  text-decoration-color: #FCA5A5;
+  text-decoration-thickness: 1.5px;
+}
 
 .cal2-footer { margin-top: auto; border-top: 1px solid var(--line-soft); background: var(--surface-2); padding: 8px 10px; display: flex; align-items: center; gap: 8px; }
 .cal2-footer-label { font-size: 11.5px; font-weight: 600; color: var(--ink-700); }

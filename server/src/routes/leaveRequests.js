@@ -7,6 +7,7 @@ import { broadcast } from '../realtime.js';
 import {
   buildDecisionEmail,
   buildReplacementRequestEmail,
+  buildNewLeaveRequestEmail,
   buildRescheduleNoticeEmail,
   buildDocsReminderEmail,
   addWorkingDays
@@ -91,6 +92,40 @@ leaveRequestsRouter.get('/', requireAuth, async (req, res) => {
   res.json(rows.map(toClientShape));
 });
 
+// Every individual calendar day the caller's own ACTIVE leave requests
+// already cover - 'requested'/'approved'/'pending_documentation' only,
+// since a rejected or withdrawn request frees the date back up. Shared by
+// the self-service lookup below (the apply-for-leave calendar disables
+// these days) and the create-time overlap guard in POST / further down, so
+// the client-side disable and the server's own check can never drift out
+// of sync with each other.
+async function ownOccupiedDays(queryable, email) {
+  const { rows } = await queryable.query(
+    `SELECT to_char(start_date, 'YYYY-MM-DD') AS start_date,
+            to_char(end_date, 'YYYY-MM-DD') AS end_date,
+            custom_dates
+     FROM leave_requests
+     WHERE email = $1 AND status IN ('requested', 'approved', 'pending_documentation')`,
+    [email]
+  );
+  const days = new Set();
+  rows.forEach((r) => {
+    expandLeaveDays(r.start_date, r.end_date, r.custom_dates).forEach((d) => days.add(d));
+  });
+  return days;
+}
+
+// Self only - lets the apply-for-leave calendar grey out/disable any date
+// already covered by one of the caller's own active requests, so a second,
+// overlapping request can't even be picked in the UI. POST / below re-runs
+// the exact same check server-side - a client-side disable alone is never
+// enough on its own (a stale calendar, or a direct API call, could still
+// slip through).
+leaveRequestsRouter.get('/occupied-dates', requireAuth, async (req, res) => {
+  const days = await ownOccupiedDays(pool, req.user.email);
+  res.json({ occupiedDates: Array.from(days) });
+});
+
 // Create a request - optionally naming a replacement (leave_replacements
 // row, occupied for whatever days their assignment actually overlaps - see
 // leaveReplacements.js's isOccupiedForDays), and optionally as an emergency
@@ -123,6 +158,23 @@ leaveRequestsRouter.post('/', requireAuth, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+
+    // Can't apply over a date already covered by one of this same person's
+    // own active requests - mirrors the leaveReplacements.js occupancy
+    // check just below, but against the requester's own history instead of
+    // a named replacement's.
+    const candidateDays = expandLeaveDays(startDate, endDate, customDates);
+    if (candidateDays.length) {
+      const occupied = await ownOccupiedDays(client, req.user.email);
+      const clash = candidateDays.find((d) => occupied.has(d));
+      if (clash) {
+        throw Object.assign(
+          new Error(`You already have a leave request covering ${clash} - pick different dates or withdraw the existing one first.`),
+          { statusCode: 409 }
+        );
+      }
+    }
+
     const { rows } = await client.query(
       `INSERT INTO leave_requests
          (email, name, week_label, type, start_date, end_date, custom_dates, reason_html,
@@ -169,6 +221,27 @@ leaveRequestsRouter.post('/', requireAuth, async (req, res) => {
 
     await client.query('COMMIT');
     broadcast({ resource: 'leaveRequests', id: created.id }, 'owners');
+
+    // Every active manager gets emailed the moment a request is submitted -
+    // previously nothing sent this at all (only a chosen replacement, above,
+    // ever got an email), so a manager with the app closed had no way to
+    // know a new request existed. Never blocks/fails the response.
+    try {
+      const { subject, html } = buildNewLeaveRequestEmail({
+        requesterName: created.name,
+        type: created.type,
+        startDate: created.start_date,
+        endDate: created.end_date,
+        weekLabel: created.week_label,
+        halfDayPeriod: created.half_day_period,
+        shortLeaveTime: created.short_leave_time,
+        reasonHtml: created.reason_html
+      });
+      const { rows: managers } = await pool.query('SELECT email FROM users WHERE is_owner = true AND active = true');
+      await Promise.all(managers.map((m) => sendMail({ to: m.email, subject, html })));
+    } catch (err) {
+      console.error('Failed to send new-leave-request email:', err);
+    }
 
     if (replacementId) {
       broadcast({ resource: 'leaveReplacements', id: replacementId }, replacementEmail);
@@ -296,6 +369,20 @@ leaveRequestsRouter.patch('/:id/reschedule', requireAuth, async (req, res) => {
   const isPartialDay = PARTIAL_DAY_TYPES.has(existing.type);
   if (isPartialDay && endDate !== b.startDate) {
     return res.status(400).json({ error: 'Short Leave and Out Pass can only be rescheduled to a single day.' });
+  }
+
+  // Can't reschedule onto a date already covered by another of this same
+  // person's own active requests - same check POST / runs at create time.
+  // This row's own current (pre-reschedule) dates never count against it
+  // here since it's still sitting at status='rejected', outside the active
+  // set ownOccupiedDays() looks at.
+  const candidateDays = expandLeaveDays(b.startDate, endDate, customDates);
+  if (candidateDays.length) {
+    const occupied = await ownOccupiedDays(pool, req.user.email);
+    const clash = candidateDays.find((d) => occupied.has(d));
+    if (clash) {
+      return res.status(409).json({ error: `You already have a leave request covering ${clash} - pick different dates.` });
+    }
   }
 
   // Time fields only ever apply to the two partial-day types - COALESCE
