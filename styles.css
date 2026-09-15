@@ -1511,6 +1511,27 @@ body {
     bottom: calc(var(--mtabbar-h) + env(safe-area-inset-bottom, 0px));
     height: auto !important;
   }
+  /* These are position:fixed, so body's own padding-top never reaches them -
+     each needs the status-bar inset applied directly, or its content
+     overlaps the translucent status bar once installed. */
+  .drawer-panel,
+  .drawer-backdrop,
+  #analyticsPanel,
+  #devDetailPanel {
+    top: env(safe-area-inset-top, 0px) !important;
+  }
+
+  /* iOS Safari zooms the whole page in when a focused form control's
+     effective font-size is under 16px - force every text-entry control to
+     at least that, regardless of whatever text-size utility class it also
+     carries, so typing never triggers an unwanted zoom. */
+  input,
+  textarea,
+  select,
+  .cell-editor,
+  [contenteditable="true"] {
+    font-size: 16px !important;
+  }
 
   /* Owner-only header tools + the late-notice/settings icons all move into
      the Account tab's sheet on mobile (see #mobileAccountModal) - keeps the
@@ -1659,11 +1680,12 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 11.75rem;
+  min-height: 2.75rem;
   max-width: 100%;
-  padding: 0.5rem 0.5rem;
+  padding: 0.5rem 0.625rem;
   font-size: 0.75rem;
-  white-space: nowrap;
+  line-height: 1.2;
+  white-space: normal;
   text-align: center;
 }
 .lv-btn.is-idle {
@@ -1783,7 +1805,7 @@ body {
   box-shadow: inset 0 0 0 1px #94a3b8;
 }
 
-.lv-chart-wrap { position: relative; min-height: 11rem; }
+.lv-chart-wrap { position: relative; min-height: 11rem; width: 100%; min-width: 0; overflow-x: auto; }
 
 .lv-metrics-filter { display: flex; gap: 0.4rem; margin-bottom: 0.65rem; }
 .lv-filter-btn {
@@ -2593,3 +2615,74 @@ body.mgr-shell:not(.is-authed) {
   font-weight: 700;
   flex-shrink: 0;
 }
+
+/* Pill-styled native <select> - status/type/developer filters and the
+   period navigator's unit picker. A real <select> (not a fake dropdown)
+   so it works correctly on iOS/Android without extra JS. */
+.mgr-select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  padding: 0.625rem 2rem 0.625rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--line-soft);
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%2394a3b8'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-700, #334155);
+  cursor: pointer;
+}
+.mgr-select:focus { outline: none; border-color: var(--brand-600); }
+
+/* Period navigator - Year/Quarter/Month/Week chips + prev/label/next,
+   shared by Archived, Summary, and Stats. */
+.mgr-period-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  background: #fff;
+  border-radius: 0.75rem;
+  border: 1px solid var(--line-soft);
+  padding: 0.5rem 0.75rem;
+}
+.mgr-period-nav-btn {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-500);
+  flex-shrink: 0;
+}
+.mgr-period-nav-btn:hover { background: var(--line-soft); }
+.mgr-period-nav-label { font-size: 0.9375rem; font-weight: 700; color: var(--ink-700, #334155); text-align: center; }
+
+/* Attendance mark-sheet option buttons - selecting one highlights it in
+   that status's own color (matching the pill it becomes on the roster),
+   not a generic brand-color highlight. */
+.mgr-att-opt.is-active { border-color: transparent; color: #fff; }
+.mgr-att-opt.is-active.att-present { background: var(--lv-approved); }
+.mgr-att-opt.is-active.att-late { background: var(--lv-requested); }
+.mgr-att-opt.is-active.att-absent,
+.mgr-att-opt.is-active.att-rejected { background: var(--lv-rejected); }
+.mgr-att-opt.is-active.att-nightduty { background: var(--lv-type-foreign); }
+.mgr-att-opt.is-active.att-onduty { background: var(--lv-type-umrah); }
+
+/* Attachment-count indicator on a request card - a small paperclip glyph
+   + count, matching the native app's card affordance for "this request
+   has files attached" without opening the detail sheet. */
+.mgr-attach-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--ink-500);
+  font-size: 11px;
+  font-weight: 600;
+}
+.mgr-attach-indicator svg { width: 13px; height: 13px; }

@@ -74,12 +74,21 @@ const mgrSignOutBtn = document.getElementById('mgrSignOutBtn');
 const mgrTabbar = document.getElementById('mgrTabbar');
 const toastContainer = document.getElementById('toastContainer');
 
+const mgrGlobalSearch = document.getElementById('mgrGlobalSearch');
+
 const mgrRequestsPanel = document.getElementById('mgrRequestsPanel');
 const mgrRequestsLoading = document.getElementById('mgrRequestsLoading');
 const mgrRequestsEmpty = document.getElementById('mgrRequestsEmpty');
-const mgrRequestsList = document.getElementById('mgrRequestsList');
+const mgrRequestsBody = document.getElementById('mgrRequestsBody');
+const mgrRequestsPendingEmpty = document.getElementById('mgrRequestsPendingEmpty');
+const mgrRequestsPendingList = document.getElementById('mgrRequestsPendingList');
+const mgrRequestsDecidedEmpty = document.getElementById('mgrRequestsDecidedEmpty');
+const mgrRequestsDecidedList = document.getElementById('mgrRequestsDecidedList');
 const mgrRequestsCount = document.getElementById('mgrRequestsCount');
 const mgrTabRequestsBadge = document.getElementById('mgrTabRequestsBadge');
+const mgrReqStatusFilter = document.getElementById('mgrReqStatusFilter');
+const mgrReqTypeFilter = document.getElementById('mgrReqTypeFilter');
+const mgrReqDeveloperFilter = document.getElementById('mgrReqDeveloperFilter');
 
 const PANELS_ = {
   requests: document.getElementById('mgrRequestsPanel'),
@@ -323,6 +332,11 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+mgrGlobalSearch.addEventListener('input', () => {
+  globalSearchQuery_ = mgrGlobalSearch.value.trim().toLowerCase();
+  rerenderActiveTab_();
+});
+
 // ---------- Tab switching ----------
 let mgrActiveTab_ = 'requests';
 let teamActiveSub_ = 'directory';
@@ -445,7 +459,6 @@ function avatarHtml_(name, email, size) {
 }
 
 let allRequestsCache_ = []; // every leave_requests row (owner-wide) - shared by Requests/Archived/Summary/Team
-let requestsCache_ = [];    // status in (requested, pending_documentation) - the Requests tab only
 
 // Every individual calendar day a request covers - mirrors expandLeaveDays()
 // in server/src/routes/leaveReplacements.js exactly (kept in sync by hand,
@@ -466,8 +479,34 @@ function isApprovedLeaveOnDate_(rec, dateStr) {
   return rec.status === 'approved' && leaveDays_(rec.startDate, rec.endDate, rec.customDates).includes(dateStr);
 }
 
-// Shared toggle behavior for every .mgr-chip group (Archived's status
-// filter, Team's Directory/Attendance/Stats switcher, Stats' period picker).
+// True once a decided request no longer needs to sit in "Requests" for
+// reference - mirrors the mobile app's archive-date rule exactly: a
+// withdrawn/dismissed request archives immediately; an approved/rejected
+// leave request archives the day after its last day passes; a resolved
+// uninformed-absence conversion archives once local noon passes (same day
+// if resolved before noon, next day otherwise).
+function isArchived_(rec) {
+  if (rec.status === 'withdrawn' || rec.status === 'dismissed') return true;
+  if (rec.status !== 'approved' && rec.status !== 'rejected') return false;
+  if (rec.type === 'uninformedAbsence') {
+    if (!rec.resolvedAt) return true;
+    const resolved = new Date(rec.resolvedAt);
+    const noon = new Date(resolved.getFullYear(), resolved.getMonth(), resolved.getDate(), 12, 0, 0, 0);
+    const archiveAt = resolved.getTime() < noon.getTime()
+      ? noon
+      : new Date(noon.getFullYear(), noon.getMonth(), noon.getDate() + 1, 12, 0, 0, 0);
+    return Date.now() >= archiveAt.getTime();
+  }
+  const days = leaveDays_(rec.startDate, rec.endDate, rec.customDates);
+  const lastDay = days.length ? days[days.length - 1] : (rec.endDate || rec.startDate);
+  if (!lastDay) return true;
+  const archiveDate = new Date(lastDay + 'T00:00:00');
+  archiveDate.setDate(archiveDate.getDate() + 1);
+  return Date.now() >= archiveDate.getTime();
+}
+
+// Shared toggle behavior for every .mgr-chip group (status filters, the
+// Team Directory/Attendance/Stats switcher, period-unit pickers).
 function wireChipGroup_(container, datasetKey, onSelect) {
   container.addEventListener('click', (e) => {
     const btn = e.target.closest('.mgr-chip');
@@ -477,20 +516,101 @@ function wireChipGroup_(container, datasetKey, onSelect) {
   });
 }
 
+// ---------- Shared period navigator (Year/Quarter/Month/Week + prev/next) ----------
+// Used by Archived, Summary, and Stats - each keeps its own state object.
+function makePeriodState_(unit) { return { unit: unit || 'week', anchor: new Date() }; }
+function periodBounds_(state) {
+  const d = new Date(state.anchor.getFullYear(), state.anchor.getMonth(), state.anchor.getDate());
+  if (state.unit === 'all') return { start: null, end: null };
+  if (state.unit === 'year') return { start: new Date(d.getFullYear(), 0, 1), end: new Date(d.getFullYear(), 11, 31) };
+  if (state.unit === 'quarter') {
+    const q = Math.floor(d.getMonth() / 3);
+    return { start: new Date(d.getFullYear(), q * 3, 1), end: new Date(d.getFullYear(), q * 3 + 3, 0) };
+  }
+  if (state.unit === 'month') return { start: new Date(d.getFullYear(), d.getMonth(), 1), end: new Date(d.getFullYear(), d.getMonth() + 1, 0) };
+  const day = (d.getDay() + 6) % 7; // Monday-start week
+  const start = new Date(d); start.setDate(d.getDate() - day);
+  const end = new Date(start); end.setDate(start.getDate() + 6);
+  return { start, end };
+}
+function periodLabel_(state) {
+  if (state.unit === 'all') return 'All time';
+  const { start, end } = periodBounds_(state);
+  if (state.unit === 'year') return String(start.getFullYear());
+  if (state.unit === 'quarter') return 'Q' + (Math.floor(start.getMonth() / 3) + 1) + ' ' + start.getFullYear();
+  if (state.unit === 'month') return start.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  return start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' – ' +
+    end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function shiftPeriod_(state, dir) {
+  const d = new Date(state.anchor);
+  if (state.unit === 'year') d.setFullYear(d.getFullYear() + dir);
+  else if (state.unit === 'quarter') d.setMonth(d.getMonth() + 3 * dir);
+  else if (state.unit === 'month') d.setMonth(d.getMonth() + dir);
+  else d.setDate(d.getDate() + 7 * dir);
+  state.anchor = d;
+}
+function inPeriod_(state, dateValue) {
+  if (state.unit === 'all' || !dateValue) return true;
+  const { start, end } = periodBounds_(state);
+  const t = new Date(dateValue).getTime();
+  const endOfDay = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999).getTime();
+  return t >= start.getTime() && t <= endOfDay;
+}
+function wirePeriodNav_(chipsContainer, prevBtn, nextBtn, labelEl, state, onChange) {
+  wireChipGroup_(chipsContainer, 'periodUnit', (unit) => { state.unit = unit; labelEl.textContent = periodLabel_(state); onChange(); });
+  prevBtn.addEventListener('click', () => { shiftPeriod_(state, -1); labelEl.textContent = periodLabel_(state); onChange(); });
+  nextBtn.addEventListener('click', () => { shiftPeriod_(state, 1); labelEl.textContent = periodLabel_(state); onChange(); });
+  labelEl.textContent = periodLabel_(state);
+}
+
+function isoDate_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+
+// ---------- Shared filter-select population ----------
+const LEAVE_TYPE_FILTER_OPTIONS_ = ['foreignTrip', 'umrah', 'medical', 'casualShort', 'casualFull', 'casualOutPass', 'emergency', 'uninformedAbsence'];
+function populateTypeSelect_(selectEl) {
+  selectEl.innerHTML = '<option value="">All types</option>' +
+    LEAVE_TYPE_FILTER_OPTIONS_.map((t) => `<option value="${t}">${escapeHtml(leaveTypeLabel_(t))}</option>`).join('');
+}
+function populateDeveloperSelect_(selectEl, allLabel) {
+  const current = selectEl.value;
+  selectEl.innerHTML = '<option value="">' + escapeHtml(allLabel || 'All developers') + '</option>' +
+    usersCache_.filter((u) => !u.isOwner).map((u) => `<option value="${escapeHtml(u.email)}">${escapeHtml(u.name)}</option>`).join('');
+  if (current && usersCache_.some((u) => u.email === current)) selectEl.value = current;
+}
+
+// ---------- Global search ----------
+// One persistent search bar (in the app shell, above every tab) filters
+// whichever tab is currently active.
+let globalSearchQuery_ = '';
+function rerenderActiveTab_() {
+  if (mgrActiveTab_ === 'requests') renderRequestsList_();
+  else if (mgrActiveTab_ === 'archived') renderArchivedList_();
+  else if (mgrActiveTab_ === 'report') renderReportTab_();
+  else if (mgrActiveTab_ === 'team' && teamActiveSub_ === 'directory') renderTeamDirectory_();
+}
+function matchesSearch_(hayParts) {
+  if (!globalSearchQuery_) return true;
+  return hayParts.filter(Boolean).join(' ').toLowerCase().includes(globalSearchQuery_);
+}
+
 async function fetchAllRequests_() {
   allRequestsCache_ = await apiRequest_('GET', '/leave-requests');
   return allRequestsCache_;
 }
 
+let reqStatusFilter_ = '';
+let reqTypeFilter_ = '';
+let reqDeveloperFilter_ = '';
+
 async function fetchRequests_() {
   mgrRequestsLoading.classList.remove('hidden');
   mgrRequestsEmpty.classList.add('hidden');
-  mgrRequestsList.innerHTML = '';
+  mgrRequestsBody.classList.add('hidden');
   try {
-    await fetchAllRequests_();
-    requestsCache_ = allRequestsCache_
-      .filter((r) => r.status === 'requested' || r.status === 'pending_documentation')
-      .sort((a, b) => new Date(a.requestedAt) - new Date(b.requestedAt));
+    await Promise.all([fetchAllRequests_(), usersCache_.length ? Promise.resolve() : fetchUsers_()]);
+    populateTypeSelect_(mgrReqTypeFilter);
+    populateDeveloperSelect_(mgrReqDeveloperFilter);
     renderRequestsList_();
   } catch (err) {
     showErrorToast_('Could not load requests: ' + err.message);
@@ -499,13 +619,21 @@ async function fetchRequests_() {
   }
 }
 
-// Shared request-card layout for both the Requests and Archived lists -
-// avatar, name/email, status pill, type/duration/date chips, a relative-
-// time chip, and (once decided) an italic "Approved/Rejected by X" line.
+// Shared request-card layout for Requests and Archived - avatar, name/
+// email, status pill, type/duration/date chips, a relative-time chip, an
+// attachment-count indicator, the reason shown directly (not hidden behind
+// a tap), and (once decided) an italic "Approved/Rejected by X" line.
 // Mirrors RequestCard.kt/request_card.dart's structure.
 function requestCardHtml_(rec) {
   const decidedBy = (rec.status === 'approved' || rec.status === 'rejected') && rec.resolvedBy
     ? `<div class="mt-2 text-xs text-slate-400 italic">${rec.status === 'approved' ? 'Approved' : 'Rejected'} by ${escapeHtml(rec.resolvedBy)}</div>`
+    : '';
+  const attachments = Array.isArray(rec.attachments) ? rec.attachments : [];
+  const attachIndicator = attachments.length ? `<span class="mgr-attach-indicator">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>${attachments.length}
+    </span>` : '';
+  const reasonPreview = rec.reasonHtml && rec.reasonHtml.trim()
+    ? `<div class="rich-text text-xs text-slate-600 mt-2">${rec.reasonHtml}</div>`
     : '';
   return `
     <button type="button" class="w-full text-left bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 hover:ring-orange-300 transition p-3.5" data-request-id="${escapeHtml(rec.requestId)}">
@@ -523,9 +651,11 @@ function requestCardHtml_(rec) {
             ${leaveTypeChipsHtml_(rec.type)}
             <span class="mgr-pill lv-meta">${escapeHtml(dateRangeLabel_(rec))}</span>
           </div>
-          <div class="flex flex-wrap gap-1.5 mt-1.5">
+          <div class="flex flex-wrap items-center gap-2.5 mt-1.5">
             <span class="mgr-pill lv-meta">${escapeHtml(timeAgo_(rec.requestedAt))}</span>
+            ${attachIndicator}
           </div>
+          ${reasonPreview}
           ${decidedBy}
         </div>
       </div>
@@ -533,26 +663,51 @@ function requestCardHtml_(rec) {
   `;
 }
 
-function renderRequestsList_() {
-  const decidable = requestsCache_.filter((r) => r.status === 'requested').length;
-  mgrRequestsCount.textContent = requestsCache_.length
-    ? requestsCache_.length + (requestsCache_.length === 1 ? ' request' : ' requests')
-    : '';
-  mgrTabRequestsBadge.classList.toggle('hidden', decidable === 0);
-  if (!requestsCache_.length) {
-    mgrRequestsEmpty.classList.remove('hidden');
-    mgrRequestsList.innerHTML = '';
-    return;
-  }
-  mgrRequestsEmpty.classList.add('hidden');
-  mgrRequestsList.innerHTML = requestsCache_.map(requestCardHtml_).join('');
+function passesCommonFilters_(rec, statusFilter, typeFilter, developerFilter) {
+  if (statusFilter && rec.status !== statusFilter) return false;
+  if (typeFilter && rec.type !== typeFilter) return false;
+  if (developerFilter && rec.email !== developerFilter) return false;
+  return matchesSearch_([rec.name, rec.email, rec.reasonHtml]);
 }
 
-mgrRequestsList.addEventListener('click', (e) => {
+function renderRequestsList_() {
+  // Requests tab = still-pending items, plus decided items that haven't
+  // reached their archive date yet (see isArchived_) - so a just-decided
+  // request stays visible for reference instead of vanishing immediately.
+  const relevant = allRequestsCache_.filter((r) =>
+    r.status === 'requested' || r.status === 'pending_documentation' ||
+    ((r.status === 'approved' || r.status === 'rejected') && !isArchived_(r))
+  );
+  const filtered = relevant.filter((r) => passesCommonFilters_(r, reqStatusFilter_, reqTypeFilter_, reqDeveloperFilter_));
+
+  const pending = filtered.filter((r) => r.status === 'requested' || r.status === 'pending_documentation')
+    .sort((a, b) => new Date(a.requestedAt) - new Date(b.requestedAt));
+  const decided = filtered.filter((r) => r.status === 'approved' || r.status === 'rejected')
+    .sort((a, b) => new Date(b.resolvedAt || b.requestedAt) - new Date(a.resolvedAt || a.requestedAt));
+
+  mgrRequestsCount.textContent = filtered.length ? filtered.length + (filtered.length === 1 ? ' request' : ' requests') : '';
+  mgrTabRequestsBadge.classList.toggle('hidden', allRequestsCache_.filter((r) => r.status === 'requested').length === 0);
+
+  const empty = filtered.length === 0;
+  mgrRequestsEmpty.classList.toggle('hidden', !empty);
+  mgrRequestsBody.classList.toggle('hidden', empty);
+  if (empty) return;
+
+  mgrRequestsPendingEmpty.classList.toggle('hidden', pending.length > 0);
+  mgrRequestsPendingList.innerHTML = pending.map(requestCardHtml_).join('');
+  mgrRequestsDecidedEmpty.classList.toggle('hidden', decided.length > 0);
+  mgrRequestsDecidedList.innerHTML = decided.map(requestCardHtml_).join('');
+}
+
+mgrReqStatusFilter.addEventListener('change', () => { reqStatusFilter_ = mgrReqStatusFilter.value; renderRequestsList_(); });
+mgrReqTypeFilter.addEventListener('change', () => { reqTypeFilter_ = mgrReqTypeFilter.value; renderRequestsList_(); });
+mgrReqDeveloperFilter.addEventListener('change', () => { reqDeveloperFilter_ = mgrReqDeveloperFilter.value; renderRequestsList_(); });
+
+mgrRequestsBody.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-request-id]');
   if (!btn) return;
-  const rec = requestsCache_.find((r) => r.requestId === btn.dataset.requestId);
-  if (rec) openDetail_(rec);
+  const rec = allRequestsCache_.find((r) => r.requestId === btn.dataset.requestId);
+  if (rec) openDetail_(rec, { readOnly: rec.status === 'approved' || rec.status === 'rejected' });
 });
 
 // ---------- Detail sheet + decide ----------
@@ -653,22 +808,27 @@ async function submitDecision_(decision) {
 }
 
 // ---------- Archived tab ----------
-const mgrArchivedFilters = document.getElementById('mgrArchivedFilters');
-const mgrArchivedSearch = document.getElementById('mgrArchivedSearch');
 const mgrArchivedLoading = document.getElementById('mgrArchivedLoading');
 const mgrArchivedEmpty = document.getElementById('mgrArchivedEmpty');
 const mgrArchivedList = document.getElementById('mgrArchivedList');
 const mgrArchivedCount = document.getElementById('mgrArchivedCount');
+const mgrArcStatusFilter = document.getElementById('mgrArcStatusFilter');
+const mgrArcTypeFilter = document.getElementById('mgrArcTypeFilter');
+const mgrArcDeveloperFilter = document.getElementById('mgrArcDeveloperFilter');
 
-const ARCHIVED_STATUSES_ = ['approved', 'rejected', 'withdrawn', 'dismissed'];
-let archivedStatusFilter_ = 'all';
+let archivedPeriodState_ = makePeriodState_('week');
+let arcStatusFilter_ = '';
+let arcTypeFilter_ = '';
+let arcDeveloperFilter_ = '';
 
 async function fetchArchived_() {
   mgrArchivedLoading.classList.remove('hidden');
   mgrArchivedEmpty.classList.add('hidden');
   mgrArchivedList.innerHTML = '';
   try {
-    await fetchAllRequests_();
+    await Promise.all([fetchAllRequests_(), usersCache_.length ? Promise.resolve() : fetchUsers_()]);
+    populateTypeSelect_(mgrArcTypeFilter);
+    populateDeveloperSelect_(mgrArcDeveloperFilter);
     renderArchivedList_();
   } catch (err) {
     showErrorToast_('Could not load archive: ' + err.message);
@@ -678,25 +838,27 @@ async function fetchArchived_() {
 }
 
 function renderArchivedList_() {
-  const search = mgrArchivedSearch.value.trim().toLowerCase();
   const filtered = allRequestsCache_
-    .filter((r) => ARCHIVED_STATUSES_.includes(r.status))
-    .filter((r) => archivedStatusFilter_ === 'all' || r.status === archivedStatusFilter_)
-    .filter((r) => !search || r.name.toLowerCase().includes(search))
+    .filter(isArchived_)
+    .filter((r) => passesCommonFilters_(r, arcStatusFilter_, arcTypeFilter_, arcDeveloperFilter_))
+    .filter((r) => inPeriod_(archivedPeriodState_, r.resolvedAt || r.requestedAt))
     .sort((a, b) => new Date(b.resolvedAt || b.requestedAt) - new Date(a.resolvedAt || a.requestedAt));
 
   mgrArchivedCount.textContent = filtered.length ? filtered.length + (filtered.length === 1 ? ' result' : ' results') : '';
-  if (!filtered.length) {
-    mgrArchivedEmpty.classList.remove('hidden');
-    mgrArchivedList.innerHTML = '';
-    return;
-  }
-  mgrArchivedEmpty.classList.add('hidden');
+  mgrArchivedEmpty.classList.toggle('hidden', filtered.length > 0);
   mgrArchivedList.innerHTML = filtered.map(requestCardHtml_).join('');
 }
 
-wireChipGroup_(mgrArchivedFilters, 'archivedStatus', (val) => { archivedStatusFilter_ = val; renderArchivedList_(); });
-mgrArchivedSearch.addEventListener('input', renderArchivedList_);
+wirePeriodNav_(
+  document.getElementById('mgrArchivedPeriodChips'),
+  document.getElementById('mgrArchivedPeriodPrevBtn'),
+  document.getElementById('mgrArchivedPeriodNextBtn'),
+  document.getElementById('mgrArchivedPeriodLabel'),
+  archivedPeriodState_, renderArchivedList_
+);
+mgrArcStatusFilter.addEventListener('change', () => { arcStatusFilter_ = mgrArcStatusFilter.value; renderArchivedList_(); });
+mgrArcTypeFilter.addEventListener('change', () => { arcTypeFilter_ = mgrArcTypeFilter.value; renderArchivedList_(); });
+mgrArcDeveloperFilter.addEventListener('change', () => { arcDeveloperFilter_ = mgrArcDeveloperFilter.value; renderArchivedList_(); });
 mgrArchivedList.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-request-id]');
   if (!btn) return;
@@ -717,6 +879,7 @@ const mgrSumKpiUninformed = document.getElementById('mgrSumKpiUninformed');
 const mgrSumByType = document.getElementById('mgrSumByType');
 const mgrSumTrend = document.getElementById('mgrSumTrend');
 const mgrSumLeaderboard = document.getElementById('mgrSumLeaderboard');
+const mgrSumDeveloperFilter = document.getElementById('mgrSumDeveloperFilter');
 
 function monthKey_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
 function monthLabel_(key) {
@@ -724,15 +887,24 @@ function monthLabel_(key) {
   return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
 }
 
+let summaryPeriodState_ = makePeriodState_('year');
+let sumDeveloperFilter_ = '';
+let summaryRequestsCache_ = [];
+let summaryUninformedCache_ = [];
+
 async function fetchSummary_() {
   mgrSummaryLoading.classList.remove('hidden');
   mgrSummaryBody.classList.add('hidden');
   try {
     const [requests, uninformed] = await Promise.all([
       fetchAllRequests_(),
-      apiRequest_('GET', '/uninformed-leaves')
+      apiRequest_('GET', '/uninformed-leaves'),
+      usersCache_.length ? Promise.resolve() : fetchUsers_()
     ]);
-    renderSummary_(requests, uninformed);
+    populateDeveloperSelect_(mgrSumDeveloperFilter);
+    summaryRequestsCache_ = requests;
+    summaryUninformedCache_ = uninformed;
+    renderSummaryFiltered_();
     mgrSummaryUpdated.textContent = 'Updated just now';
   } catch (err) {
     showErrorToast_('Could not load summary: ' + err.message);
@@ -741,6 +913,25 @@ async function fetchSummary_() {
     mgrSummaryBody.classList.remove('hidden');
   }
 }
+
+function renderSummaryFiltered_() {
+  const requests = summaryRequestsCache_
+    .filter((r) => inPeriod_(summaryPeriodState_, r.requestedAt))
+    .filter((r) => !sumDeveloperFilter_ || r.email === sumDeveloperFilter_);
+  const uninformed = summaryUninformedCache_
+    .filter((r) => inPeriod_(summaryPeriodState_, r.reportedAt))
+    .filter((r) => !sumDeveloperFilter_ || r.email === sumDeveloperFilter_);
+  renderSummary_(requests, uninformed);
+}
+
+wirePeriodNav_(
+  document.getElementById('mgrSummaryPeriodChips'),
+  document.getElementById('mgrSummaryPeriodPrevBtn'),
+  document.getElementById('mgrSummaryPeriodNextBtn'),
+  document.getElementById('mgrSummaryPeriodLabel'),
+  summaryPeriodState_, renderSummaryFiltered_
+);
+mgrSumDeveloperFilter.addEventListener('change', () => { sumDeveloperFilter_ = mgrSumDeveloperFilter.value; renderSummaryFiltered_(); });
 
 function renderSummary_(requests, uninformed) {
   const total = requests.length;
@@ -797,10 +988,9 @@ function renderSummary_(requests, uninformed) {
     </div>
   `).join('');
 
-  // Leaderboard - this calendar month, by request count
-  const thisMonthKey = monthKey_(now);
+  // Leaderboard - within the currently selected period/developer filter
   const byEmail = {};
-  requests.filter((r) => monthKey_(new Date(r.requestedAt)) === thisMonthKey).forEach((r) => {
+  requests.forEach((r) => {
     if (!byEmail[r.email]) byEmail[r.email] = { name: r.name, email: r.email, count: 0 };
     byEmail[r.email].count++;
   });
@@ -814,7 +1004,7 @@ function renderSummary_(requests, uninformed) {
           </div>
           <span class="font-semibold text-slate-800">${p.count}</span>
         </div>
-      `).join('') : '<div class="text-sm text-slate-400 text-center py-4">No requests this month yet.</div>';
+      `).join('') : '<div class="text-sm text-slate-400 text-center py-4">No requests in this period.</div>';
 }
 
 // ---------- Report tab ----------
@@ -849,6 +1039,8 @@ const mgrReportDecideNote = document.getElementById('mgrReportDecideNote');
 const mgrReportDecideError = document.getElementById('mgrReportDecideError');
 const mgrReportDecideRejectBtn = document.getElementById('mgrReportDecideRejectBtn');
 const mgrReportDecideAcceptBtn = document.getElementById('mgrReportDecideAcceptBtn');
+const mgrReportDeveloperFilter = document.getElementById('mgrReportDeveloperFilter');
+let reportDeveloperFilter_ = '';
 
 let usersCache_ = [];
 async function fetchUsers_() {
@@ -865,8 +1057,10 @@ async function fetchReportTab_() {
   try {
     const [uninformed, notices] = await Promise.all([
       apiRequest_('GET', '/uninformed-leaves'),
-      apiRequest_('GET', '/late-arrival-notices')
+      apiRequest_('GET', '/late-arrival-notices'),
+      usersCache_.length ? Promise.resolve() : fetchUsers_()
     ]);
+    populateDeveloperSelect_(mgrReportDeveloperFilter);
     uninformedCache_ = uninformed;
     lateNoticesCache_ = notices;
     renderReportTab_();
@@ -924,10 +1118,12 @@ function lateNoticeCard_(n) {
   `;
 }
 
+function passesDeveloperFilter_(r) { return !reportDeveloperFilter_ || r.email === reportDeveloperFilter_; }
+
 function renderReportTab_() {
-  const decision = uninformedCache_.filter((r) => r.status === 'explained').sort((a, b) => new Date(a.explainedAt) - new Date(b.explainedAt));
-  const open = uninformedCache_.filter((r) => r.status === 'reported').sort((a, b) => new Date(b.reportedAt) - new Date(a.reportedAt));
-  const resolved = uninformedCache_.filter((r) => r.status === 'resolved').sort((a, b) => new Date(b.resolvedAt) - new Date(a.resolvedAt));
+  const decision = uninformedCache_.filter((r) => r.status === 'explained' && passesDeveloperFilter_(r)).sort((a, b) => new Date(a.explainedAt) - new Date(b.explainedAt));
+  const open = uninformedCache_.filter((r) => r.status === 'reported' && passesDeveloperFilter_(r)).sort((a, b) => new Date(b.reportedAt) - new Date(a.reportedAt));
+  const resolved = uninformedCache_.filter((r) => r.status === 'resolved' && passesDeveloperFilter_(r)).sort((a, b) => new Date(b.resolvedAt) - new Date(a.resolvedAt));
 
   mgrReportDecisionEmpty.classList.toggle('hidden', decision.length > 0);
   mgrReportDecisionList.innerHTML = decision.map((r) => reportCard_(r, 'decision')).join('');
@@ -936,10 +1132,11 @@ function renderReportTab_() {
   mgrReportResolvedEmpty.classList.toggle('hidden', resolved.length > 0);
   mgrReportResolvedList.innerHTML = resolved.map((r) => reportCard_(r, 'resolved')).join('');
 
-  const notices = lateNoticesCache_.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const notices = lateNoticesCache_.filter(passesDeveloperFilter_).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   mgrLateNoticeEmpty.classList.toggle('hidden', notices.length > 0);
   mgrLateNoticeList.innerHTML = notices.map(lateNoticeCard_).join('');
 }
+mgrReportDeveloperFilter.addEventListener('change', () => { reportDeveloperFilter_ = mgrReportDeveloperFilter.value; renderReportTab_(); });
 
 mgrReportBody.addEventListener('click', (e) => {
   const ackBtn = e.target.closest('[data-ack-notice-id]');
@@ -1051,7 +1248,6 @@ mgrNewReportForm.addEventListener('submit', async (e) => {
 });
 
 // ---------- Team tab: Directory ----------
-const mgrTeamSearch = document.getElementById('mgrTeamSearch');
 const mgrTeamDirectoryList = document.getElementById('mgrTeamDirectoryList');
 const mgrTeamDirectorySub = document.getElementById('mgrTeamDirectorySub');
 const mgrTeamAttendanceSub = document.getElementById('mgrTeamAttendanceSub');
@@ -1076,11 +1272,7 @@ async function fetchTeamDirectory_() {
   }
 }
 function renderTeamDirectory_() {
-  const search = mgrTeamSearch.value.trim().toLowerCase();
-  const filtered = usersCache_.filter((u) =>
-    !search || u.name.toLowerCase().includes(search) || u.email.toLowerCase().includes(search) ||
-    (u.designation || '').toLowerCase().includes(search)
-  );
+  const filtered = usersCache_.filter((u) => matchesSearch_([u.name, u.email, u.designation]));
   if (!filtered.length) {
     mgrTeamDirectoryList.innerHTML = '<div class="text-center py-12 text-sm text-slate-400">No matches.</div>';
     return;
@@ -1103,7 +1295,6 @@ function renderTeamDirectory_() {
     </button>
   `).join('');
 }
-mgrTeamSearch.addEventListener('input', renderTeamDirectory_);
 mgrTeamDirectoryList.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-user-email]');
   if (!btn) return;
@@ -1312,13 +1503,20 @@ mgrAttList.addEventListener('click', (e) => {
 let attMarkUser_ = null;
 let attMarkSelectedStatus_ = null;
 
+// Selecting an option highlights it in that status's own color (matching
+// the pill it'll render as on the roster) rather than a generic orange -
+// "unmark" borrows the rejected/red family as a destructive-action cue.
+const ATT_OPT_ACTIVE_CLASS_ = {
+  present: 'att-present', late: 'att-late', absent: 'att-absent',
+  night_duty: 'att-nightduty', on_duty: 'att-onduty', unmark: 'att-rejected'
+};
 function selectAttOption_(status) {
   attMarkSelectedStatus_ = status;
   document.querySelectorAll('.mgr-att-opt').forEach((b) => {
     const active = b.dataset.attStatus === status;
-    b.classList.toggle('bg-orange-600', active);
-    b.classList.toggle('text-white', active);
-    b.classList.toggle('border-orange-600', active);
+    b.classList.toggle('is-active', active);
+    Object.values(ATT_OPT_ACTIVE_CLASS_).forEach((c) => b.classList.remove(c));
+    if (active) b.classList.add(ATT_OPT_ACTIVE_CLASS_[status]);
   });
   mgrAttArrivalTimeWrap.classList.toggle('hidden', status !== 'late');
   mgrAttOnDutyRangeWrap.classList.toggle('hidden', status !== 'on_duty');
@@ -1343,7 +1541,7 @@ function openAttMark_(user) {
   mgrAttOnDutyStart.value = attSelectedDate_;
   mgrAttOnDutyEnd.value = attSelectedDate_;
   mgrAttMarkError.classList.add('hidden');
-  document.querySelectorAll('.mgr-att-opt').forEach((b) => b.classList.remove('bg-orange-600', 'text-white', 'border-orange-600'));
+  document.querySelectorAll('.mgr-att-opt').forEach((b) => b.classList.remove('is-active', 'att-present', 'att-late', 'att-absent', 'att-nightduty', 'att-onduty', 'att-rejected'));
   mgrAttMarkSaveBtn.disabled = true;
   mgrAttMarkSaveBtn.textContent = 'Select a status';
   if (st.status !== 'unmarked' && st.status !== 'on_leave') selectAttOption_(st.status);
@@ -1400,22 +1598,19 @@ const mgrStatsKpiOnLeave = document.getElementById('mgrStatsKpiOnLeave');
 const mgrStatsBreakdown = document.getElementById('mgrStatsBreakdown');
 const mgrStatsByPerson = document.getElementById('mgrStatsByPerson');
 
-let statsPeriod_ = 'week';
-wireChipGroup_(document.getElementById('mgrStatsPeriodChips'), 'statsPeriod', (val) => { statsPeriod_ = val; fetchStats_(); });
+const mgrStatsDeveloperFilter = document.getElementById('mgrStatsDeveloperFilter');
+let statsPeriodState_ = makePeriodState_('year');
+let statsDeveloperFilter_ = '';
 
-function isoDate_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
-function periodRange_(period) {
-  const now = new Date();
-  const start = new Date(now);
-  if (period === 'week') {
-    start.setDate(start.getDate() - ((start.getDay() + 6) % 7)); // Monday
-  } else if (period === 'month') {
-    start.setDate(1);
-  } else if (period === 'quarter') {
-    start.setMonth(Math.floor(start.getMonth() / 3) * 3, 1);
-  }
-  return { start: isoDate_(start), end: isoDate_(now) };
-}
+wirePeriodNav_(
+  document.getElementById('mgrStatsPeriodChips'),
+  document.getElementById('mgrStatsPeriodPrevBtn'),
+  document.getElementById('mgrStatsPeriodNextBtn'),
+  document.getElementById('mgrStatsPeriodLabel'),
+  statsPeriodState_, fetchStats_
+);
+mgrStatsDeveloperFilter.addEventListener('change', () => { statsDeveloperFilter_ = mgrStatsDeveloperFilter.value; fetchStats_(); });
+
 function eachDate_(startStr, endStr) {
   const days = [];
   const cur = new Date(startStr + 'T00:00:00Z');
@@ -1428,13 +1623,15 @@ async function fetchStats_() {
   mgrStatsLoading.classList.remove('hidden');
   mgrStatsBody.classList.add('hidden');
   try {
-    const { start, end } = periodRange_(statsPeriod_);
+    if (!usersCache_.length) await fetchUsers_();
+    populateDeveloperSelect_(mgrStatsDeveloperFilter, 'Whole team');
+    const { start, end } = periodBounds_(statsPeriodState_);
+    const startStr = isoDate_(start), endStr = isoDate_(end);
     const [attendance] = await Promise.all([
-      apiRequest_('GET', '/attendance?start=' + start + '&end=' + end),
-      usersCache_.length ? Promise.resolve() : fetchUsers_(),
+      apiRequest_('GET', '/attendance?start=' + startStr + '&end=' + endStr),
       allRequestsCache_.length ? Promise.resolve() : fetchAllRequests_()
     ]);
-    renderStats_(attendance, start, end);
+    renderStats_(attendance, startStr, endStr);
   } catch (err) {
     showErrorToast_('Could not load stats: ' + err.message);
   } finally {
@@ -1443,7 +1640,7 @@ async function fetchStats_() {
   }
 }
 function renderStats_(attendance, start, end) {
-  const roster = usersCache_.filter((u) => u.active && !u.isOwner);
+  const roster = usersCache_.filter((u) => u.active && !u.isOwner && (!statsDeveloperFilter_ || u.email === statsDeveloperFilter_));
   const days = eachDate_(start, end);
   const counts = { present: 0, late: 0, absent: 0, night_duty: 0, on_duty: 0, on_leave: 0 };
   const perPerson = {};

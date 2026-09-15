@@ -2537,6 +2537,11 @@ async function openMyLeavesDrawer() {
   } finally {
     myLeavesLoading.classList.add('hidden');
     myLeavesContent.classList.remove('hidden');
+    // The trend chart was constructed above while this container was still
+    // display:none, so Chart.js had a zero-size box to measure - resizing
+    // now that it's actually visible corrects the canvas's backing-store
+    // size (otherwise it renders oversized, needing a pinch-zoom to see).
+    if (myLeavesTrendChartInstance) requestAnimationFrame(() => myLeavesTrendChartInstance.resize());
   }
 }
 
@@ -4778,6 +4783,7 @@ function closeLateNoticeModal_() {
   lateNoticeModal.classList.add('hidden');
   closeLnDatePopover_();
   closeLnTimePopover_();
+  consumeReopenMobileAccountSheet_();
 }
 lateNoticeBtn.addEventListener('click', openLateNoticeModal_);
 closeLateNoticeBtn.addEventListener('click', closeLateNoticeModal_);
@@ -5298,6 +5304,7 @@ function openChangePasswordModal_() {
 }
 function closeChangePasswordModal_() {
   changePasswordModal.classList.add('hidden');
+  consumeReopenMobileAccountSheet_();
 }
 changePasswordMenuBtn.addEventListener('click', openChangePasswordModal_);
 closeChangePasswordBtn.addEventListener('click', closeChangePasswordModal_);
@@ -5953,6 +5960,7 @@ function closeExportModal() {
   exportBackdrop.classList.add('hidden');
   exportModal.classList.remove('flex');
   exportModal.classList.add('hidden');
+  consumeReopenMobileAccountSheet_();
 }
 
 // ExcelJS is ~900 KB - load it lazily, only when the owner actually exports.
@@ -7063,6 +7071,7 @@ function closeAnalyticsPanel() {
   setTimeout(function () {
     analyticsBackdrop.classList.add('hidden');
     analyticsPanel.classList.add('hidden');
+    consumeReopenMobileAccountSheet_();
   }, 200);
 }
 
@@ -8048,10 +8057,22 @@ document.addEventListener('keydown', function (e) {
 
 // Every sheet action proxy-clicks the header's own (still-present, just
 // CSS-hidden on phones) button rather than duplicating its open logic.
-mAcctLateNoticeBtn.addEventListener('click', function () { closeMobileAccountSheet_(); lateNoticeBtn.click(); });
-mAcctExportBtn.addEventListener('click', function () { closeMobileAccountSheet_(); exportSummaryBtn.click(); });
-mAcctAnalyticsBtn.addEventListener('click', function () { closeMobileAccountSheet_(); analyticsBtn.click(); });
-mAcctChangePasswordBtn.addEventListener('click', function () { closeMobileAccountSheet_(); changePasswordMenuBtn.click(); });
+// Set right before proxy-clicking the real header button, and consumed by
+// that sub-panel's own close function - lets closeLateNoticeModal_() etc.
+// know to reopen the Account sheet behind them instead of just dropping
+// the user back on whatever tab happened to be underneath.
+let reopenMobileAccountSheetOnClose_ = false;
+function consumeReopenMobileAccountSheet_() {
+  if (reopenMobileAccountSheetOnClose_) {
+    reopenMobileAccountSheetOnClose_ = false;
+    openMobileAccountSheet_();
+  }
+}
+
+mAcctLateNoticeBtn.addEventListener('click', function () { closeMobileAccountSheet_(); reopenMobileAccountSheetOnClose_ = true; lateNoticeBtn.click(); });
+mAcctExportBtn.addEventListener('click', function () { closeMobileAccountSheet_(); reopenMobileAccountSheetOnClose_ = true; exportSummaryBtn.click(); });
+mAcctAnalyticsBtn.addEventListener('click', function () { closeMobileAccountSheet_(); reopenMobileAccountSheetOnClose_ = true; analyticsBtn.click(); });
+mAcctChangePasswordBtn.addEventListener('click', function () { closeMobileAccountSheet_(); reopenMobileAccountSheetOnClose_ = true; changePasswordMenuBtn.click(); });
 mAcctSignOutBtn.addEventListener('click', function () { closeMobileAccountSheet_(); signOutBtn.click(); });
 
 // Mirrors the Leaves drawer's own rail badges (reschedule-pending on
