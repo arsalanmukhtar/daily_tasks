@@ -1838,6 +1838,24 @@ function leaveClampTimeToWindow_(t) {
   return leaveTime24ToParts_(total);
 }
 
+// Minutes-since-midnight, in the office's own timezone (Asia/Karachi) -
+// NOT the viewing device's own OS/browser timezone. "Office hours" is a
+// fixed Pakistan-time concept; a device set to any other zone (UTC is the
+// common default on a misconfigured machine) previously showed the "now"
+// tick up to 5 hours off from actual Pakistan time, since it read plain
+// now.getHours()/getMinutes() - always whatever the *viewer's* clock
+// thinks the time is, not the office's. Mirrors the same TIME_ZONE-pinned
+// approach server/src/emailTemplate.cjs already uses for exactly this
+// reason, just via Intl on the client instead of a fixed env var.
+function nowMinutesInOfficeTz_() {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Karachi', hour: '2-digit', minute: '2-digit', hour12: false
+  }).formatToParts(new Date());
+  const hour = Number(parts.find(function (p) { return p.type === 'hour'; }).value);
+  const minute = Number(parts.find(function (p) { return p.type === 'minute'; }).value);
+  return hour * 60 + minute;
+}
+
 // Draws one timer-selection's scaled timeline (timebar-3.html's own visual
 // centerpiece) - the "away" block sized/positioned within the 8:30 AM-
 // 4:30 PM window, a live duration label, and a today's-current-time tick
@@ -1866,8 +1884,7 @@ function renderLeaveTimeline_(tlCfg) {
   tlCfg.awayLabelEl.classList.toggle('bad', bad);
 
   if (tlCfg.nowEl) {
-    const now = new Date();
-    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const nowMin = nowMinutesInOfficeTz_();
     if (nowMin >= LEAVE_TIME_WINDOW_MIN_ && nowMin <= LEAVE_TIME_WINDOW_MAX_) {
       tlCfg.nowEl.style.left = pct(nowMin) + '%';
       tlCfg.nowEl.style.display = '';
