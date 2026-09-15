@@ -47,12 +47,12 @@
        forking a parallel design system - every .cal2-*/.sheet-modal/
        .mobile-tabbar/.tb-btn/rich-text/.toast component this app reuses
        stays visually identical and gets any future fix automatically. -->
-  <link href="../styles.css?v=20260915a" rel="stylesheet" />
+  <link href="../styles.css?v=20260915b" rel="stylesheet" />
 </head>
-<body class="min-h-screen bg-gradient-to-br from-slate-200 via-slate-100 to-orange-100/70">
+<body class="mgr-shell min-h-screen bg-gradient-to-br from-slate-200 via-slate-100 to-orange-100/70">
 
   <!-- ============ LOADING ============ -->
-  <div id="loadingState" class="bg-white rounded-2xl shadow-lg ring-1 ring-slate-100 p-8 sm:p-10 text-center max-w-lg mx-auto my-10">
+  <div id="loadingState" class="bg-white rounded-2xl shadow-lg ring-1 ring-slate-100 p-8 sm:p-10 text-center max-w-lg mx-auto">
     <div class="inline-block w-8 h-8 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin"></div>
     <p class="mt-3 text-slate-500 text-sm">Checking sign-in&hellip;</p>
   </div>
@@ -62,7 +62,7 @@
        addition: on successful sign-in, showForm() rejects (and signs back
        out) anyone whose account isn't isOwner - this app is manager-only,
        there's no separate "developer" experience to fall back to here. -->
-  <div id="authGate" class="hidden bg-white rounded-2xl shadow-lg ring-1 ring-slate-100 p-7 sm:p-10 text-center max-w-xl mx-auto my-10 w-full">
+  <div id="authGate" class="hidden bg-white rounded-2xl shadow-lg ring-1 ring-slate-100 p-7 sm:p-10 text-center max-w-xl mx-auto w-full">
     <div class="w-12 h-12 sm:w-14 sm:h-14 mx-auto rounded-full bg-orange-100 flex items-center justify-center">
       <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 sm:w-7 sm:h-7 text-orange-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
@@ -217,11 +217,11 @@
       <div id="mgrSummaryBody" class="hidden space-y-4">
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 lv-kpi-grid">
           <div class="an-kpi stat-tile stat-all"><div class="an-kpi-label"><i></i>Total</div><div id="mgrSumKpiTotal" class="an-kpi-value">0</div></div>
-          <div class="an-kpi stat-tile stat-ok"><div class="an-kpi-label"><i></i>Approved</div><div id="mgrSumKpiApproved" class="an-kpi-value">0</div></div>
-          <div class="an-kpi stat-tile stat-no"><div class="an-kpi-label"><i></i>Rejected</div><div id="mgrSumKpiRejected" class="an-kpi-value">0</div></div>
-          <div class="an-kpi stat-tile stat-wait"><div class="an-kpi-label"><i></i>Pending</div><div id="mgrSumKpiPending" class="an-kpi-value">0</div></div>
-          <div class="an-kpi stat-tile stat-neutral"><div class="an-kpi-label"><i></i>Withdrawn</div><div id="mgrSumKpiWithdrawn" class="an-kpi-value">0</div></div>
-          <div class="an-kpi stat-tile stat-neutral"><div class="an-kpi-label"><i></i>Uninformed</div><div id="mgrSumKpiUninformed" class="an-kpi-value">0</div></div>
+          <div class="an-kpi stat-tile stat-lv-approved"><div class="an-kpi-label"><i></i>Approved</div><div id="mgrSumKpiApproved" class="an-kpi-value">0</div></div>
+          <div class="an-kpi stat-tile stat-lv-rejected"><div class="an-kpi-label"><i></i>Rejected</div><div id="mgrSumKpiRejected" class="an-kpi-value">0</div></div>
+          <div class="an-kpi stat-tile stat-lv-requested"><div class="an-kpi-label"><i></i>Pending</div><div id="mgrSumKpiPending" class="an-kpi-value">0</div></div>
+          <div class="an-kpi stat-tile stat-lv-withdrawn"><div class="an-kpi-label"><i></i>Withdrawn</div><div id="mgrSumKpiWithdrawn" class="an-kpi-value">0</div></div>
+          <div class="an-kpi stat-tile stat-lv-requested"><div class="an-kpi-label"><i></i>Uninformed</div><div id="mgrSumKpiUninformed" class="an-kpi-value">0</div></div>
         </div>
 
         <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
@@ -316,9 +316,16 @@
         </div>
         <div id="mgrStatsBody" class="hidden space-y-4">
           <div class="grid grid-cols-3 gap-2 lv-kpi-grid">
-            <div class="an-kpi stat-tile stat-ok"><div class="an-kpi-label"><i></i>Present</div><div id="mgrStatsKpiPresent" class="an-kpi-value">0%</div></div>
-            <div class="an-kpi stat-tile stat-wait"><div class="an-kpi-label"><i></i>Late</div><div id="mgrStatsKpiLate" class="an-kpi-value">0%</div></div>
-            <div class="an-kpi stat-tile stat-no"><div class="an-kpi-label"><i></i>Absent</div><div id="mgrStatsKpiAbsent" class="an-kpi-value">0%</div></div>
+            <div class="an-kpi stat-tile stat-lv-approved"><div class="an-kpi-label"><i></i>Present</div><div id="mgrStatsKpiPresent" class="an-kpi-value">0%</div></div>
+            <div class="an-kpi stat-tile stat-lv-requested"><div class="an-kpi-label"><i></i>Late</div><div id="mgrStatsKpiLate" class="an-kpi-value">0%</div></div>
+            <div class="an-kpi stat-tile stat-lv-rejected"><div class="an-kpi-label"><i></i>Absent</div><div id="mgrStatsKpiAbsent" class="an-kpi-value">0%</div></div>
+            <div class="an-kpi stat-tile stat-lv-nightduty"><div class="an-kpi-label"><i></i>Night Duty</div><div id="mgrStatsKpiNightDuty" class="an-kpi-value">0%</div></div>
+            <div class="an-kpi stat-tile stat-lv-onduty"><div class="an-kpi-label"><i></i>On Duty</div><div id="mgrStatsKpiOnDuty" class="an-kpi-value">0%</div></div>
+            <div class="an-kpi stat-tile stat-lv-onleave"><div class="an-kpi-label"><i></i>On Leave</div><div id="mgrStatsKpiOnLeave" class="an-kpi-value">0%</div></div>
+          </div>
+          <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
+            <div class="text-xs font-semibold text-slate-600 mb-3">Breakdown</div>
+            <div id="mgrStatsBreakdown" class="space-y-2"></div>
           </div>
           <div class="bg-white rounded-2xl shadow-sm ring-1 ring-slate-200/70 p-4">
             <div class="text-xs font-semibold text-slate-600 mb-3">By person</div>
@@ -595,6 +602,6 @@
   <!-- ============ TOAST NOTIFICATIONS ============ -->
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
-  <script type="module" src="app.js?v=20260915a"></script>
+  <script type="module" src="app.js?v=20260915b"></script>
 </body>
 </html>

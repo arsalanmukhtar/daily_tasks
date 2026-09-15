@@ -2472,3 +2472,124 @@ input[type="password"]:not(:placeholder-shown) {
   color: #fff;
 }
 .mgr-chip.is-active:hover { background: var(--brand-700); }
+
+/* Sign-in/loading vertical centering. Scoped per app since the manager
+   app's header lives entirely inside #appShell (hidden pre-auth, so its
+   gate can center in the full viewport), while the developer app's header
+   is persistent chrome outside the auth state machine (always visible, so
+   its gate only centers in the space below it, via #appWrapper). Guarded
+   by :not(.is-authed) so the already-tuned signed-in layout (including the
+   desktop lg:flex/lg:h-full rules on #appWrapper) is untouched. */
+body.app-shell:not(.is-authed) #appWrapper {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+body.app-shell:not(.is-authed) #appWrapper > #loadingState,
+body.app-shell:not(.is-authed) #appWrapper > #authGate {
+  margin-top: auto;
+  margin-bottom: auto;
+}
+body.mgr-shell:not(.is-authed) {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* ===== Leave status / type / duration / attendance colors =====
+   Exact hex values from mobile_app/lib/core/theme/app_colors.dart, kept in
+   sync by hand so status/type/duration/attendance pills read identically
+   on the manager web app and the Flutter app. */
+:root {
+  --lv-approved: #166534;     --lv-approved-bg: #DCFCE7;
+  --lv-rejected: #B91C1C;     --lv-rejected-bg: #FFE2E3;
+  --lv-withdrawn: #49454F;    --lv-withdrawn-bg: #E7E0EB;
+  --lv-requested: #92400E;    --lv-requested-bg: #FEF3C7;
+  --lv-type-foreign: #3B5BDB; --lv-type-foreign-bg: #E8EDFC;
+  --lv-type-umrah: #0E8A7D;   --lv-type-umrah-bg: #DFF2EF;
+  --lv-type-medical: #0B7FA8; --lv-type-medical-bg: #DFF0F8;
+  --lv-type-casual: #6C4CC4;  --lv-type-casual-bg: #EDE7FA;
+  --lv-dur-short: #0369A1;    --lv-dur-short-bg: #E3EFF8;
+  --lv-dur-full: #3730A3;     --lv-dur-full-bg: #E9E8F8;
+  --lv-dur-outpass: #0F766E;  --lv-dur-outpass-bg: #E3F4F2;
+  --lv-meta: #54607A;         --lv-meta-bg: #ECEEF4;
+}
+
+/* Rounded, borderless pill - the Flutter app's request/attendance chip
+   look, distinct from the older, bordered .tag component. */
+.mgr-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1;
+}
+.mgr-pill.is-status { text-transform: uppercase; font-weight: 700; letter-spacing: 0.02em; font-size: 10.5px; }
+
+.mgr-pill.lv-approved      { background: var(--lv-approved-bg);      color: var(--lv-approved); }
+.mgr-pill.lv-rejected      { background: var(--lv-rejected-bg);      color: var(--lv-rejected); }
+.mgr-pill.lv-withdrawn     { background: var(--lv-withdrawn-bg);     color: var(--lv-withdrawn); }
+.mgr-pill.lv-requested     { background: var(--lv-requested-bg);     color: var(--lv-requested); }
+.mgr-pill.lv-type-foreign  { background: var(--lv-type-foreign-bg);  color: var(--lv-type-foreign); }
+.mgr-pill.lv-type-umrah    { background: var(--lv-type-umrah-bg);    color: var(--lv-type-umrah); }
+.mgr-pill.lv-type-medical  { background: var(--lv-type-medical-bg);  color: var(--lv-type-medical); }
+.mgr-pill.lv-type-casual   { background: var(--lv-type-casual-bg);   color: var(--lv-type-casual); }
+.mgr-pill.lv-dur-short     { background: var(--lv-dur-short-bg);     color: var(--lv-dur-short); }
+.mgr-pill.lv-dur-full      { background: var(--lv-dur-full-bg);      color: var(--lv-dur-full); }
+.mgr-pill.lv-dur-outpass   { background: var(--lv-dur-outpass-bg);   color: var(--lv-dur-outpass); }
+.mgr-pill.lv-meta          { background: var(--lv-meta-bg);          color: var(--lv-meta); }
+/* Attendance statuses - same underlying palette as above, named for
+   clarity at call sites (mirrors AttendanceStatus's foreground/background
+   getters in team_providers.dart exactly). */
+.mgr-pill.att-present   { background: var(--lv-approved-bg);     color: var(--lv-approved); }
+.mgr-pill.att-absent    { background: var(--lv-rejected-bg);     color: var(--lv-rejected); }
+.mgr-pill.att-late      { background: var(--lv-requested-bg);    color: var(--lv-requested); }
+.mgr-pill.att-nightduty { background: var(--lv-type-foreign-bg); color: var(--lv-type-foreign); }
+.mgr-pill.att-onduty    { background: var(--lv-type-umrah-bg);   color: var(--lv-type-umrah); }
+.mgr-pill.att-onleave   { background: var(--lv-meta-bg);         color: var(--lv-meta); }
+.mgr-pill.att-unmarked  { background: var(--lv-withdrawn-bg);    color: var(--lv-withdrawn); }
+
+/* KPI-tile variants matching the pill palette above, for Summary/Stats
+   tiles that need the same exact-Flutter colors rather than the generic
+   .stat-ok/.stat-no/.stat-wait/.stat-neutral set. */
+.an-kpi.stat-lv-approved  { background: var(--lv-approved-bg); border-color: transparent; }
+.an-kpi.stat-lv-approved .an-kpi-value { color: var(--lv-approved); }
+.an-kpi.stat-lv-approved .an-kpi-label i { background: var(--lv-approved); }
+.an-kpi.stat-lv-rejected  { background: var(--lv-rejected-bg); border-color: transparent; }
+.an-kpi.stat-lv-rejected .an-kpi-value { color: var(--lv-rejected); }
+.an-kpi.stat-lv-rejected .an-kpi-label i { background: var(--lv-rejected); }
+.an-kpi.stat-lv-requested { background: var(--lv-requested-bg); border-color: transparent; }
+.an-kpi.stat-lv-requested .an-kpi-value { color: var(--lv-requested); }
+.an-kpi.stat-lv-requested .an-kpi-label i { background: var(--lv-requested); }
+.an-kpi.stat-lv-withdrawn { background: var(--lv-withdrawn-bg); border-color: transparent; }
+.an-kpi.stat-lv-withdrawn .an-kpi-value { color: var(--lv-withdrawn); }
+.an-kpi.stat-lv-withdrawn .an-kpi-label i { background: var(--lv-withdrawn); }
+.an-kpi.stat-lv-nightduty { background: var(--lv-type-foreign-bg); border-color: transparent; }
+.an-kpi.stat-lv-nightduty .an-kpi-value { color: var(--lv-type-foreign); }
+.an-kpi.stat-lv-nightduty .an-kpi-label i { background: var(--lv-type-foreign); }
+.an-kpi.stat-lv-onduty { background: var(--lv-type-umrah-bg); border-color: transparent; }
+.an-kpi.stat-lv-onduty .an-kpi-value { color: var(--lv-type-umrah); }
+.an-kpi.stat-lv-onduty .an-kpi-label i { background: var(--lv-type-umrah); }
+.an-kpi.stat-lv-onleave { background: var(--lv-meta-bg); border-color: transparent; }
+.an-kpi.stat-lv-onleave .an-kpi-value { color: var(--lv-meta); }
+.an-kpi.stat-lv-onleave .an-kpi-label i { background: var(--lv-meta); }
+
+/* Deterministic-per-email avatar circle - same golden-angle HSL hue
+   assignment as mobile_app/lib/widgets/avatar.dart (JS's hash won't land
+   on the identical hue Dart's 64-bit-wrapping hash would for a given
+   email, but the visual character - vivid, evenly-distributed, stable per
+   person - matches). */
+.mgr-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: #fff;
+  font-weight: 700;
+  flex-shrink: 0;
+}

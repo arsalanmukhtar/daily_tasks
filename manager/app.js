@@ -148,6 +148,7 @@ function showLoading() {
   authGate.classList.add('hidden');
   appShell.classList.add('hidden');
   mgrTabbar.classList.add('hidden');
+  document.body.classList.remove('is-authed');
 }
 const AUTH_GATE_STATES_ = {
   signIn: authGateSignInState, forgot: authGateForgotState,
@@ -166,6 +167,7 @@ function showAuthGate(errMsg, state) {
   setAuthGateState_(state || 'signIn');
   authError.classList.add('hidden');
   authError.textContent = '';
+  document.body.classList.remove('is-authed');
   if (errMsg) showErrorToast_(errMsg);
 }
 function showForm(user) {
@@ -173,6 +175,7 @@ function showForm(user) {
   authGate.classList.add('hidden');
   appShell.classList.remove('hidden');
   mgrTabbar.classList.remove('hidden');
+  document.body.classList.add('is-authed');
   mgrHeaderSubtitle.textContent = user.name + ' · ' + user.email;
   fetchRequests_();
   connectRealtime_();
@@ -377,6 +380,70 @@ function timeAgo_(iso) {
   return Math.round(hours / 24) + 'd ago';
 }
 
+// ---------- Shared: pills, avatars, chip rows ----------
+// Exact-Flutter status/type/duration colors - see styles.css's "Leave
+// status / type / duration / attendance colors" block for the token
+// values, ported by hand from mobile_app/lib/core/theme/app_colors.dart.
+function pill_(label, cls, isStatus) {
+  return `<span class="mgr-pill ${cls}${isStatus ? ' is-status' : ''}">${escapeHtml(label)}</span>`;
+}
+function statusPillHtml_(status) {
+  if (status === 'approved') return pill_('Approved', 'lv-approved', true);
+  if (status === 'rejected') return pill_('Rejected', 'lv-rejected', true);
+  if (status === 'withdrawn') return pill_('Withdrawn', 'lv-withdrawn', true);
+  if (status === 'dismissed') return pill_('Dismissed', 'lv-withdrawn', true);
+  if (status === 'pending_documentation') return pill_('Awaiting Docs', 'lv-requested', true);
+  return pill_('Requested', 'lv-requested', true);
+}
+// Mirrors AppColors.forType()/forDuration(): non-casual types get one chip
+// in their own family color; the three casual variants get a shared
+// "Casual" chip plus a second chip naming the specific duration.
+function leaveTypeChipsHtml_(type) {
+  if (type === 'foreignTrip') return pill_('Foreign Trip', 'lv-type-foreign');
+  if (type === 'umrah') return pill_('Umrah', 'lv-type-umrah');
+  if (type === 'medical') return pill_('Medical', 'lv-type-medical');
+  if (type === 'uninformedAbsence') return pill_('Uninformed Absence', 'lv-requested');
+  if (type === 'casualShort') return pill_('Casual', 'lv-type-casual') + pill_('Short Leave', 'lv-dur-short');
+  if (type === 'casualOutPass') return pill_('Casual', 'lv-type-casual') + pill_('Out Pass', 'lv-dur-outpass');
+  if (type === 'casualFull') return pill_('Casual', 'lv-type-casual') + pill_('Full Leave', 'lv-dur-full');
+  return pill_(leaveTypeLabel_(type), 'lv-type-casual'); // emergency/pending_documentation
+}
+// Mirrors AppColors.forLeaveTypeBar() - deliberately NOT the same grouping
+// as leaveTypeChipsHtml_ above (that shares one "Casual" color across all
+// three variants for request-card chips; each needs its own distinct color
+// here since they're separate rows in the same chart).
+function leaveTypeBarColorVar_(type) {
+  if (type === 'casualFull') return '--lv-dur-full';
+  if (type === 'casualShort') return '--lv-dur-short';
+  if (type === 'casualOutPass') return '--lv-dur-outpass';
+  if (type === 'medical') return '--lv-type-medical';
+  if (type === 'foreignTrip') return '--lv-type-foreign';
+  if (type === 'umrah') return '--lv-type-umrah';
+  if (type === 'uninformedAbsence') return '--lv-requested';
+  return '--lv-meta';
+}
+
+// Deterministic-per-email colored initials circle - see .mgr-avatar in
+// styles.css for why this can't be a byte-identical hue to the Flutter
+// app's Avatar.dart, only the same visual character.
+function initialsFor_(name, email) {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return email ? email[0].toUpperCase() : '?';
+  const parts = trimmed.split(/\s+/);
+  const first = parts[0] ? parts[0][0] : '';
+  const last = parts.length > 1 && parts[parts.length - 1] ? parts[parts.length - 1][0] : '';
+  return (first + last).toUpperCase();
+}
+function avatarHtml_(name, email, size) {
+  size = size || 36;
+  const key = (email || name || '').toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) | 0;
+  const hue = Math.abs(hash * 137.508) % 360;
+  const fontSize = Math.round(size * 0.38);
+  return `<span class="mgr-avatar" style="width:${size}px;height:${size}px;font-size:${fontSize}px;background:hsl(${hue.toFixed(1)},55%,55%)">${escapeHtml(initialsFor_(name, email))}</span>`;
+}
+
 let allRequestsCache_ = []; // every leave_requests row (owner-wide) - shared by Requests/Archived/Summary/Team
 let requestsCache_ = [];    // status in (requested, pending_documentation) - the Requests tab only
 
@@ -432,6 +499,40 @@ async function fetchRequests_() {
   }
 }
 
+// Shared request-card layout for both the Requests and Archived lists -
+// avatar, name/email, status pill, type/duration/date chips, a relative-
+// time chip, and (once decided) an italic "Approved/Rejected by X" line.
+// Mirrors RequestCard.kt/request_card.dart's structure.
+function requestCardHtml_(rec) {
+  const decidedBy = (rec.status === 'approved' || rec.status === 'rejected') && rec.resolvedBy
+    ? `<div class="mt-2 text-xs text-slate-400 italic">${rec.status === 'approved' ? 'Approved' : 'Rejected'} by ${escapeHtml(rec.resolvedBy)}</div>`
+    : '';
+  return `
+    <button type="button" class="w-full text-left bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 hover:ring-orange-300 transition p-3.5" data-request-id="${escapeHtml(rec.requestId)}">
+      <div class="flex items-start gap-3">
+        ${avatarHtml_(rec.name, rec.email)}
+        <div class="min-w-0 flex-1">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="font-semibold text-slate-800 text-sm truncate">${escapeHtml(rec.name)}</div>
+              <div class="text-xs text-slate-500 truncate">${escapeHtml(rec.email)}</div>
+            </div>
+            <div class="shrink-0">${statusPillHtml_(rec.status)}</div>
+          </div>
+          <div class="flex flex-wrap gap-1.5 mt-2.5">
+            ${leaveTypeChipsHtml_(rec.type)}
+            <span class="mgr-pill lv-meta">${escapeHtml(dateRangeLabel_(rec))}</span>
+          </div>
+          <div class="flex flex-wrap gap-1.5 mt-1.5">
+            <span class="mgr-pill lv-meta">${escapeHtml(timeAgo_(rec.requestedAt))}</span>
+          </div>
+          ${decidedBy}
+        </div>
+      </div>
+    </button>
+  `;
+}
+
 function renderRequestsList_() {
   const decidable = requestsCache_.filter((r) => r.status === 'requested').length;
   mgrRequestsCount.textContent = requestsCache_.length
@@ -444,22 +545,7 @@ function renderRequestsList_() {
     return;
   }
   mgrRequestsEmpty.classList.add('hidden');
-  mgrRequestsList.innerHTML = requestsCache_.map((rec) => {
-    const awaitingDocs = rec.status === 'pending_documentation';
-    return `
-    <button type="button" class="w-full text-left bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 hover:ring-orange-300 transition p-3.5" data-request-id="${escapeHtml(rec.requestId)}">
-      <div class="flex items-start justify-between gap-2">
-        <div class="min-w-0">
-          <div class="font-semibold text-slate-800 text-sm truncate">${escapeHtml(rec.name)}</div>
-          <div class="text-xs text-slate-500 mt-0.5">${escapeHtml(leaveTypeLabel_(rec.type))} · ${escapeHtml(dateRangeLabel_(rec))}</div>
-        </div>
-        ${awaitingDocs
-          ? '<span class="tag wait shrink-0 mt-0.5">Awaiting docs</span>'
-          : `<span class="text-[11px] text-slate-400 shrink-0 mt-0.5">${escapeHtml(timeAgo_(rec.requestedAt))}</span>`}
-      </div>
-    </button>
-  `;
-  }).join('');
+  mgrRequestsList.innerHTML = requestsCache_.map(requestCardHtml_).join('');
 }
 
 mgrRequestsList.addEventListener('click', (e) => {
@@ -468,14 +554,6 @@ mgrRequestsList.addEventListener('click', (e) => {
   const rec = requestsCache_.find((r) => r.requestId === btn.dataset.requestId);
   if (rec) openDetail_(rec);
 });
-
-function archivedStatusTag_(status) {
-  if (status === 'approved') return '<span class="tag ok">Approved</span>';
-  if (status === 'rejected') return '<span class="tag no">Rejected</span>';
-  if (status === 'withdrawn') return '<span class="tag neutral">Withdrawn</span>';
-  if (status === 'dismissed') return '<span class="tag neutral">Dismissed</span>';
-  return '<span class="tag neutral">' + escapeHtml(status) + '</span>';
-}
 
 // ---------- Detail sheet + decide ----------
 let currentDetailRecord_ = null;
@@ -488,11 +566,11 @@ function openDetail_(rec, opts) {
   mgrDetailName.textContent = rec.name;
   mgrDetailMeta.textContent = 'Sent ' + timeAgo_(rec.requestedAt) + (rec.weekLabel ? ' · ' + rec.weekLabel : '');
   mgrDetailChips.innerHTML =
-    `<span class="tag neutral">${escapeHtml(leaveTypeLabel_(rec.type))}</span>` +
-    `<span class="tag neutral">${escapeHtml(dateRangeLabel_(rec))}</span>` +
-    (rec.shortLeaveTime ? `<span class="tag neutral">${escapeHtml(rec.shortLeaveTime)}</span>` : '') +
-    (rec.checkOutTime ? `<span class="tag neutral">${escapeHtml(rec.checkOutTime)} – ${escapeHtml(rec.checkInTime || '')}</span>` : '') +
-    (opts.readOnly ? archivedStatusTag_(rec.status) : '');
+    leaveTypeChipsHtml_(rec.type) +
+    `<span class="mgr-pill lv-meta">${escapeHtml(dateRangeLabel_(rec))}</span>` +
+    (rec.shortLeaveTime ? `<span class="mgr-pill lv-meta">${escapeHtml(rec.shortLeaveTime)}</span>` : '') +
+    (rec.checkOutTime ? `<span class="mgr-pill lv-meta">${escapeHtml(rec.checkOutTime)} – ${escapeHtml(rec.checkInTime || '')}</span>` : '') +
+    (opts.readOnly ? statusPillHtml_(rec.status) : '');
   mgrDetailReason.innerHTML = rec.reasonHtml && rec.reasonHtml.trim() ? rec.reasonHtml : '<i class="text-slate-400">No reason provided.</i>';
 
   const attachments = Array.isArray(rec.attachments) ? rec.attachments : [];
@@ -614,17 +692,7 @@ function renderArchivedList_() {
     return;
   }
   mgrArchivedEmpty.classList.add('hidden');
-  mgrArchivedList.innerHTML = filtered.map((rec) => `
-    <button type="button" class="w-full text-left bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 hover:ring-orange-300 transition p-3.5" data-request-id="${escapeHtml(rec.requestId)}">
-      <div class="flex items-start justify-between gap-2">
-        <div class="min-w-0">
-          <div class="font-semibold text-slate-800 text-sm truncate">${escapeHtml(rec.name)}</div>
-          <div class="text-xs text-slate-500 mt-0.5">${escapeHtml(leaveTypeLabel_(rec.type))} · ${escapeHtml(dateRangeLabel_(rec))}</div>
-        </div>
-        <div class="shrink-0">${archivedStatusTag_(rec.status)}</div>
-      </div>
-    </button>
-  `).join('');
+  mgrArchivedList.innerHTML = filtered.map(requestCardHtml_).join('');
 }
 
 wireChipGroup_(mgrArchivedFilters, 'archivedStatus', (val) => { archivedStatusFilter_ = val; renderArchivedList_(); });
@@ -705,7 +773,7 @@ function renderSummary_(requests, uninformed) {
           <span class="font-semibold">${count}</span>
         </div>
         <div class="h-2 rounded-full bg-slate-100 overflow-hidden">
-          <div class="h-full bg-orange-500 rounded-full" style="width:${Math.round((count / maxType) * 100)}%"></div>
+          <div class="h-full rounded-full" style="width:${Math.round((count / maxType) * 100)}%;background:var(${leaveTypeBarColorVar_(type)})"></div>
         </div>
       </div>
     `).join('') : '<div class="text-sm text-slate-400 text-center py-4">No data yet.</div>';
@@ -733,14 +801,15 @@ function renderSummary_(requests, uninformed) {
   const thisMonthKey = monthKey_(now);
   const byEmail = {};
   requests.filter((r) => monthKey_(new Date(r.requestedAt)) === thisMonthKey).forEach((r) => {
-    if (!byEmail[r.email]) byEmail[r.email] = { name: r.name, count: 0 };
+    if (!byEmail[r.email]) byEmail[r.email] = { name: r.name, email: r.email, count: 0 };
     byEmail[r.email].count++;
   });
   const top = Object.values(byEmail).sort((a, b) => b.count - a.count).slice(0, 5);
   mgrSumLeaderboard.innerHTML = top.length ? top.map((p, i) => `
         <div class="flex items-center justify-between text-sm">
-          <div class="flex items-center gap-2 min-w-0">
+          <div class="flex items-center gap-2.5 min-w-0">
             <span class="w-5 h-5 rounded-full bg-slate-100 text-slate-500 text-[11px] font-bold flex items-center justify-center shrink-0">${i + 1}</span>
+            ${avatarHtml_(p.name, p.email, 28)}
             <span class="truncate text-slate-700">${escapeHtml(p.name)}</span>
           </div>
           <span class="font-semibold text-slate-800">${p.count}</span>
@@ -811,20 +880,25 @@ async function fetchReportTab_() {
 
 function reportCard_(r, kind) {
   const badge = kind === 'decision'
-    ? '<span class="tag wait">Explained</span>'
-    : kind === 'open' ? '<span class="tag neutral">Awaiting explanation</span>' : '<span class="tag ok">Resolved</span>';
+    ? pill_('Explained', 'lv-requested', true)
+    : kind === 'open' ? pill_('Awaiting Explanation', 'lv-withdrawn', true) : pill_('Resolved', 'lv-approved', true);
   const bodyHtml = kind === 'decision' ? r.explanationHtml : kind === 'open' ? r.reasonHtml : r.resolutionHtml;
   const isDecision = kind === 'decision';
   return `
     <${isDecision ? 'button type="button"' : 'div'} ${isDecision ? `data-report-id="${escapeHtml(r.reportId)}"` : ''} class="w-full text-left bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 ${isDecision ? 'hover:ring-orange-300 transition' : ''} p-3.5 block">
-      <div class="flex items-start justify-between gap-2">
-        <div class="min-w-0">
-          <div class="font-semibold text-slate-800 text-sm truncate">${escapeHtml(r.name)}</div>
-          <div class="text-xs text-slate-500 mt-0.5">${escapeHtml(fmtDate_(r.date))}</div>
+      <div class="flex items-start gap-3">
+        ${avatarHtml_(r.name, r.email)}
+        <div class="min-w-0 flex-1">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="font-semibold text-slate-800 text-sm truncate">${escapeHtml(r.name)}</div>
+              <div class="text-xs text-slate-500">${escapeHtml(fmtDate_(r.date))}</div>
+            </div>
+            <div class="shrink-0">${badge}</div>
+          </div>
+          ${bodyHtml && bodyHtml.trim() ? `<div class="rich-text text-xs text-slate-600 mt-2">${bodyHtml}</div>` : ''}
         </div>
-        <div class="shrink-0">${badge}</div>
       </div>
-      ${bodyHtml && bodyHtml.trim() ? `<div class="rich-text text-xs text-slate-600 mt-2">${bodyHtml}</div>` : ''}
     </${isDecision ? 'button' : 'div'}>
   `;
 }
@@ -833,14 +907,19 @@ function lateNoticeCard_(n) {
   const ack = n.status === 'acknowledged';
   return `
     <div class="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 p-3.5">
-      <div class="flex items-start justify-between gap-2">
-        <div class="min-w-0">
-          <div class="font-semibold text-slate-800 text-sm truncate">${escapeHtml(n.name)}</div>
-          <div class="text-xs text-slate-500 mt-0.5">${escapeHtml(fmtDate_(n.date))}${n.expectedArrivalTime ? ' · ETA ' + escapeHtml(n.expectedArrivalTime) : ''}</div>
+      <div class="flex items-start gap-3">
+        ${avatarHtml_(n.name, n.email)}
+        <div class="min-w-0 flex-1">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="font-semibold text-slate-800 text-sm truncate">${escapeHtml(n.name)}</div>
+              <div class="text-xs text-slate-500">${escapeHtml(fmtDate_(n.date))}${n.expectedArrivalTime ? ' · ETA ' + escapeHtml(n.expectedArrivalTime) : ''}</div>
+            </div>
+            ${ack ? pill_('Acknowledged', 'lv-approved', true) : `<button type="button" data-ack-notice-id="${escapeHtml(n.id)}" class="text-xs font-semibold text-orange-700 hover:text-orange-800 shrink-0">Acknowledge</button>`}
+          </div>
+          ${n.reasonHtml && n.reasonHtml.trim() ? `<div class="rich-text text-xs text-slate-600 mt-2">${n.reasonHtml}</div>` : ''}
         </div>
-        ${ack ? '<span class="tag ok shrink-0">Acknowledged</span>' : `<button type="button" data-ack-notice-id="${escapeHtml(n.id)}" class="text-xs font-semibold text-orange-700 hover:text-orange-800 shrink-0">Acknowledge</button>`}
       </div>
-      ${n.reasonHtml && n.reasonHtml.trim() ? `<div class="rich-text text-xs text-slate-600 mt-2">${n.reasonHtml}</div>` : ''}
     </div>
   `;
 }
@@ -1008,12 +1087,18 @@ function renderTeamDirectory_() {
   }
   mgrTeamDirectoryList.innerHTML = filtered.map((u) => `
     <button type="button" class="w-full text-left bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 hover:ring-orange-300 transition p-3.5" data-user-email="${escapeHtml(u.email)}">
-      <div class="flex items-start justify-between gap-2">
-        <div class="min-w-0">
-          <div class="font-semibold text-slate-800 text-sm truncate">${escapeHtml(u.name)}${!u.active ? ' <span class="text-[10px] text-slate-400 font-normal">(inactive)</span>' : ''}</div>
-          <div class="text-xs text-slate-500 mt-0.5 truncate">${escapeHtml(u.designation || u.email)}</div>
+      <div class="flex items-start gap-3">
+        ${avatarHtml_(u.name, u.email)}
+        <div class="min-w-0 flex-1">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="font-semibold text-slate-800 text-sm truncate">${escapeHtml(u.name)}${!u.active ? ' <span class="text-[10px] text-slate-400 font-normal">(inactive)</span>' : ''}</div>
+              <div class="text-xs text-slate-500 truncate">${escapeHtml(u.email)}</div>
+            </div>
+            ${u.isOwner ? '<span class="mgr-pill lv-withdrawn is-status shrink-0">Manager</span>' : ''}
+          </div>
+          ${u.designation ? `<div class="text-xs text-slate-500 mt-0.5 truncate">${escapeHtml(u.designation)}</div>` : ''}
         </div>
-        ${u.isOwner ? '<span class="tag neutral shrink-0">Manager</span>' : ''}
       </div>
     </button>
   `).join('');
@@ -1151,11 +1236,14 @@ const ATT_STATUS_LABELS_ = {
   present: 'Present', absent: 'Absent', late: 'Late', night_duty: 'Night Duty',
   on_duty: 'On Duty', on_leave: 'On Leave', unmarked: 'Unmarked'
 };
-const ATT_STATUS_TAG_CLASS_ = {
-  present: 'ok', late: 'wait', absent: 'no', night_duty: 'neutral', on_duty: 'neutral', on_leave: 'neutral', unmarked: 'neutral'
+// Exact-Flutter attendance colors - see team_providers.dart's
+// AttendanceStatus.foreground/background getters.
+const ATT_STATUS_PILL_CLASS_ = {
+  present: 'att-present', late: 'att-late', absent: 'att-absent', night_duty: 'att-nightduty',
+  on_duty: 'att-onduty', on_leave: 'att-onleave', unmarked: 'att-unmarked'
 };
 function attStatusTag_(status) {
-  return `<span class="tag ${ATT_STATUS_TAG_CLASS_[status] || 'neutral'}">${ATT_STATUS_LABELS_[status] || status}</span>`;
+  return pill_(ATT_STATUS_LABELS_[status] || status, ATT_STATUS_PILL_CLASS_[status] || 'att-unmarked', true);
 }
 // Manual mark always wins over a derived On Leave day - mirrors the mobile
 // app's resolveAttendanceStatus() precedence exactly.
@@ -1191,12 +1279,15 @@ function renderAttendanceRoster_() {
     const st = resolveAttendanceStatus_(u.email, attSelectedDate_);
     return `
       <button type="button" class="w-full text-left bg-white rounded-xl shadow-sm ring-1 ring-slate-200/70 hover:ring-orange-300 transition p-3.5" data-att-email="${escapeHtml(u.email)}">
-        <div class="flex items-center justify-between gap-2">
-          <div class="min-w-0">
-            <div class="font-semibold text-slate-800 text-sm truncate">${escapeHtml(u.name)}</div>
-            <div class="text-xs text-slate-500 mt-0.5 truncate">${escapeHtml(u.designation || '')}</div>
+        <div class="flex items-center gap-3">
+          ${avatarHtml_(u.name, u.email)}
+          <div class="min-w-0 flex-1 flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <div class="font-semibold text-slate-800 text-sm truncate">${escapeHtml(u.name)}</div>
+              <div class="text-xs text-slate-500 truncate">${escapeHtml(u.email)}</div>
+            </div>
+            <div class="shrink-0">${attStatusTag_(st.status)}</div>
           </div>
-          <div class="shrink-0">${attStatusTag_(st.status)}</div>
         </div>
       </button>
     `;
@@ -1303,6 +1394,10 @@ const mgrStatsBody = document.getElementById('mgrStatsBody');
 const mgrStatsKpiPresent = document.getElementById('mgrStatsKpiPresent');
 const mgrStatsKpiLate = document.getElementById('mgrStatsKpiLate');
 const mgrStatsKpiAbsent = document.getElementById('mgrStatsKpiAbsent');
+const mgrStatsKpiNightDuty = document.getElementById('mgrStatsKpiNightDuty');
+const mgrStatsKpiOnDuty = document.getElementById('mgrStatsKpiOnDuty');
+const mgrStatsKpiOnLeave = document.getElementById('mgrStatsKpiOnLeave');
+const mgrStatsBreakdown = document.getElementById('mgrStatsBreakdown');
 const mgrStatsByPerson = document.getElementById('mgrStatsByPerson');
 
 let statsPeriod_ = 'week';
@@ -1369,11 +1464,34 @@ function renderStats_(attendance, start, end) {
     });
   });
 
-  const totalMarked = counts.present + counts.late + counts.absent + counts.night_duty + counts.on_duty;
-  const pct = (n) => totalMarked ? Math.round((n / totalMarked) * 100) : 0;
+  // Percentage base includes On Leave (only truly unmarked days are
+  // excluded) - matches the Flutter Stats screen's 6-way breakdown, where
+  // every marked-or-on-leave day accounts for exactly one slice.
+  const totalAll = counts.present + counts.late + counts.absent + counts.night_duty + counts.on_duty + counts.on_leave;
+  const pct = (n) => totalAll ? Math.round((n / totalAll) * 100) : 0;
   mgrStatsKpiPresent.textContent = pct(counts.present) + '%';
   mgrStatsKpiLate.textContent = pct(counts.late) + '%';
   mgrStatsKpiAbsent.textContent = pct(counts.absent) + '%';
+  mgrStatsKpiNightDuty.textContent = pct(counts.night_duty) + '%';
+  mgrStatsKpiOnDuty.textContent = pct(counts.on_duty) + '%';
+  mgrStatsKpiOnLeave.textContent = pct(counts.on_leave) + '%';
+
+  const BREAKDOWN_ROWS_ = [
+    ['present', 'Present', '--lv-approved'], ['late', 'Late', '--lv-requested'], ['absent', 'Absent', '--lv-rejected'],
+    ['night_duty', 'Night Duty', '--lv-type-foreign'], ['on_duty', 'On Duty', '--lv-type-umrah'], ['on_leave', 'On Leave', '--lv-meta']
+  ];
+  const maxCount = Math.max(1, ...BREAKDOWN_ROWS_.map(([key]) => counts[key]));
+  mgrStatsBreakdown.innerHTML = BREAKDOWN_ROWS_.map(([key, label, colorVar]) => `
+    <div>
+      <div class="flex items-center justify-between text-xs text-slate-600 mb-1">
+        <span>${label}</span>
+        <span class="font-semibold">${counts[key]}</span>
+      </div>
+      <div class="h-2 rounded-full bg-slate-100 overflow-hidden">
+        <div class="h-full rounded-full" style="width:${Math.round((counts[key] / maxCount) * 100)}%;background:var(${colorVar})"></div>
+      </div>
+    </div>
+  `).join('');
 
   const rows = Object.values(perPerson).filter((p) => p.marked > 0).sort((a, b) => (b.present / b.marked) - (a.present / a.marked));
   mgrStatsByPerson.innerHTML = rows.length ? rows.map((p) => {

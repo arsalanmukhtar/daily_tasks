@@ -53,12 +53,12 @@
       }
     };
   </script>
-  <link href="styles.css?v=20260909a" rel="stylesheet" />
+  <link href="styles.css?v=20260915a" rel="stylesheet" />
 </head>
 <!-- `app-shell` drives the desktop single-viewport lock - see the media query
      in styles.css (engages only when the screen is wide AND tall enough). -->
 <body class="app-shell min-h-screen bg-gradient-to-br from-slate-200 via-slate-100 to-orange-100/70">
-  <div class="max-w-[100rem] w-full mx-auto px-3 sm:px-4 xl:px-6 py-3 sm:py-4 lg:h-full lg:flex lg:flex-col lg:gap-3 xl:gap-4">
+  <div id="appWrapper" class="max-w-[100rem] w-full mx-auto px-3 sm:px-4 xl:px-6 py-3 sm:py-4 lg:h-full lg:flex lg:flex-col lg:gap-3 xl:gap-4">
 
     <!-- ============ HEADER ============ -->
     <header class="bg-white rounded-2xl shadow-lg overflow-hidden ring-1 ring-slate-200/70 shrink-0 mb-3 sm:mb-4 lg:mb-0">
@@ -1766,6 +1766,6 @@
 
   <!-- ?v= is a cache-buster: bump it whenever app.js changes so browsers
        fetch the new file instead of serving a stale cached copy. -->
-  <script type="module" src="app.js?v=20260909a"></script>
+  <script type="module" src="app.js?v=20260915a"></script>
 </body>
 </html>
