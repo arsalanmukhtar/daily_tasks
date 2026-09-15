@@ -19,6 +19,7 @@ theme-preview.html
 
 # Secrets and build artifacts - never commit these
 *firebase-adminsdk*.json
+server/firebase-service-account.json
 *.jks
 *.keystore
 keystore_password*.txt
