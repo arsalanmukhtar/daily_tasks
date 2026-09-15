@@ -47,7 +47,7 @@
        forking a parallel design system - every .cal2-*/.sheet-modal/
        .mobile-tabbar/.tb-btn/rich-text/.toast component this app reuses
        stays visually identical and gets any future fix automatically. -->
-  <link href="../styles.css?v=20260915d" rel="stylesheet" />
+  <link href="../styles.css?v=20260915e" rel="stylesheet" />
 </head>
 <body class="mgr-shell min-h-screen bg-gradient-to-br from-slate-200 via-slate-100 to-orange-100/70">
 
@@ -499,6 +499,32 @@
     </div>
   </div>
 
+  <!-- ============ LEAVE DATES CALENDAR (opened from a request card's date
+       pill calendar icon) - navigation-only, mirrors the developer app's
+       #leaveCalendarModal look/behavior exactly, just fed by whichever
+       request the icon was clicked on instead of one fixed upcoming leave. ============ -->
+  <div id="mgrLeaveCalModal" class="hidden fixed inset-0 z-[80] flex items-center justify-center p-4">
+    <div id="mgrLeaveCalBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
+    <div class="relative bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 w-full max-w-xs p-4">
+      <div class="flex items-center justify-between mb-1 px-1">
+        <h3 id="mgrLeaveCalTitle" class="text-sm font-semibold text-slate-800">Leave dates</h3>
+        <button id="mgrLeaveCalCloseBtn" type="button" aria-label="Close" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+      </div>
+      <p id="mgrLeaveCalSubtitle" class="text-xs text-slate-500 mb-2 px-1"></p>
+      <div class="cal2-head">
+        <button type="button" class="cal2-nav" id="mgrLeaveCalPrevBtn" aria-label="Previous month">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="cal2-pick"><span id="mgrLeaveCalMonthYearLabel" class="text-sm font-semibold text-slate-700"></span></div>
+        <button type="button" class="cal2-nav" id="mgrLeaveCalNextBtn" aria-label="Next month">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+      </div>
+      <div class="cal2-weekdays"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+      <div class="cal2-grid" id="mgrLeaveCalGrid"></div>
+    </div>
+  </div>
+
   <!-- ============ REPORT: DECIDE MODAL (accept/reject an explanation) ============ -->
   <div id="mgrReportDecideModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 sheet-modal">
     <div id="mgrReportDecideBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
@@ -667,6 +693,6 @@
   <!-- ============ TOAST NOTIFICATIONS ============ -->
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
-  <script type="module" src="app.js?v=20260915d"></script>
+  <script type="module" src="app.js?v=20260915e"></script>
 </body>
 </html>

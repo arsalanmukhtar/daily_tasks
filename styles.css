@@ -2561,8 +2561,15 @@ body.mgr-shell:not(.is-authed) {
   white-space: nowrap;
   line-height: 1;
 }
-.mgr-pill svg { width: 12px; height: 12px; flex-shrink: 0; }
+.mgr-pill svg { width: 12px; height: 12px; flex-shrink: 0; display: block; }
 .mgr-pill.is-status { text-transform: uppercase; font-weight: 700; letter-spacing: 0.02em; font-size: 10.5px; }
+/* The calendar icon inside a date pill is its own flex row (not just a bare
+   svg) so it centers on the same baseline as the pill's text span instead of
+   sitting on its own inline-level box - that mismatch is what read as
+   "not horizontally aligned with the pill text". */
+.cal-pill-icon { display: inline-flex; align-items: center; cursor: pointer; }
+.cal-pill-icon:hover svg { opacity: 0.65; }
+.cal-pill-text { display: inline-flex; align-items: center; }
 
 .mgr-pill.lv-approved      { background: var(--lv-approved-bg);      color: var(--lv-approved); }
 .mgr-pill.lv-rejected      { background: var(--lv-rejected-bg);      color: var(--lv-rejected); }

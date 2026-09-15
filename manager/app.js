@@ -247,6 +247,16 @@ const mgrDecideConfirmFooter = document.getElementById('mgrDecideConfirmFooter')
 const mgrDecideCancelBtn = document.getElementById('mgrDecideCancelBtn');
 const mgrDecideConfirmBtn = document.getElementById('mgrDecideConfirmBtn');
 
+const mgrLeaveCalModal = document.getElementById('mgrLeaveCalModal');
+const mgrLeaveCalBackdrop = document.getElementById('mgrLeaveCalBackdrop');
+const mgrLeaveCalCloseBtn = document.getElementById('mgrLeaveCalCloseBtn');
+const mgrLeaveCalTitle = document.getElementById('mgrLeaveCalTitle');
+const mgrLeaveCalSubtitle = document.getElementById('mgrLeaveCalSubtitle');
+const mgrLeaveCalPrevBtn = document.getElementById('mgrLeaveCalPrevBtn');
+const mgrLeaveCalNextBtn = document.getElementById('mgrLeaveCalNextBtn');
+const mgrLeaveCalMonthYearLabel = document.getElementById('mgrLeaveCalMonthYearLabel');
+const mgrLeaveCalGrid = document.getElementById('mgrLeaveCalGrid');
+
 // ---------- Toast ----------
 function showToast_(message, tone) {
   const el = document.createElement('div');
@@ -520,8 +530,105 @@ function dateRangeLabel_(rec) {
   return fmtDate_(rec.startDate) + ' – ' + fmtDate_(rec.endDate);
 }
 function dateRangePillHtml_(rec) {
-  return `<span class="mgr-pill lv-meta">${CALENDAR_ICON_SVG_}${escapeHtml(dateRangeLabel_(rec))}</span>`;
+  return `<span class="mgr-pill lv-meta">` +
+    `<span class="cal-pill-icon" data-cal-rec="${escapeHtml(rec.requestId)}" role="button" tabindex="0" aria-label="View leave dates on a calendar">${CALENDAR_ICON_SVG_}</span>` +
+    `<span class="cal-pill-text">${escapeHtml(dateRangeLabel_(rec))}</span>` +
+  `</span>`;
 }
+
+// ---------- Leave dates calendar popup (the date pill's calendar icon) ----------
+// Navigation-only month grid highlighting a request's actual leave days -
+// mirrors the developer app's #leaveCalendarModal exactly, just fed by
+// whichever request card's icon was clicked instead of one fixed upcoming
+// leave.
+const CAL_MONTHS_ = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+let mgrCalRecord_ = null;
+let mgrCalViewYear_ = new Date().getFullYear();
+let mgrCalViewMonth_ = new Date().getMonth();
+
+function mgrCalRenderGrid_() {
+  mgrLeaveCalMonthYearLabel.textContent = CAL_MONTHS_[mgrCalViewMonth_] + ' ' + mgrCalViewYear_;
+  const days = mgrCalRecord_ ? leaveDays_(mgrCalRecord_.startDate, mgrCalRecord_.endDate, mgrCalRecord_.customDates) : [];
+  const highlightSet = new Set(days);
+  const isCustom = Array.isArray(mgrCalRecord_ && mgrCalRecord_.customDates) && mgrCalRecord_.customDates.length > 1;
+  const todayKey = isoDate_(new Date());
+  const lead = new Date(mgrCalViewYear_, mgrCalViewMonth_, 1).getDay();
+
+  let html = '';
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(mgrCalViewYear_, mgrCalViewMonth_, 1 - lead + i);
+    const dKey = isoDate_(d);
+    const isHighlighted = highlightSet.has(dKey);
+
+    let links = '';
+    if (!isCustom && isHighlighted) {
+      const prev = new Date(d); prev.setDate(d.getDate() - 1);
+      const next = new Date(d); next.setDate(d.getDate() + 1);
+      const col = d.getDay();
+      if (highlightSet.has(isoDate_(prev)) && col !== 0) links += '<span class="cal2-link l"></span>';
+      if (highlightSet.has(isoDate_(next)) && col !== 6) links += '<span class="cal2-link r"></span>';
+    }
+
+    const classes = ['cal2-day'];
+    if (d.getMonth() !== mgrCalViewMonth_) classes.push('is-adjacent');
+    if (d.getDay() === 0 || d.getDay() === 6) classes.push('is-weekend');
+    if (dKey === todayKey) classes.push('is-today');
+    if (isHighlighted) classes.push('is-edge');
+
+    html += '<div class="cal2-cell">' + links +
+      '<button type="button" class="' + classes.join(' ') + '" disabled tabindex="-1">' + d.getDate() + '</button></div>';
+  }
+  mgrLeaveCalGrid.innerHTML = html;
+}
+function openMgrLeaveCal_(rec) {
+  const days = leaveDays_(rec.startDate, rec.endDate, rec.customDates);
+  const first = days.length ? days[0] : rec.startDate;
+  if (!first) return;
+  mgrCalRecord_ = rec;
+  const firstDate = new Date(first + 'T00:00:00Z');
+  mgrCalViewYear_ = firstDate.getFullYear();
+  mgrCalViewMonth_ = firstDate.getMonth();
+  mgrLeaveCalTitle.textContent = rec.name;
+  mgrLeaveCalSubtitle.textContent = leaveTypeLabel_(rec.type) + ' · ' + dateRangeLabel_(rec);
+  mgrCalRenderGrid_();
+  mgrLeaveCalModal.classList.remove('hidden');
+}
+function closeMgrLeaveCal_() {
+  mgrLeaveCalModal.classList.add('hidden');
+  mgrCalRecord_ = null;
+}
+mgrLeaveCalCloseBtn.addEventListener('click', closeMgrLeaveCal_);
+mgrLeaveCalBackdrop.addEventListener('click', closeMgrLeaveCal_);
+mgrLeaveCalPrevBtn.addEventListener('click', () => {
+  mgrCalViewMonth_--;
+  if (mgrCalViewMonth_ < 0) { mgrCalViewMonth_ = 11; mgrCalViewYear_--; }
+  mgrCalRenderGrid_();
+});
+mgrLeaveCalNextBtn.addEventListener('click', () => {
+  mgrCalViewMonth_++;
+  if (mgrCalViewMonth_ > 11) { mgrCalViewMonth_ = 0; mgrCalViewYear_++; }
+  mgrCalRenderGrid_();
+});
+// Handles a calendar-icon click inside any request card list; returns true
+// (and opens the popup) if the click was on the icon, so callers can skip
+// their own "open the detail sheet" handling for the same click.
+function handleCalPillIconClick_(e, recordsCache) {
+  const icon = e.target.closest('[data-cal-rec]');
+  if (!icon) return false;
+  const rec = recordsCache.find((r) => r.requestId === icon.dataset.calRec);
+  if (rec) openMgrLeaveCal_(rec);
+  return true;
+}
+// The icon is keyboard-focusable (role="button" tabindex="0"); Enter/Space
+// should activate it same as a click, same as any real button would.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const icon = e.target.closest && e.target.closest('[data-cal-rec]');
+  if (!icon) return;
+  e.preventDefault();
+  const rec = allRequestsCache_.find((r) => r.requestId === icon.dataset.calRec);
+  if (rec) openMgrLeaveCal_(rec);
+});
 function timeAgo_(iso) {
   if (!iso) return '';
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -843,6 +950,7 @@ mgrReqTypeFilter.addEventListener('change', () => { reqTypeFilter_ = mgrReqTypeF
 mgrReqDeveloperFilter.addEventListener('change', () => { reqDeveloperFilter_ = mgrReqDeveloperFilter.value; renderRequestsList_(); });
 
 mgrRequestsBody.addEventListener('click', (e) => {
+  if (handleCalPillIconClick_(e, allRequestsCache_)) return;
   const btn = e.target.closest('[data-request-id]');
   if (!btn) return;
   const rec = allRequestsCache_.find((r) => r.requestId === btn.dataset.requestId);
@@ -899,6 +1007,7 @@ function closeDetail_() {
 }
 mgrDetailCloseBtn.addEventListener('click', closeDetail_);
 mgrDetailBackdrop.addEventListener('click', closeDetail_);
+mgrDetailChips.addEventListener('click', (e) => { handleCalPillIconClick_(e, allRequestsCache_); });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !mgrDetailModal.classList.contains('hidden')) closeDetail_();
 });
@@ -996,6 +1105,7 @@ mgrArcStatusFilter.addEventListener('change', () => { arcStatusFilter_ = mgrArcS
 mgrArcTypeFilter.addEventListener('change', () => { arcTypeFilter_ = mgrArcTypeFilter.value; renderArchivedList_(); });
 mgrArcDeveloperFilter.addEventListener('change', () => { arcDeveloperFilter_ = mgrArcDeveloperFilter.value; renderArchivedList_(); });
 mgrArchivedList.addEventListener('click', (e) => {
+  if (handleCalPillIconClick_(e, allRequestsCache_)) return;
   const btn = e.target.closest('[data-request-id]');
   if (!btn) return;
   const rec = allRequestsCache_.find((r) => r.requestId === btn.dataset.requestId);
