@@ -8067,3 +8067,12 @@ if (mtabLeavesBadge && historyRailBadge && uninformedRailBadge) {
   new MutationObserver(syncMtabLeavesBadge_).observe(uninformedRailBadge, { attributes: true, attributeFilter: ['class'] });
   syncMtabLeavesBadge_();
 }
+
+// PWA install support. `serviceWorker` is only exposed on secure contexts
+// (HTTPS or localhost), so this silently no-ops until the app is served
+// over TLS - nothing to gate here.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/sw.js').catch(function () {});
+  });
+}

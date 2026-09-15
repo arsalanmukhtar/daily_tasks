@@ -491,5 +491,13 @@ async function submitDecision_(decision) {
   }
 }
 
+// PWA install support - see ../app.js for why this silently no-ops until
+// the app is served over TLS.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/manager/sw.js', { scope: '/manager/' }).catch(function () {});
+  });
+}
+
 // ---------- Boot ----------
 restoreSession_();
