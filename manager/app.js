@@ -178,7 +178,6 @@ function showForm(user) {
 signInForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   signInSubmitBtn.disabled = true;
-  authError.classList.add('hidden');
   try {
     const result = await apiRequest_('POST', '/auth/login', {
       email: signInEmail.value.trim(), password: signInPassword.value
@@ -186,8 +185,7 @@ signInForm.addEventListener('submit', async (e) => {
     setStoredAuthToken_(result.token);
     await restoreSession_();
   } catch (err) {
-    authError.textContent = err.message;
-    authError.classList.remove('hidden');
+    showErrorToast_(err.message);
   } finally {
     signInSubmitBtn.disabled = false;
   }
@@ -214,8 +212,7 @@ forgotForm.addEventListener('submit', async (e) => {
 resetForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   if (resetNewPassword.value !== resetNewPasswordConfirm.value) {
-    authError.textContent = 'Passwords do not match.';
-    authError.classList.remove('hidden');
+    showErrorToast_('Passwords do not match.');
     return;
   }
   resetSubmitBtn.disabled = true;
@@ -226,8 +223,7 @@ resetForm.addEventListener('submit', async (e) => {
     showToast_('Password updated - sign in with your new password.', 'success');
     setAuthGateState_('signIn');
   } catch (err) {
-    authError.textContent = err.message;
-    authError.classList.remove('hidden');
+    showErrorToast_(err.message);
   } finally {
     resetSubmitBtn.disabled = false;
   }

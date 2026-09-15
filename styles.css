@@ -82,6 +82,15 @@ textarea {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Installed as a home-screen app (both this app and manager/), the status
+   bar is translucent and overlays the page rather than reserving its own
+   space - `viewport-fit=cover` in each <head> is what makes this inset
+   available at all. Resolves to 0 in a normal browser tab/desktop, so this
+   is always safe to apply globally. */
+body {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
 /* Tailwind's `.hidden` must always beat responsive display utilities like lg:flex */
 .hidden {
   display: none !important;
